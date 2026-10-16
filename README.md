@@ -1,6 +1,6 @@
 # codecycle
 
-Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl nach Abo-Profil (sparsam, großzügig, extrem), Tiefe nach Größe der Aufgabe, Fortschritt in Dateien im Repo, wenig Limit-Verbrauch. Dazu ein optionaler Mod mit Bautafel, Statuszeile und Seitenleiste samt Agenten-Leiste.
+Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl nach Abo-Profil (sparsam, großzügig, extrem), Rollen nach den Merkmalen der Aufgabe, Fortschritt in Dateien im Repo. Ausgelegt auf Genauigkeit statt auf möglichst wenig Limit-Verbrauch. Dazu ein optionaler Mod mit Bautafel und Seitenleiste.
 
 ## Voraussetzungen
 
@@ -96,7 +96,7 @@ Zusatzteile sind einzeln schaltbar, im Abschnitt „Schalter“ von `.claude/cod
 
 ## Mod (optional)
 
-Bautafel über dem Eingabefeld, Statuszeile, Seitenleiste (`/codecycle-panel`), `/profile`. Ohne Mod läuft der Ablauf gleich, nur ohne Bautafel, Limit-Prüfung, Token-Buch und technischen Zaun.
+Bautafel über dem Eingabefeld, Seitenleiste (`/codecycle-panel`), `/profile`. Ohne Mod läuft der Ablauf gleich, nur ohne Bautafel, Limit-Prüfung, Token-Buch und technischen Zaun.
 
 ## Aktualisieren
 

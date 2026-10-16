@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.15.5 / Werkzeug 0.4.10] – 2026-10-16
+
+### Geändert
+
+- README: Beschreibung korrigiert (ausgelegt auf Genauigkeit statt auf möglichst wenig Limit-Verbrauch, Rollen nach den Merkmalen der Aufgabe, keine Statuszeile mehr).
+
 ## [0.15.4 / Werkzeug 0.4.10] – 2026-10-15
 
 ### Geändert
