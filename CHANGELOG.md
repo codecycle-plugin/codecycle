@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.15.7 / Werkzeug 0.4.10] – 2026-10-16
+
+### Geändert
+
+- README: Hinweis, dass `/codecycle:setup` die Urheberzeilen von Claude in Commits und Pull Requests abschaltet, und wie man sie behält.
+
 ## [0.15.6 / Werkzeug 0.4.10] – 2026-10-16
 
 ### Geändert
