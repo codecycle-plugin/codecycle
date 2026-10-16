@@ -2,6 +2,14 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.15.6 / Werkzeug 0.4.10] – 2026-10-16
+
+### Geändert
+
+- README: beim Entfernen der Hinweis, nach dem Löschen von `.githooks/` die Git-Einstellung `core.hooksPath` zurückzusetzen.
+- README: was der Pre-Commit-Hook bei jedem Commit prüft, wie man die Hooks abschaltet, und dass die Mod-Tests in `tests/` in Projekten nie mitlaufen.
+- CONTRIBUTING: was `validate` und `test` prüfen, wie man das Plugin aus dem Ordner lädt, und ein Abschnitt „Aufbau“ mit allen Ordnern.
+
 ## [0.15.5 / Werkzeug 0.4.10] – 2026-10-16
 
 ### Geändert
