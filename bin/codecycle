@@ -1,0 +1,27 @@
+#!/bin/sh
+# Starter für das Projekt-Werkzeug: nimmt die Kopie im
+# Hauptordner des Projekts (auch aus Worktrees), sonst den Kern im Plugin.
+# Sonderregel: `install-tool` und `update` nehmen immer den Kern im Plugin.
+# Fehlt Node oder ist es zu alt: Exit 2 (Werkzeug kaputt), nicht Nodes Exit 1.
+if ! command -v node >/dev/null 2>&1; then
+  echo "Werkzeug kaputt: node fehlt (mindestens Version 24)"
+  exit 2
+fi
+major=$(node -p "process.versions.node.split('.')[0]")
+if [ "$major" -lt 24 ] 2>/dev/null; then
+  echo "Werkzeug kaputt: Node $major ist zu alt (mindestens Version 24)"
+  exit 2
+fi
+here=$(cd "$(dirname "$0")/.." && pwd)
+# install-tool und update laufen immer vom Plugin-Kern: die Kopie aktualisiert sich nie selbst.
+if [ "$1" = "install-tool" ] || [ "$1" = "update" ]; then
+  exec node "$here/tool/cli.ts" "$@"
+fi
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+if [ -n "$common" ]; then
+  root=$(dirname "$common")
+  if [ -f "$root/.codecycle/tool/cli.ts" ]; then
+    exec node "$root/.codecycle/tool/cli.ts" "$@"
+  fi
+fi
+exec node "$here/tool/cli.ts" "$@"

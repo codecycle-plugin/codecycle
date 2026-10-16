@@ -1,0 +1,14 @@
+{
+  "name": "codecycle",
+  "description": "Marktplatz für das Plugin codecycle",
+  "owner": {
+    "name": "codecycle"
+  },
+  "plugins": [
+    {
+      "name": "codecycle",
+      "source": ".",
+      "description": "Fester, wiederholbarer Arbeitsablauf für Claude Code mit Profilen, Rollen-Agenten und optionalem Mod"
+    }
+  ]
+}

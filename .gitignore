@@ -1,0 +1,5 @@
+# vom Claude-Code-Engine bei jedem Laden geschrieben
+.claude-plugin/types/
+# Laut Doku legt Claude Code beim Laden eines Mods ohne eigene tsconfig eine im Mod-Wurzelordner an
+# (https://code.claude.com/docs/en/plugins/mods/create); die eigene Konfiguration liegt im Repo-Root.
+/tsconfig.json

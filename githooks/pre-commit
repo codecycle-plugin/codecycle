@@ -1,0 +1,27 @@
+#!/bin/sh
+# >>> codecycle (hooks-version 1, verwaltet von `codecycle hooks install`, nicht von Hand ändern) >>>
+# Gestuft: Lint, Format und die Tests zur Änderung. Die ganze Suite läuft am Ende eines Pakets und
+# vor dem Merge (`codecycle check --full`), nicht hier. Die Kopie des Werkzeugs liegt im Hauptordner.
+codecycle_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+if [ -n "$codecycle_common" ]; then
+  codecycle_root=$(dirname "$codecycle_common")
+  codecycle_tool="$codecycle_root/.codecycle/tool/cli.ts"
+  if [ -f "$codecycle_tool" ] && [ -f "$codecycle_root/.codecycle/tool.config.json" ]; then
+    if command -v node >/dev/null 2>&1; then
+      node "$codecycle_tool" check --affected --staged
+      codecycle_code=$?
+      if [ "$codecycle_code" -ne 0 ]; then
+        if [ "$codecycle_code" -eq 2 ]; then
+          echo "codecycle: Werkzeug kaputt (Exit 2), Commit gestoppt." >&2
+        else
+          echo "codecycle: Prüfung rot, Commit gestoppt." >&2
+        fi
+        echo "codecycle: --no-verify darf nur der Nutzer setzen, nie ein Agent." >&2
+        exit "$codecycle_code"
+      fi
+    else
+      echo "codecycle: node fehlt, Pre-Commit-Prüfung übersprungen." >&2
+    fi
+  fi
+fi
+# <<< codecycle <<<

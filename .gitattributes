@@ -1,0 +1,5 @@
+# Shell-Skripte immer mit LF, sonst bricht der Starter (#!/bin/sh mit CR)
+bin/* text eol=lf
+# cmd.exe braucht CRLF (Sprungmarken); die spätere Zeile gewinnt
+bin/*.cmd text eol=crlf
+githooks/* text eol=lf

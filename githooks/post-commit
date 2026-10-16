@@ -1,0 +1,30 @@
+#!/bin/sh
+# >>> codecycle (hooks-version 1, verwaltet von `codecycle hooks install`, nicht von Hand ändern) >>>
+# Graph im Hintergrund aktualisieren: nie blockierend, nie ein Fehler nach außen.
+# Paket-Worktrees werden übersprungen; aktualisiert wird beim Merge in den Aufgaben-Branch.
+codecycle_graph_update() {
+  # $1: Vergleichsstand für das Update (z. B. --base ORIG_HEAD), darf leer sein
+  [ -n "$CODECYCLE_NO_GRAPH_HOOK" ] && return 0
+  gd=$(git rev-parse --path-format=absolute --git-dir 2>/dev/null) || return 0
+  cd_=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  [ "$gd" = "$cd_" ] || return 0   # Paket-Worktree: überspringen
+  top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+  provider="@GRAPH_PROVIDER@"
+  if [ "$provider" = auto ]; then
+    if [ -d "$top/.code-review-graph" ]; then provider=code-review-graph
+    elif [ -d "$top/.codegraph" ]; then provider=codegraph
+    else return 0
+    fi
+  fi
+  case "$provider" in
+    code-review-graph)
+      command -v code-review-graph >/dev/null 2>&1 || return 0
+      ( cd "$top" && code-review-graph update --quiet $1 >/dev/null 2>&1 & ) ;;
+    codegraph)
+      command -v codegraph >/dev/null 2>&1 || return 0
+      ( cd "$top" && codegraph sync >/dev/null 2>&1 & ) ;;
+  esac
+  return 0
+}
+codecycle_graph_update ""
+# <<< codecycle <<<

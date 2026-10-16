@@ -1,0 +1,363 @@
+// Erlaubtlisten für Bash: Doku-Pfleger und Lese-Rollen. Rein: kein Node, keine Mod-API.
+
+import { isDocPath } from './protected.ts'
+import { bashWriteTargets } from './bash-write-targets.ts'
+import { commandName, positionals, PREFIX, walkSegments } from './bash-shell.ts'
+
+// ---------------------------------------------------------------------------
+// Bash des Doku-Pflegers: nur git (lesen, eigener Commit auf Doku-Dateien),
+// codecycle-Befehle (auch der Rückfall `node …/cli.ts`) und Lesebefehle. Schreibziele (Umleitung, tee …) prüft der
+// Mod getrennt mit `bashWriteTargets` und `isDocPath`.
+//
+// Der Zaun bleibt ein Netz gegen Versehen, keine Sicherheitsgrenze. Die Bash-Ausnahme für den Doku-Pfleger soll aber
+// keine bequeme Hintertür sein: Deshalb prüft die Liste auch Optionen, über die erlaubte Befehle Programme starten
+// oder Dateien schreiben (`rg --pre`, `sort -o`, `tree -o`, zweites Argument von `uniq`, `git -c`, `--ext-diff`,
+// `--textconv`, `--output`, `node -e`/`--require`). Interaktive Anzeiger (`less`, `more`, `bat` mit Pager) fehlen
+// absichtlich: Sie kennen Befehls-Escapes und hängen ohne Terminal ohnehin.
+
+/** Lese- und Hilfsbefehle ohne Schreibwirkung; Optionen von rg, sort, tree, uniq, sed, find werden gesondert geprüft. */
+const DOC_KEEPER_PLAIN = new Set([
+  'cat', 'head', 'tail', 'wc', 'nl', 'tac', 'grep', 'egrep', 'fgrep', 'rg', 'ls', 'dir', 'tree',
+  'pwd', 'cd', 'echo', 'printf', 'test', '[', 'true', 'false', 'sort', 'uniq', 'cut', 'diff', 'basename', 'dirname',
+  'realpath', 'readlink', 'which', 'type', 'date', 'stat', 'file',
+])
+
+/** Optionen erlaubter Befehle, die ein Programm starten oder eine Datei schreiben (Name → Prüfung je Wort). */
+const DOC_KEEPER_BAD_OPTION: Record<string, (a: string) => boolean> = {
+  tree: a => /^-o/.test(a) || /^--output(=|$)/.test(a),
+}
+
+/**
+ * Erlaubtliste der Optionen für `rg` und `sort`: Beide haben Optionen, die Programme
+ * starten (`rg --pre`, `--hostname-bin`, `-z`/`--search-zip` mit Entpackern; `sort --compress-program`) oder Dateien
+ * schreiben (`sort -o`, `-T`). Eine Sperrliste übersieht neue Optionen künftiger Versionen; deshalb hier nur bekannte
+ * Lese- und Anzeige-Optionen (für `sed` siehe `sedProblem`). Bei `tree`, `find`, `uniq` bleibt es (ohne großen Umbau) bei der gezielten Sperre:
+ * deren Schreib- und Startoptionen sind wenige und seit Langem fest. Unbekannte Optionen werden verweigert, auch harmlose
+ * (lieber eine Rückfrage zu viel als eine Hintertür).
+ */
+type OptionList = { short: string; shortValued: string; long: readonly string[]; longValued: readonly string[] }
+
+const DOC_KEEPER_OPTIONS: Record<string, OptionList> = {
+  rg: {
+    short: 'abcFHhiIlLnNopqsSuUvVwx0.',
+    shortValued: 'ABCdeEfgjmMrtT',
+    long: [
+      'line-number', 'no-line-number', 'ignore-case', 'smart-case', 'case-sensitive', 'word-regexp', 'line-regexp', 'fixed-strings',
+      'files-with-matches', 'files-without-match', 'files', 'count', 'count-matches', 'only-matching', 'invert-match', 'hidden',
+      'no-hidden', 'no-ignore', 'no-ignore-vcs', 'no-ignore-parent', 'no-ignore-dot', 'no-ignore-global', 'no-ignore-exclude',
+      'no-ignore-files', 'no-require-git', 'unrestricted', 'multiline', 'multiline-dotall', 'json', 'heading', 'no-heading',
+      'with-filename', 'no-filename', 'stats', 'follow', 'pcre2', 'no-pcre2', 'trim', 'column', 'no-column', 'vimgrep', 'null',
+      'null-data', 'quiet', 'type-list', 'passthru', 'passthrough', 'no-messages', 'binary', 'no-binary', 'text', 'crlf',
+      'one-file-system', 'include-zero', 'pretty', 'byte-offset', 'glob-case-insensitive', 'ignore-file-case-insensitive',
+      'max-columns-preview', 'block-buffered', 'line-buffered', 'no-unicode', 'sort-files', 'no-config', 'debug', 'help', 'version',
+    ],
+    longValued: [
+      'regexp', 'file', 'glob', 'iglob', 'type', 'type-not', 'type-add', 'type-clear', 'context', 'after-context', 'before-context',
+      'max-count', 'max-depth', 'color', 'colors', 'sort', 'sortr', 'replace', 'max-columns', 'max-filesize', 'threads', 'encoding',
+      'field-match-separator', 'field-context-separator', 'context-separator', 'path-separator', 'ignore-file', 'engine',
+    ],
+  },
+  sort: {
+    short: 'bdfghiMnrRsuVzcCm',
+    shortValued: 'ktS',
+    long: [
+      'ignore-leading-blanks', 'dictionary-order', 'ignore-case', 'general-numeric-sort', 'ignore-nonprinting', 'month-sort',
+      'human-numeric-sort', 'numeric-sort', 'random-sort', 'reverse', 'version-sort', 'check', 'merge', 'stable', 'unique',
+      'zero-terminated', 'debug', 'help', 'version',
+    ],
+    longValued: ['key', 'field-separator', 'buffer-size', 'parallel', 'sort', 'batch-size', 'files0-from', 'random-source'],
+  },
+}
+
+/** Erste Option außerhalb der Erlaubtliste (so geschrieben wie im Befehl), sonst null. Nach `--` nur Dateien. */
+function optionOutsideList(args: readonly string[], list: OptionList): string | null {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!
+    if (a === '--') return null
+    if (a === '-' || !a.startsWith('-')) continue
+    if (a.startsWith('--')) {
+      const eq = a.indexOf('=')
+      const key = a.slice(2, eq < 0 ? undefined : eq)
+      if (list.long.includes(key) && eq < 0) continue
+      if (list.long.includes(key) && key === 'check') continue // sort --check=quiet
+      if (list.longValued.includes(key)) {
+        if (eq < 0) i++
+        continue
+      }
+      return a
+    }
+    const s = a.slice(1)
+    for (let k = 0; k < s.length; k++) {
+      const c = s[k]!
+      if (list.shortValued.includes(c)) {
+        if (k === s.length - 1) i++
+        break
+      }
+      if (!list.short.includes(c)) return a
+    }
+  }
+  return null
+}
+
+/** Ein sed-Befehl `p` mit Zeilenadresse: `5p`, `$p`, `10,20p`, `3,$p`, `1,+4p`. */
+const SED_PRINT = /^(\d+|\$)(,(\d+|\$|\+\d+))?p$/
+
+/**
+ * `sed` für den Doku-Pfleger nur als Zeilenanzeige
+ * `sed -n '<Adresse>p' <Dateien>`, auch mehrere `-e` oder mit `;` getrennt. Eine Sperre nur von `-i` ließ Skripte durch,
+ * die schreiben (`w`, `W`, `s///w`) oder Programme starten (`e`, `s///e`), ebenso Skriptdateien (`-f`). Erlaubtliste
+ * statt Zerlegung der sed-Grammatik, wie bei `rg` und `sort`.
+ */
+function sedProblem(args: readonly string[]): string | null {
+  if (args.some(a => /^-[a-zA-Z]*i/.test(a) || a.startsWith('--in-place'))) return 'sed -i ändert Dateien (der Doku-Pfleger ändert Doku mit Edit/Write)'
+  const why = (detail: string) => `sed ${detail} ist nicht erlaubt (nur Zeilenanzeige: sed -n '10,20p' <datei>; andere sed-Skripte können Dateien schreiben oder Programme starten)`
+  let quiet = false
+  const scripts: string[] = []
+  const pos: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!
+    if (a === '--') {
+      pos.push(...args.slice(i + 1))
+      break
+    }
+    if (a === '-n' || a === '--quiet' || a === '--silent') quiet = true
+    else if (a === '-e' || a === '-ne' || a === '--expression') {
+      if (a === '-ne') quiet = true
+      if (args[i + 1] === undefined) return why(a)
+      scripts.push(args[++i]!)
+    } else if (a.startsWith('--expression=')) scripts.push(a.slice('--expression='.length))
+    else if (a.startsWith('-') && a !== '-') return why(a)
+    else pos.push(a)
+  }
+  if (scripts.length === 0) {
+    if (pos.length === 0) return why('ohne Skript')
+    scripts.push(pos.shift()!)
+  }
+  if (!quiet) return why('ohne -n')
+  for (const s of scripts) {
+    const bad = s.split(/[;\n]/).map(p => p.trim()).find(p => p !== '' && !SED_PRINT.test(p))
+    if (bad !== undefined || s.trim() === '') return why(`'${s}'`)
+  }
+  return null
+}
+
+/** Erlaubte Werkzeug-Pfade des Doku-Pflegers (vom Mod: Hauptordner und Plugin-Wurzel). */
+export type DocKeeperAllowed = {
+  /** genaue Pfade von `cli.ts` für `node <pfad> <befehl>`: `<Hauptordner>/.codecycle/tool/cli.ts`, `<Plugin>/tool/cli.ts` */
+  cli: readonly string[]
+  /** genaue Pfade des Starters `codecycle` mit Pfad (ohne `.cmd`/`.ps1`): `<Plugin>/bin/codecycle` */
+  launchers?: readonly string[]
+}
+
+/** Gleicher Pfad? Schrägstriche, Git-Bash-Laufwerk `/c/…` = `c:/…`; mit Laufwerksbuchstaben ohne Groß-/Kleinschreibung. */
+export function sameToolPath(a: string, b: string): boolean {
+  const norm = (p: string): string => p.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/')
+  let x = norm(a)
+  const y = norm(b)
+  const drive = /^[A-Za-z]:\//
+  if (drive.test(y)) {
+    const m = /^\/([A-Za-z])\//.exec(x)
+    if (m) x = `${m[1]}:/${x.slice(3)}`
+  }
+  if (x === '' || y === '') return false
+  return drive.test(y) || drive.test(x) ? x.toLowerCase() === y.toLowerCase() : x === y
+}
+
+/** git-Unterbefehle, die nur lesen */
+const GIT_READ = new Set(['status', 'diff', 'log', 'show', 'rev-parse', 'ls-files', 'blame'])
+
+/** git add/commit: Optionen ohne Wert, die erlaubt sind */
+const GIT_ADD_OK = new Set(['--', '-v', '--verbose', '-N', '--intent-to-add'])
+const GIT_COMMIT_VALUED = new Set(['-m', '--message', '-F', '--file', '--author', '--date', '-t', '--template', '--cleanup'])
+
+function gitProblem(args: readonly string[]): string | null {
+  // globale Optionen vor dem Unterbefehl: nur `-C <ordner>` und `--no-pager` (`-c`, `--config-env`, `--exec-path` …
+  // könnten Programme einschleusen)
+  let i = 0
+  while (i < args.length && args[i]!.startsWith('-')) {
+    const a = args[i]!
+    if (a === '-C') i += 2
+    else if (a === '--no-pager') i += 1
+    else return `git ${a} ist nicht erlaubt (globale Optionen nur -C <ordner> und --no-pager)`
+  }
+  const sub = args[i] ?? ''
+  const rest = args.slice(i + 1)
+  if (GIT_READ.has(sub)) {
+    const bad = rest.find(a => /^--(output|ext-diff|textconv)(=|$)/.test(a))
+    return bad ? `git ${sub} ${bad} ist nicht erlaubt (schreibt eine Datei oder startet ein Programm)` : null
+  }
+  if (sub === 'add') {
+    let paths = false
+    for (const a of rest) {
+      if (a === '--') paths = true
+      else if (!paths && a.startsWith('-')) {
+        if (!GIT_ADD_OK.has(a)) return `git add ${a} ist nicht erlaubt (nur einzelne Doku-Dateien stagen)`
+      } else if (a === '.' || a === ':/' || /[*?]/.test(a) || !isDocPath(a)) return `git add ${a}: keine Doku-Datei (nur einzelne Doku-Dateien stagen)`
+    }
+    return null
+  }
+  if (sub === 'commit') {
+    for (let k = 0; k < rest.length; k++) {
+      const a = rest[k]!
+      if (a === '--') {
+        const bad = rest.slice(k + 1).find(p => !isDocPath(p))
+        return bad ? `git commit ${bad}: keine Doku-Datei` : null
+      }
+      if (a === '--all' || a === '--amend' || a === '--include' || a === '--only') return `git commit ${a} ist nicht erlaubt (nur eigene, gestagte Doku-Dateien committen)`
+      if (/^-[A-Za-z]+$/.test(a)) {
+        if (/a/.test(a)) return `git commit ${a} ist nicht erlaubt (-a nimmt alle geänderten Dateien mit; nur gestagte Doku-Dateien committen)`
+        if (/[mFtCc]$/.test(a)) k++
+        continue
+      }
+      if (a.startsWith('-')) {
+        if (GIT_COMMIT_VALUED.has(a)) k++
+        continue
+      }
+      if (!isDocPath(a)) return `git commit ${a}: keine Doku-Datei`
+    }
+    return null
+  }
+  return `git ${sub || '(ohne Unterbefehl)'} ist für den Doku-Pfleger nicht erlaubt (nur status, diff, log, show, rev-parse, ls-files, blame, add und commit auf Doku-Dateien)`
+}
+
+/** Wofür die gemeinsame Erlaubtliste gilt: Name in Meldungen, git- und codecycle-Regeln der Rolle. */
+type AllowProfile = {
+  who: string
+  git: (args: readonly string[]) => string | null
+  /** Argumente nach `codecycle` bzw. nach `…/cli.ts`; null = erlaubt */
+  tool: (args: readonly string[]) => string | null
+}
+
+/**
+ * Warum ein Bash-Befehl des Doku-Pflegers verweigert wird, sonst null. Jeder Abschnitt (auch in Befehlsersetzung)
+ * muss erlaubt sein; Verpackungen (`bash -c`, `eval`, `pwsh`) sind es nicht. Heuristik wie `bashWriteTargets`.
+ */
+export function docKeeperBashProblem(command: string, allowed: DocKeeperAllowed): string | null {
+  return allowlistProblem(command, allowed, { who: 'den Doku-Pfleger', git: gitProblem, tool: () => null })
+}
+
+/** git-Unterbefehle für Lese-Rollen: nur lesend, ohne Optionen, die Dateien schreiben oder Programme starten. */
+function readerGitProblem(args: readonly string[]): string | null {
+  let i = 0
+  while (i < args.length && args[i]!.startsWith('-')) {
+    const a = args[i]!
+    if (a === '-C') i += 2
+    else if (a === '--no-pager') i += 1
+    else return `git ${a} ist nicht erlaubt (globale Optionen nur -C <ordner> und --no-pager)`
+  }
+  const sub = args[i] ?? ''
+  if (!GIT_READ.has(sub)) return `git ${sub || '(ohne Unterbefehl)'} ist für Lese-Rollen nicht erlaubt (nur ${[...GIT_READ].join(', ')})`
+  const bad = args.slice(i + 1).find(a => /^--(output|ext-diff|textconv)(=|$)/.test(a))
+  return bad ? `git ${sub} ${bad} ist nicht erlaubt (schreibt eine Datei oder startet ein Programm)` : null
+}
+
+/**
+ * codecycle-Befehle für Lese-Rollen; `server` nur mit `server: true` (Browser-Prüfer). Ohne `effort`: es schreibt
+ * `aufwand.json` auch ohne Optionen neu; der Plan-Prüfer liest `aufwand.json` direkt.
+ */
+export const READER_TOOL_COMMANDS = ['test', 'locate', 'callers', 'tests-for', 'impact', 'info', 'tasks', 'rework', 'package-info', 'selftest', 'guard'] as const
+
+/** Browser-Prüfer: `server` nur in den festen Formen, keine freien Eingaben. */
+function serverProblem(rest: readonly string[]): string | null {
+  const key = [...rest].sort().join(' ')
+  if (rest.length === 0 || key === '--stop' || key === '--temp' || key === '--same --temp') return null
+  return `codecycle server ${rest.join(' ')} ist nicht erlaubt (nur server, server --stop, server --temp, server --temp --same)`
+}
+
+function readerToolProblem(args: readonly string[], server: boolean): string | null {
+  const sub = args[0] ?? 'help'
+  if (sub === 'help' || sub === '--help' || sub === '--version') return null
+  if (sub === 'server' && server) return serverProblem(args.slice(1))
+  if (sub === 'check' || sub === 'lint' || sub === 'format') {
+    return `codecycle ${sub} ist für Lese-Rollen nicht erlaubt (führt Lint und Format des Projekts aus; Format und Lint mit Korrektur ändern Dateien). Lint- und Format-Ergebnis steht im Bericht des Handwerkers; Tests mit codecycle test`
+  }
+  if (!(READER_TOOL_COMMANDS as readonly string[]).includes(sub)) return `codecycle ${sub} ist für Lese-Rollen nicht erlaubt`
+  if (sub === 'guard' && args.includes('--record')) return 'codecycle guard --record ist für Lese-Rollen nicht erlaubt (setzt die Grundlage für guard)'
+  return null
+}
+
+/** Was eine Lese-Rolle per Bash darf, vollständig, für Verweigerungsmeldungen (gleiche Liste in agents/*.md). */
+export function readerBashAllowedText(server: boolean): string {
+  const tool: string[] = READER_TOOL_COMMANDS.map(c => (c === 'guard' ? 'guard (ohne --record)' : c))
+  if (server) tool.push('server (nur ohne Argument, --stop, --temp, --temp --same)')
+  return `git ${[...GIT_READ].join('/')} (nur lesend); codecycle ${tool.join(', ')} (Rückfall: node <Hauptordner>/.codecycle/tool/cli.ts <befehl>); Lesebefehle wie cat, head, tail, wc, grep, rg, ls, find (ohne -exec/-delete), sed -n '10,20p' <datei>`
+}
+
+/** Erlaubte Werkzeug-Pfade einer Lese-Rolle; `server` nur für den Browser-Prüfer. */
+export type ReaderAllowed = DocKeeperAllowed & { server?: boolean }
+
+/**
+ * Warum ein Bash-Befehl einer Lese-Rolle (Gutachter, Prüfer, Abnahme, Einrichter …)
+ * verweigert wird, sonst null. Gleiche Erlaubtliste wie beim Doku-Pfleger, aber git nur lesend, codecycle nur
+ * `READER_TOOL_COMMANDS` (kein check/lint/format: Format kann schreiben) und kein Schreibziel, auch keine Umleitung.
+ * Hilfsskripte fallen weg, weil node nur mit genau dem cli.ts des Werkzeugs läuft.
+ */
+export function readerBashProblem(command: string, allowed: ReaderAllowed): string | null {
+  const problem = allowlistProblem(command, allowed, {
+    who: 'Lese-Rollen',
+    git: readerGitProblem,
+    tool: args => readerToolProblem(args, allowed.server === true),
+  })
+  if (problem) return problem
+  const target = bashWriteTargets(command)[0]
+  return target ? `${target} wäre ein Schreibziel (Umleitung oder schreibender Befehl); Lese-Rollen schreiben nur ihren Bericht, und den mit Write` : null
+}
+
+function allowlistProblem(command: string, allowed: DocKeeperAllowed, profile: AllowProfile): string | null {
+  let problem: string | null = null
+  walkSegments(command, seg => {
+    if (problem) return
+    // Zuweisungen und Präfixe vor dem Befehl (`PAGER=…`, `GIT_EXTERNAL_DIFF=…`,
+    // `RIPGREP_CONFIG_PATH=…`, `env`, `sudo` …) können erlaubte Befehle Programme starten lassen
+    const first = seg.words[0] ?? ''
+    if (/^[A-Za-z_]\w*=/.test(first)) {
+      problem = `Umgebungsvariable vor dem Befehl (${first.split('=')[0]}=…) ist nicht erlaubt (kann über PAGER, GIT_EXTERNAL_DIFF u. Ä. Programme starten)`
+      return
+    }
+    if (PREFIX.has(first)) {
+      problem = `${first} ist für ${profile.who} nicht erlaubt`
+      return
+    }
+    // `.`/`source` führt in Bash eine Datei aus (ohne Pfad auch aus dem aktuellen Ordner); commandName
+    // entfernt `.` als PowerShell-Aufrufzeichen, PowerShell ist für diese Rollen aber gesperrt
+    if (first === '.' || first === 'source') {
+      problem = `${first} (source) führt eine Datei als Skript aus und ist für ${profile.who} nicht erlaubt`
+      return
+    }
+    const { name, args, program } = commandName(seg)
+    if (name === '') return
+    // Programme nur mit Namen (Suche über den PATH); mit Pfad könnte es jede Datei im Projekt sein
+    // (`./cat`, `src/git`). Einzige Ausnahme: genau der Starter des Plugins, geprüft im Zweig `codecycle`.
+    if (/[\\/]/.test(program) && name !== 'codecycle') {
+      problem = `${name} bitte ohne Pfad aufrufen, nicht ${program} (für ${profile.who} laufen Programme nur über ihren Namen; mit Pfad könnte es eine beliebige Datei sein)`
+      return
+    }
+    if (name === 'git') problem = profile.git(args)
+    else if (name === 'codecycle') {
+      // nackt (Starter auf dem PATH) oder genau der Starter des Plugins; nie ein Programm gleichen Namens anderswo
+      if (/[\\/]/.test(program) && !allowed.launchers?.some(l => sameToolPath(program.replace(/\.(exe|cmd|bat|ps1)$/i, ''), l))) {
+        problem = `codecycle nur als „codecycle <befehl>“ oder über den Starter des Plugins, nicht ${program}`
+      } else problem = profile.tool(args)
+    } else if (name === 'node') {
+      // nur genau `node <Hauptordner>/.codecycle/tool/cli.ts <befehl>` oder `node <Plugin>/tool/cli.ts <befehl>`, keine
+      // Optionen davor. Genaue Pfade statt Endung `tool/cli.ts`: der Doku-Pfleger darf
+      // in Doku-Ordnern schreiben und könnte sonst etwa x/tool/cli.ts anlegen und starten.
+      if (!allowed.cli.some(p => sameToolPath(args[0] ?? '', p))) {
+        problem = 'node nur als Rückfall des Werkzeugs in genau dieser Form: node <Hauptordner>/.codecycle/tool/cli.ts <befehl> (absoluter Pfad; keine Optionen wie -e, -p, --require, --import)'
+      } else problem = profile.tool(args.slice(1))
+    } else if (name === 'uniq') {
+      if (positionals(args, ['-f', '-s', '-w', '--skip-fields', '--skip-chars', '--check-chars']).length > 1) problem = 'uniq mit zweitem Dateinamen schreibt eine Ausgabedatei'
+    } else if (DOC_KEEPER_OPTIONS[name]) {
+      const bad = optionOutsideList(args, DOC_KEEPER_OPTIONS[name]!)
+      if (bad) problem = `${name} ${bad} ist nicht erlaubt (nur bekannte Lese-Optionen; andere können Programme starten oder Dateien schreiben)`
+    } else if (DOC_KEEPER_BAD_OPTION[name] && args.some(DOC_KEEPER_BAD_OPTION[name]!)) {
+      problem = `${name} ${args.find(DOC_KEEPER_BAD_OPTION[name]!)} ist nicht erlaubt (startet ein Programm oder schreibt eine Datei)`
+    } else if (name === 'sed') {
+      problem = sedProblem(args)
+    } else if (name === 'find') {
+      const bad = args.find(a => /^-(delete|exec|execdir|ok|okdir|fprint\w*|fls)$/.test(a))
+      if (bad) problem = `find ${bad} ist nicht erlaubt`
+    } else if (!DOC_KEEPER_PLAIN.has(name)) problem = `${name} ist für ${profile.who} nicht erlaubt`
+  })
+  return problem
+}
