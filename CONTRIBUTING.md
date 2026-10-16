@@ -33,3 +33,5 @@ Rückmeldungen und Pull Requests sind willkommen.
 | `types/` | Typen des Mod-Zustands (nur für TypeScript) |
 
 Bei einer Änderung am Werkzeug (`tool/`, `lib/`, `githooks/`) steigt auch dessen Version in `tool/version.ts`, damit Projekte ihre Kopie mit `/codecycle:update` erneuern.
+
+<!-- Probe-PR: Test der Übernahme, wird nicht veröffentlicht -->
