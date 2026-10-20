@@ -142,6 +142,35 @@ describe('Zaun und Sperren', () => {
     expect((await bash('codecycle guard --record')).deny).toMatch(/Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith/)
   })
 
+  // H1 (KP7): Git-Hooks, Werkzeug und guard-Grundlage auch mit fence aus nur für toolsmith; Hauptsitzung frei
+  test('Kontrolldateien der Prüfung: auch mit fence aus gesperrt für Agenten (auch ohne Rolle), frei für toolsmith und Hauptsitzung', async ($, on) => {
+    mock.store(on)
+    fakeWorld(on, { ...FILES, [PROJECT_MD]: FILES[PROJECT_MD]!.replace('fence: an', 'fence: aus') })
+    let n = 0
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: `a${++n}` }))
+    on('tool.call', () => ({ result: {} }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/`, 'codecycle:toolsmith')
+    const as = (agentId: string | undefined, input: Record<string, unknown>) => $.tool.call({ ...input, ...(agentId ? { agentId } : {}) } as never)
+    for (const input of [
+      { tool: 'Edit', file_path: '/proj/.githooks/pre-commit', old_string: 'a', new_string: 'b' },
+      { tool: 'Write', file_path: '/proj/.codecycle/tool.config.json', content: '{}' },
+      { tool: 'Bash', command: 'mv .githooks/pre-commit /tmp/pc' },
+      { tool: 'Bash', command: 'chmod -x .githooks/pre-commit' },
+      { tool: 'Bash', command: 'git checkout HEAD~3 .githooks/pre-commit' },
+      { tool: 'Bash', command: 'echo {} > .codecycle/tmp/guard-records.json' },
+      { tool: 'PowerShell', command: 'Remove-Item .codecycle\\tool\\cli.ts' },
+    ]) {
+      expect((await as('a1', input)).deny, JSON.stringify(input)).toMatch(/steuert die Prüfung.*toolsmith/)
+      expect((await as('fremd-1', input)).deny, `ohne Rolle: ${JSON.stringify(input)}`).toMatch(/steuert die Prüfung/)
+      expect((await as('a2', input)).deny, `toolsmith: ${JSON.stringify(input)}`).toBeUndefined()
+      expect((await as(undefined, input)).deny, `Hauptsitzung: ${JSON.stringify(input)}`).toBeUndefined()
+    }
+    // Anderes in .codecycle/tmp/ bleibt frei
+    expect((await as('a1', { tool: 'Bash', command: 'echo x > .codecycle/tmp/notiz.txt' })).deny).toBeUndefined()
+  })
+
   // Lese-Rollen schreiben nur ihren Bericht, Bash nach Erlaubtliste; auch mit fence aus
   test('Lese-Rollen schreiben nur ihren Bericht, Bash nur Erlaubtliste, Meldung nennt alles Erlaubte, Stopp-Hinweis nach 3', async ($, on) => {
     mock.store(on)
@@ -322,6 +351,9 @@ describe('Python-Sperre (Python-Befehle dürfen nicht hängen)', () => {
     await $.session.start({ cwd: '/proj', surface: null } as never)
     expect((await call($, 'Bash', 'python3 x.py')).deny).toBeUndefined()
     expect((await call($, 'Bash', 'python3')).deny).toMatch(/auf Eingabe warten/)
+    // Heredoc liefert das Skript; gesperrt nur unter Windows
+    expect((await call($, 'Bash', "python3 - <<'EOF'\nprint(1)\nEOF")).deny).toBeUndefined()
+    expect((await call($, 'Bash', 'python3 - <<EOF\nprint(1)\nEOF\npython')).deny).toMatch(/auf Eingabe warten/)
   })
 })
 

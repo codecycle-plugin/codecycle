@@ -63,11 +63,33 @@ export function isWriteTool(tool: string): boolean {
   return tool === 'Edit' || tool === 'Write' || tool === 'NotebookEdit'
 }
 
-/** Schreibziele eines Aufrufs: bei Edit/Write/NotebookEdit die Datei; bei Bash die erkannten Ziele (Heuristik). */
+/** Schreibziele eines Aufrufs: bei Edit/Write/NotebookEdit die Datei; bei Bash und PowerShell die erkannten Ziele (Heuristik). */
 export function writeTargetsOf(call: ToolCall): string[] {
   if (isWriteTool(call.tool) && call.path) return [call.path]
   if (call.tool === 'Bash' && call.command) return bashWriteTargets(call.command)
+  if (call.tool === 'PowerShell' && call.command) return bashWriteTargets(call.command, 'powershell')
   return []
+}
+
+/**
+ * Dateien, ohne die der Pre-Commit-Hook oder `codecycle guard` still nichts prüft: Git-Hooks, Werkzeug-Kopie und
+ * -Konfiguration, guard-Grundlage. Geschützt unabhängig vom Schalter `fence` (Pfad relativ zum Projekt).
+ */
+const HOOK_CRITICAL = /^(\.githooks(\/.*)?|\.codecycle\/tool\.config\.json|\.codecycle\/tool(\/.*)?|\.codecycle\/tmp\/guard-records\.json)$/i
+
+/**
+ * Ändert ein Agent eine dieser Dateien? Für alle Agenten außer `toolsmith`, auch ohne codecycle-Rolle (`role` null);
+ * die Hauptsitzung prüft der Mod hier nicht (Einrichtung, Update, `serverTemp` nach Antwort des Nutzers).
+ */
+export function hookCriticalReason(role: string | null, call: ToolCall, rel: (path: string) => string): string | null {
+  if (role === 'toolsmith') return null
+  for (const t of writeTargetsOf(call)) {
+    const r = rel(t).replace(/\\/g, '/').replace(/^\.\//, '')
+    if (HOOK_CRITICAL.test(r)) {
+      return `codecycle: ${r} steuert die Prüfung (Git-Hooks, Werkzeug, guard-Grundlage); ändern nur über den toolsmith mit Freigabe des Nutzers.${call.tool === 'Bash' || call.tool === 'PowerShell' ? ' (Schreibziel im Befehl)' : ''}`
+    }
+  }
+  return null
 }
 
 function cliPaths(env: FenceEnv): string[] {

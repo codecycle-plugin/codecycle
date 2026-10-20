@@ -1,7 +1,7 @@
 // Umgehung der Git-Hooks erkennen (`--no-verify`, `commit -n`, `core.hooksPath` …). Der Mod sperrt solche Befehle
 // Rein: kein Node, keine Mod-API.
 
-import { segTargets } from './bash-write-targets.ts'
+import { bashWriteTargets, segTargets } from './bash-write-targets.ts'
 import { heredocsRun, MAX_DEPTH, positionals, splitShell, unwrap } from './bash-shell.ts'
 
 /**
@@ -12,9 +12,14 @@ import { heredocsRun, MAX_DEPTH, positionals, splitShell, unwrap } from './bash-
  * `Invoke-Expression`, Befehlsersetzung `$(…)` und Backticks (auch in Anführungszeichen), Klammern und
  * Blöcke. Heredoc-Inhalte zählen, wenn im selben Befehl ein Interpreter läuft (Abschnitt `heredocsRun`).
  * Text in Anführungszeichen (Commit-Nachrichten) löst nichts aus. Lieber ein Fehlalarm als eine Lücke.
+ * PowerShell: Backslashes werden zu Schrägstrichen (dort kein Fluchtzeichen), Schreibziele auch über Cmdlets.
  */
-export function hookBypass(command: string): string | null {
-  return bypassIn(command, 0, false)
+export function hookBypass(command: string, shell: 'bash' | 'powershell' = 'bash'): string | null {
+  const text = shell === 'powershell' ? command.replace(/\\/g, '/') : command
+  const hit = bypassIn(text, 0, false)
+  if (hit) return hit
+  // Schreibziele über alle Verpackungen, auch Cmdlets und [IO.File]:: (bash-write-targets.ts)
+  return bashWriteTargets(text).some(t => GIT_INTERNAL.test(normalize(t))) ? 'Schreiben in .git/config oder .git/hooks' : null
 }
 
 function bypassIn(command: string, depth: number, run: boolean): string | null {
@@ -141,7 +146,8 @@ function configBypass(rest: readonly string[], depth: number): string | null {
 /**
  * Umgebungsvariablen, die Konfiguration für Git-Aufrufe setzen: `GIT_CONFIG_KEY_<n>`/`GIT_CONFIG_PARAMETERS`
  * mit einem bewachten Schlüssel; `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `HOME`, `XDG_CONFIG_HOME`
- * (fremde Konfigurationsdatei), wenn im selben Befehl Git läuft. Auch PowerShell (`$env:X = …`).
+ * (fremde Konfigurationsdatei), wenn im selben Befehl Git läuft. `PATH` ohne den bisherigen Pfad (`$PATH`) im selben
+ * Befehl wie Git: Der Pre-Commit-Hook endet ohne Node grün. Auch PowerShell (`$env:X = …`).
  */
 function envBypass(words: readonly string[], hasGit: boolean, command: string): string | null {
   for (let k = 0; k < words.length; k++) {
@@ -151,6 +157,11 @@ function envBypass(words: readonly string[], hasGit: boolean, command: string): 
     if (assign('GIT_CONFIG_KEY_\\d+|GIT_CONFIG_PARAMETERS') && /core\.hookspath|include(if)?\./i.test(command)) return 'core.hooksPath'
     if (hasGit && assign('GIT_CONFIG_GLOBAL|GIT_CONFIG_SYSTEM|HOME|XDG_CONFIG_HOME')) {
       return 'core.hooksPath (fremde Git-Konfiguration über GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM oder HOME)'
+    }
+    if (hasGit && assign('PATH')) {
+      // Wert: im selben Wort (`PATH=…`) oder nach `=` (PowerShell `$env:PATH = …`)
+      const value = /=/.test(w) ? w.slice(w.indexOf('=') + 1) : (words[k + 2] ?? '')
+      if (!/\$\{?PATH\}?|\$env:PATH/i.test(value)) return 'PATH ohne den bisherigen Pfad vor Git (der Pre-Commit-Hook fände Node nicht und prüfte nichts)'
     }
   }
   return null

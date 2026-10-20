@@ -16,7 +16,7 @@ Vorlage für `.claude/codecycle.md`. Wird vom Agenten `setup` ausgefüllt, der N
 ## Oberfläche
 - Gibt es eine: <ja | nein>
 - Start: <…>
-- Wegwerf-Daten: <Umgebungsvariable der Datendatei | keine> (steht als `serverTemp.env` in `.codecycle/tool.config.json`; `codecycle server --temp` startet damit den Server mit einer frischen Wegwerf-Datei, damit der Browser-Prüfer echte Daten nicht ändert)
+- Wegwerf-Daten: <Umgebungsvariable der Datendatei | ohne Daten | keine Wegwerf-Möglichkeit> (Umgebungsvariable: steht als `serverTemp.env` in `.codecycle/tool.config.json`, `codecycle server --temp` startet den Server mit einer frischen Wegwerf-Datei, damit Prüfer echte Daten nicht ändern; „ohne Daten“: der Server speichert nichts, steht als `serverTemp: { "ohneDaten": true }`, `--temp` startet ihn ohne Variable)
 - Test-Zugang: <Testwerte, keine echten Zugangsdaten>
 
 ## Code-Graph

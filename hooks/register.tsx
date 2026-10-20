@@ -47,6 +47,7 @@ import {
   controlFileReason,
   docKeeperCheck,
   fenceDenyText,
+  hookCriticalReason,
   isReaderRole,
   otherPackageReason,
   readBudgetDeny,
@@ -1736,7 +1737,7 @@ async function suggestUpdate($: EngineInterface): Promise<void> {
 // Microsoft Store und hängt; nacktes `python` wartet überall auf Eingabe. Erkennung über `where`, nie python selbst.
 
 const PYTHON_REPL =
-  'codecycle: Python würde auf Eingabe warten und hängen (nackt, -i oder `python -`/Heredoc). Skript in eine Datei unter .codecycle/tmp schreiben und `python datei.py` aufrufen, `-c` nutzen, oder node.'
+  'codecycle: Python würde auf Eingabe warten und hängen (nackt, -i, `python -` ohne Pipe oder Datei, Heredoc unter Windows). Skript in eine Datei unter .codecycle/tmp schreiben und `python datei.py` aufrufen, `-c` nutzen, oder node.'
 const PYTHON_STUB =
   'codecycle: python ist hier nur der Microsoft-Store-Platzhalter (hängt). Nutze node (node -e / Skript in .codecycle/tmp).'
 
@@ -2570,6 +2571,7 @@ async function denyPython($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   // als string vergleichen: die Werkzeugtypen entstehen je Rechner, unter Linux und macOS fehlt PowerShell darin
   const kind = typeof command === 'string' ? pythonCall(command, (e.tool as string) === 'PowerShell' ? 'powershell' : 'bash') : null
   if (kind === 'repl') return { deny: PYTHON_REPL }
+  if (kind === 'heredoc' && (await onWindows($))) return { deny: PYTHON_REPL }
   if (kind === 'call' && (await onWindows($)) && !realPython) return { deny: PYTHON_STUB }
   return next(e)
 }
@@ -2598,7 +2600,7 @@ function denyBaseline(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
 // Hook-Sperre auch für PowerShell
 function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
-  const hit = typeof command === 'string' ? hookBypass(command) : null
+  const hit = typeof command === 'string' ? hookBypass(command, (e.tool as string) === 'PowerShell' ? 'powershell' : 'bash') : null
   return hit ? { deny: `codecycle: ${hit} ist verboten (Git-Hooks sind die Prüfung, nicht umgehen). Fehler beheben statt überspringen.` } : next(e)
 }
 
@@ -2679,6 +2681,10 @@ async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> 
     const denied = docKeeperCheck(call, fenceEnv)
     if (denied) return denied
   }
+
+  // Git-Hooks, Werkzeug und guard-Grundlage: nur der toolsmith, unabhängig vom Schalter fence
+  const critical = hookCriticalReason(rt.rolle, call, fenceEnv.rel)
+  if (critical) return critical
 
   if (isOn(switches, 'fence')) {
     // Edit/Write/NotebookEdit: die Datei; Bash: erkannte Schreibziele (Heuristik, lib/bash-write-targets.ts bashWriteTargets)
@@ -2834,7 +2840,12 @@ async function onToolCall($: EngineInterface, e: Evt<'tool.call'>, next: Nxt<'to
   const rt = e.agentId ? agents.get(e.agentId) : undefined
   // Agent ohne codecycle-Rolle, während die Sitzung an einer Solo-Aufgabe arbeitet: nur lesen
   if (!rt && e.agentId) {
-    const denied = await foreignSoloDeny($, e as unknown as ToolInput)
+    const fi = e as unknown as ToolInput
+    const root = await rootOf($)
+    const rel = (p: string): string => relPath(root && !/^([\\/]|[A-Za-z]:)/.test(p) ? join(root, p) : p, [root])
+    const critical = hookCriticalReason(null, { tool: fi.tool, command: fi.command, path: fi.file_path ?? fi.notebook_path }, rel)
+    if (critical) return { deny: critical }
+    const denied = await foreignSoloDeny($, fi)
     if (denied) return { deny: denied }
   }
   if (!rt) {

@@ -2,6 +2,39 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.19.1 / Werkzeug 0.6.6] – 2026-10-20
+
+### Geändert
+
+- Solo-Weg: Der Abschnitt „Eingabeformate“ nennt nur Schreibweisen. Was eine Schreibweise bedeutet, steht unter „Annahmen“ und richtet sich nach dem Wortlaut der Aufgabe; der Solo-Prüfer misst jedes Ergebnis am Wortlaut, nicht an der Liste.
+- `codecycle solo funde` setzt den Haltepunkt selbst: 4, sobald der Prüfbericht da ist, 5, sobald jeder Fund einen Status hat.
+
+## [0.19.0 / Werkzeug 0.6.5] – 2026-10-20
+
+### Geändert
+
+- Git-Hooks (`.githooks/`), Werkzeug (`.codecycle/tool/`), seine Konfiguration und die Grundlage von `codecycle guard` ändert nur noch `codecycle:toolsmith` oder die Hauptsitzung, auch wenn der Schalter `fence` aus ist. Das gilt auch für Agenten ohne codecycle-Rolle.
+- Der Zaun erkennt mehr Schreibziele: Quellen von `mv`, `chmod` und Verwandte, `git rm`, `git mv`, `git checkout <stand> <datei>` sowie PowerShell-Befehle wie `Set-Content`, `Remove-Item`, `Move-Item` und `[IO.File]::WriteAllText`.
+- Die Hook-Sperre verweigert `PATH=…` ohne den bisherigen Pfad vor einem Git-Befehl (der Pre-Commit-Hook fände Node nicht) und prüft Schreibziele in PowerShell auf `.git/config` und `.git/hooks`.
+
+## [0.18.4 / Werkzeug 0.6.4] – 2026-10-20
+
+### Geändert
+
+- Python-Sperre: `python3 - <<'EOF' … EOF` ist außerhalb von Windows erlaubt; unter Windows bleibt es gesperrt.
+- `/codecycle:solo`: Die Sitzung hält im Kurzplan die Eingabeformate fest (realistische Schreibweisen der Eingaben), probiert sie selbst aus und gibt sie dem Solo-Prüfer mit; er prüft jede einzeln und ergänzt eigene.
+
+## [0.18.3 / Werkzeug 0.6.3] – 2026-10-20
+
+### Hinzugefügt
+
+- `serverTemp: { "ohneDaten": true }` in `.codecycle/tool.config.json` für Server, die nichts speichern: `codecycle server --temp` startet den Server dann ohne Umgebungsvariable, statt mit „nicht eingerichtet“ abzubrechen.
+
+### Geändert
+
+- Setup: Die Zeile „Wegwerf-Daten“ in `.claude/codecycle.md` kennt drei Werte (Umgebungsvariable, ohne Daten, keine Wegwerf-Möglichkeit); der Setup-Agent beurteilt sie am Code.
+- `/codecycle:solo`: Fehlt `serverTemp`, schlägt die Sitzung den Eintrag vor und fragt einmal. Der Solo-Prüfer startet ohne `serverTemp` keinen Server mehr und meldet die Oberfläche als ungeprüft.
+
 ## [0.18.2 / Werkzeug 0.6.2] – 2026-10-20
 
 ### Geändert

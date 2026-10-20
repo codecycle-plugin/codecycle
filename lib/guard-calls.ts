@@ -5,14 +5,14 @@ import { commandName, splitShell, stripPrefix, walkSegments } from './bash-shell
 
 /**
  * Ruft der Befehl Python auf (`python`, `python3`, `python3.12`, `py`, auch über `sh -c`/`eval`)?
- * 'repl': Python liest Skript oder Befehle von der Eingabe – nackt, `-i`, oder `-` (auch mit Heredoc,
- * das in PowerShell und Hintergrund-Läufen nicht zuverlässig ankommt; ausgenommen `… | python -`
- * in Bash). Solche Prozesse hingen bis zu 50 Minuten.
- * 'call': sonstiger Aufruf. null: kein Python. Der Mod sperrt 'repl' immer und 'call' unter Windows
- * ohne echtes Python (Store-Platzhalter).
+ * 'repl': Python liest Skript oder Befehle von der Eingabe, die nicht sicher ankommt – nackt, `-i`, oder `-`
+ * ohne Pipe, Datei oder Heredoc, in PowerShell immer. Solche Prozesse hingen bis zu 50 Minuten.
+ * 'heredoc': in Bash liefert ein Heredoc das Skript (`python3 - <<EOF`); hing nur in Windows-Bash.
+ * 'call': sonstiger Aufruf. null: kein Python. Der Mod sperrt 'repl' immer, 'heredoc' unter Windows und 'call'
+ * unter Windows ohne echtes Python (Store-Platzhalter). Vorrang beim Zusammenfassen: repl, heredoc, call.
  */
-export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash', depth = 0): 'repl' | 'call' | null {
-  let found: 'repl' | 'call' | null = null
+export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash', depth = 0): 'repl' | 'heredoc' | 'call' | null {
+  let found: 'heredoc' | 'call' | null = null
   const segs = splitShell(command)
   for (const seg of segs) {
     const w = stripPrefix(seg.words)
@@ -25,11 +25,13 @@ export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash
       const end = Math.min(ci < 0 ? args.length : ci, si < 0 ? args.length : si)
       const interactive = args.slice(0, end).some(a => /^-[bBdEhIOqsSuvx]*i[bBdEhIOqsSuvx]*$/.test(a))
       const fromStdin = end === args.length || args[end] === '-'
-      // Eingabe sicher vorhanden: in Bash aus einer Pipe, einer Datei oder einem Here-String; nicht per Heredoc
-      // (kommt in PowerShell und manchen Hintergrund-Läufen nicht an) und nie in PowerShell
+      // Eingabe sicher vorhanden: in Bash aus einer Pipe, einer Datei oder einem Here-String; nie in PowerShell
       const fed = shell === 'bash' && (seg.pipedIn || seg.stdin === 'file')
-      if (interactive || (fromStdin && !fed)) return 'repl'
-      found = 'call'
+      if (interactive) return 'repl'
+      if (fromStdin && !fed) {
+        if (shell !== 'bash' || seg.stdin !== 'heredoc') return 'repl'
+        found = 'heredoc'
+      } else found = found ?? 'call'
       continue
     }
     if (depth < 3) {
@@ -41,7 +43,8 @@ export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash
       for (const text of inner) {
         const r = pythonCall(text, 'bash', depth + 1)
         if (r === 'repl') return r
-        found = found ?? r
+        if (r === 'heredoc') found = r
+        else found = found ?? r
       }
     }
   }

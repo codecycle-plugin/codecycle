@@ -42,6 +42,10 @@ Nach der Freigabe nur hier ergänzen (Datum, was, warum).
 ## Kurzplan
 <Nur Solo-Weg: 3–10 Zeilen, Dateien, Vorgehen, Prüfweg.>
 
+## Eingabeformate
+<Nur Solo-Weg: je Eingabe die Schreibweisen, die Nutzer dieser Aufgabe realistisch eingeben, z. B. `- Menge: 1.000 g, 1 000 g, 1,5 kg, 1 ½ cups, 2 EL.`; ohne Eingaben „keine“.>
+- keine
+
 ## Annahmen
 <Nur Solo-Weg: je still entschiedenem Punkt eine Zeile `- <Annahme> (Grund)`.>
 - keine

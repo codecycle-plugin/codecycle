@@ -2,8 +2,9 @@
 //   check: Haltepunkt „Eigene Kontrolle“. `codecycle check` grün, alles außerhalb des Aufgabenordners committet,
 //          Risikobereiche der geänderten Dateien seit dem Start; schreibt `geprueftAuf: <HEAD>` und `haltepunkt: 3` in STATE.md.
 //          Exit 0 grün, 1 rot. Berührte Risikobereiche nennt die Ausgabe als Zeile für den Prüfauftrag.
-//   funde: Haltepunkt „Nachbesserung“. Jeder Fund aus reports/pruefung.md hat in TASK.md, Abschnitt „Funde“,
-//          `behoben` oder `verworfen: <Grund>`. Exit 0 vollständig, 1 sonst.
+//   funde: Haltepunkte „Prüfung“ und „Nachbesserung“. Jeder Fund aus reports/pruefung.md hat in TASK.md, Abschnitt „Funde“,
+//          `behoben` oder `verworfen: <Grund>`. Exit 0 vollständig, 1 sonst. Mit Bericht mindestens `haltepunkt: 4`;
+//          hat jeder Fund einen Status (auch `offen` als Wortlaut-Frage), `haltepunkt: 5`. Nie niedriger als vorher.
 // Start ist der Abzweig vom Hauptbranch (`git merge-base <hauptbranch> HEAD`).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -18,7 +19,7 @@ import { findWorkTree, tryLoadConfig } from '../project.ts'
 import { check } from './check.ts'
 
 const { GIT_QUIET } = pathsLib
-const { SOLO_REPORT, checkFindings } = soloFindingsLib
+const { SOLO_REPORT, checkFindings, findingStatuses } = soloFindingsLib
 
 const CODECYCLE_MD = '.claude/codecycle.md'
 const USAGE = 'Aufruf: codecycle solo check <aufgabenordner> | codecycle solo funde <aufgabenordner>'
@@ -104,13 +105,29 @@ function soloFunde(f: Folder, ctx: Ctx): number {
   const taskPath = join(f.abs, 'TASK.md')
   const task = existsSync(taskPath) ? readFileSync(taskPath, 'utf8') : ''
   const r = checkFindings(readFileSync(report, 'utf8'), task)
+  // `offen` ist eine Wortlaut-Frage an den Nutzer: zählt für die Merge-Sperre als fehlend, die Nachbesserung ist aber durch.
+  const last = new Map(findingStatuses(task).map(s => [s.id, s.status]))
+  const questions = r.fehlend.filter(id => last.get(id) === 'offen')
+  const stop = questions.length === r.fehlend.length ? 5 : 4
+  const reached = raiseStop(f, stop)
   if (r.fehlend.length > 0) {
     ctx.out(`rot: ${r.fehlend.length} von ${r.ids.length} Funden ohne Status in TASK.md, Abschnitt „Funde“: ${r.fehlend.join(', ')}`)
-    ctx.out('  Je Fund eine Zeile: „- M1: behoben (…)“ oder „- M1: verworfen: <Grund>“')
+    if (stop === 5) ctx.out(`  offen als Frage an den Nutzer im Abschluss: ${questions.join(', ')} · haltepunkt ${reached}`)
+    else ctx.out(`  Je Fund eine Zeile: „- M1: behoben (…)“ oder „- M1: verworfen: <Grund>“ · haltepunkt ${reached}`)
     return 1
   }
-  ctx.out(r.ids.length === 0 ? 'grün: Bericht ohne Funde' : `grün: alle ${r.ids.length} Funde mit Status`)
+  ctx.out(`${r.ids.length === 0 ? 'grün: Bericht ohne Funde' : `grün: alle ${r.ids.length} Funde mit Status`}, haltepunkt ${reached}`)
   return 0
+}
+
+/** Setzt `haltepunkt` in STATE.md auf `stop`, wenn er niedriger steht; liefert den Stand danach. */
+function raiseStop(f: Folder, stop: number): number {
+  const statePath = join(f.abs, 'STATE.md')
+  const text = readFileSync(statePath, 'utf8')
+  const now = stateFile.parseState(text, `${f.rel}/STATE.md`).haltepunkt ?? 0
+  if (now >= stop) return now
+  writeFileSync(statePath, stateFile.withHeadField(text, 'haltepunkt', String(stop)))
+  return stop
 }
 
 export function solo(args: string[], ctx: Ctx): number {

@@ -39,14 +39,17 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
    - Die Frage steht ganz unten unter „Entscheidungen für dich“: „1a: Voller Ablauf (`/codecycle:new`)“ und „1b: Solo-Weg“, je mit Folge, dazu „Empfehlung: 1a“ oder „Empfehlung: 1b“ mit Grund. Die Empfehlung ist dein Urteil und passt zur Begründung. Vor der Antwort legst du nichts an.
    - Weg und Antwort im Wortlaut kommen in den Verlauf von `STATE.md`.
 4. Thema als kurzer Name (Kleinbuchstaben, Bindestriche); Ordner `docs/codecycle/<JJJJ-MM-TT>-<thema>/` mit `reports/.gitkeep`; Branch `codecycle/<thema>` vom Hauptbranch (`git switch -c codecycle/<thema>`).
-5. `TASK.md` aus `${CLAUDE_PLUGIN_ROOT}/skills/workflow/templates/TASK.md` mit nur diesen Abschnitten: „Wortlaut“ (Beschreibung unverändert als Zitat, `> ` vor jeder Zeile, auch Tippfehler bleiben; danach nie mehr bearbeiten), „Ziel“ (1–3 Sätze), „Kurzplan“, „Annahmen“, „Funde“.
+5. `TASK.md` aus `${CLAUDE_PLUGIN_ROOT}/skills/workflow/templates/TASK.md` mit nur diesen Abschnitten: „Wortlaut“ (Beschreibung unverändert als Zitat, `> ` vor jeder Zeile, auch Tippfehler bleiben; danach nie mehr bearbeiten), „Ziel“ (1–3 Sätze), „Kurzplan“, „Eingabeformate“, „Annahmen“, „Funde“.
 6. `STATE.md` aus `${CLAUDE_PLUGIN_ROOT}/skills/workflow/templates/STATE.md`: `weg: solo`, `haltepunkt: 1`, `zustand: erfasst`, `art`, `groesse: klein`, `branch`, `zuletzt` heute, `budget` mit Nullen, **keine** Zeile `pakete:`; Verlauf „<Datum> erfasst (solo)“.
 7. Commit.
 
 ### 2. Kurzplan
 1. `haltepunkt: 2`, `zustand: in-arbeit`.
 2. In `TASK.md` unter „Kurzplan“ 3–10 Zeilen: Dateien, Vorgehen, wie du es prüfst. Keine Freigabe abwarten.
-3. Offene Punkte entscheidest du still und schreibst jeden als eine Zeile unter „Annahmen“: `- <Annahme> (Grund)`. Fragen nur bei einem Widerspruch oder einer Lücke im Wortlaut, die sich nicht still festlegen lässt; dann eine gebündelte Frage.
+3. Unter „Eingabeformate“ je Eingabe die Schreibweisen, die Nutzer dieser Aufgabe realistisch tippen oder einfügen: Komma oder Punkt, Tausendertrenner, wo der Wortlaut sie nicht ausschließt, Brüche (`½`, `1/2`), Abkürzungen mit und ohne Punkt, Einheit mit und ohne Leerzeichen, groß/klein, Umlaute. Nur was zu dieser Aufgabe passt; ohne Eingaben „keine“.
+   - Nur Schreibweisen, keine Deutung: Was eine Schreibweise bedeutet, steht unter „Annahmen“, denn der Prüfer bekommt diesen Abschnitt.
+   - Die Deutung folgt dem Wortlaut. Erlaubt er eine Schreibweise schon (z. B. „Dezimalzahlen mit Punkt“), bekommt sie keine zweite Bedeutung (`1.250` bleibt 1,25). Lässt er sie offen und hängt viel daran, ist das eine Lücke im Wortlaut (Punkt 4).
+4. Offene Punkte entscheidest du still und schreibst jeden als eine Zeile unter „Annahmen“: `- <Annahme> (Grund)`. Fragen nur bei einem Widerspruch oder einer Lücke im Wortlaut, die sich nicht still festlegen lässt; dann eine gebündelte Frage.
 
 ### Bauen (frei)
 - Reihenfolge, Tests zuerst oder danach, Zahl der Commits: frei. Nie `git commit --no-verify`; die Git-Hooks sind die Prüfung.
@@ -62,29 +65,35 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 
 ### 3. Eigene Kontrolle
 1. Berührt die Aufgabe eine Oberfläche: selbst im Browser ansehen, Desktop und Handybreite 375 px, danach Browser schließen.
-   - Server: `codecycle server --temp`; meldet es „--temp nicht eingerichtet“, `codecycle server`. Beenden mit `codecycle server --stop`.
+   - Server: `codecycle server --temp`, beenden mit `codecycle server --stop`.
+   - Meldet es „--temp nicht eingerichtet“: am Code nachsehen, ob der Server Daten speichert. Dann dem Nutzer in einer Frage den Eintrag in `.codecycle/tool.config.json` vorschlagen, Empfehlung zuerst: `"serverTemp": { "ohneDaten": true }` (speichert nichts) oder `"serverTemp": { "env": "<Variable der Datendatei>" }`.
+   - Eintragen erst nach der Antwort (Kontrolldatei, nicht committen), danach `codecycle guard --record` (neue Grundlage; sonst wertet ein späteres `codecycle guard` die Änderung als Eingriff).
+   - Ohne Eintrag keinen Server gegen echte Daten starten: Die Oberfläche bleibt ungeprüft, das kommt in den Verlauf von `STATE.md` und in die Startnachricht des Prüfers.
    - Nie `pkill -f`, `killall` oder `kill` mit Suchmuster: Das Muster trifft auch die eigene Shell, der Rest des Befehls läuft dann nicht.
-2. Alles committen.
-3. `codecycle solo check <ordner>`:
+2. Jede Schreibweise unter „Eingabeformate“ selbst ausprobieren (Kommandozeile, Schnittstelle oder Seite); was nicht stimmt, beheben.
+3. Alles committen.
+4. `codecycle solo check <ordner>`:
    - Exit 0: grün, `geprueftAuf` und `haltepunkt: 3` stehen in `STATE.md`. Weiter.
    - Exit 1: beheben, committen, erneut.
    - **Risikobereiche:** Die Ausgabe nennt berührte Bereiche in einer Zeile `Risikobereiche: …`. Bereiche ohne Pfadmuster („selbst beurteilen“) beurteilst du am Diff; berührt er sie, ergänze sie in dieser Zeile mit den Dateien. Die Zeile kommt in den Verlauf von `STATE.md` und in die Startnachricht des Prüfers. Keine Frage an den Nutzer.
-4. Verlauf in `STATE.md` ergänzen, Commit von `STATE.md` (Änderungen im Aufgabenordner zählen für die Sperre nicht).
+5. Verlauf in `STATE.md` ergänzen, Commit von `STATE.md` (Änderungen im Aufgabenordner zählen für die Sperre nicht).
 
 ### 4. Prüfung
 1. Wegwerf-Worktree am geprüften Commit, neben dem Projekt: `git worktree add --detach ../<projekt>--wt-solo-pruefung <geprueftAuf>`.
-2. `codecycle:solo-reviewer` starten, **nur** mit dieser Nachricht (keine Annahmen, kein Kurzplan, keine Meinung von dir):
+2. `codecycle:solo-reviewer` starten, **nur** mit dieser Nachricht (keine Annahmen, kein Kurzplan, keine Meinung von dir; die Eingabeformate sind eine Mindestliste, er ergänzt eigene):
    ```
    Aufgabenordner: <ordner>
    Worktree: <absoluter Pfad des Worktrees>
    Commit: <geprueftAuf>
    Diff: git diff <basis> <geprueftAuf>
    Risikobereiche: <Zeile aus `codecycle solo check`, ergänzt nach Haltepunkt 3> | keine
+   Eingabeformate:
+   <Abschnitt „Eingabeformate“ aus TASK.md, unverändert>
    Wortlaut:
    <Abschnitt „Wortlaut“ aus TASK.md, unverändert>
    ```
    `<basis>` nennt die Ausgabe von `codecycle solo check`. Verweigert der Mod den Start, nennt die Meldung den fehlenden Schritt.
-3. Nach der Quittung: `git worktree remove --force <worktree>`; `reports/pruefung.md` committen; `haltepunkt: 4`.
+3. Nach der Quittung: `git worktree remove --force <worktree>`; `codecycle solo funde <ordner>` setzt `haltepunkt: 4` (Exit 1 heißt hier nur: Funde noch ohne Status); Bericht und `STATE.md` committen, erst dann nachbessern.
 
 ### 5. Nachbesserung (eine Runde)
 1. Lies den Bericht. Je Fund (`M1`, `M2` …) unter „Funde“ in `TASK.md` genau eine Zeile:
@@ -93,7 +102,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
    - `- M3: offen: Frage an den Nutzer`: nur für Abweichungen vom Wortlaut.
 2. **Abweichung vom Wortlaut nie still verwerfen:** Sie wird eine Frage an den Nutzer im Abschluss; Empfehlung: den Wortlaut einhalten.
 3. Nach den Korrekturen `codecycle check` grün, Commit. Keine erneute Prüfung.
-4. `codecycle solo funde <ordner>`: Exit 1 ist nur mit offenen Wortlaut-Fragen in Ordnung. `haltepunkt: 5`, Commit.
+4. `codecycle solo funde <ordner>`: setzt `haltepunkt: 5`, sobald jeder Fund einen Status hat; Exit 1 ist nur mit offenen Wortlaut-Fragen in Ordnung. Commit.
 
 ### 6. Abschluss
 1. Doku und Changelog nach dem „Doku-Aufbau“ in `.claude/codecycle.md` selbst nachziehen; Commit.

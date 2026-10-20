@@ -36,9 +36,10 @@ export type ToolConfig = {
   junit?: string
   /**
    * Wegwerf-Datendatei für den Browser-Prüfer (`server --temp`): `env` = Umgebungsvariable, über die der Server seine
-   * Datendatei liest; `file` = Dateiname in der Wegwerf-Ablage (Standard `daten`). Nie automatisch erzeugt.
+   * Datendatei liest; `file` = Dateiname in der Wegwerf-Ablage (Standard `daten`). `ohneDaten: true` = der Server
+   * speichert nichts, `--temp` startet ihn ohne Variable. Nie automatisch erzeugt.
    */
-  serverTemp?: { env: string; file?: string }
+  serverTemp?: { env: string; file?: string } | { ohneDaten: true }
 }
 
 /** Gemeinsames Git-Verzeichnis (`--git-common-dir`, absolut; im Worktree das `.git` des Hauptordners). */
@@ -105,9 +106,16 @@ export function loadConfig(root: string): ToolConfig {
   }
   const serverTemp = (data as { serverTemp?: unknown }).serverTemp
   if (serverTemp !== undefined) {
-    const st = serverTemp as { env?: unknown; file?: unknown } | null
-    if (typeof st !== 'object' || st === null || Array.isArray(st)) throw new ToolBroken(`${CONFIG_PATH}: serverTemp muss ein Objekt { env, file? } sein`)
-    if (typeof st.env !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(st.env)) {
+    const st = serverTemp as { env?: unknown; file?: unknown; ohneDaten?: unknown } | null
+    if (typeof st !== 'object' || st === null || Array.isArray(st)) {
+      throw new ToolBroken(`${CONFIG_PATH}: serverTemp muss ein Objekt { env, file? } oder { ohneDaten: true } sein`)
+    }
+    if ('ohneDaten' in st) {
+      // „speichert nichts“ ist eine bewusste Aussage: nur true, nicht gemischt mit env/file
+      if (st.ohneDaten !== true || Object.keys(st).length !== 1) {
+        throw new ToolBroken(`${CONFIG_PATH}: serverTemp.ohneDaten muss true sein und allein stehen ({ "ohneDaten": true })`)
+      }
+    } else if (typeof st.env !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(st.env)) {
       throw new ToolBroken(`${CONFIG_PATH}: serverTemp.env muss der Name einer Umgebungsvariable sein (Text, nicht leer)`)
     }
     if (st.file !== undefined && (typeof st.file !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(st.file))) {

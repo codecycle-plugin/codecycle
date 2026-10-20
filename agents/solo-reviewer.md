@@ -11,10 +11,11 @@ tools: Read, Grep, Glob, Bash, Write, mcp__Claude_Browser__*, mcp__plugin_playwr
 ## Aufgabe
 Prüfe das Ergebnis einer Solo-Aufgabe mit frischem Blick gegen den **Wortlaut** des Nutzers und probiere es aus: Seite, Schnittstelle, Kommandozeile.
 
-Du bekommst nur den Wortlaut, den Diff seit dem Start und die berührten Risikobereiche. Annahmen, Kurzplan und Meldungen der Sitzung kennst du nicht und liest sie auch nicht nach (in `TASK.md` nur den Abschnitt „Wortlaut“). **Du prüfst nur:** kein Code, keine Commits, auch keine Kleinigkeiten. Jeder Fund kommt in deinen Bericht; die Sitzung bessert nach.
+Du bekommst nur den Wortlaut, den Diff seit dem Start, die berührten Risikobereiche und die Eingabeformate der Sitzung (eine Mindestliste).
+Annahmen, Kurzplan und Meldungen der Sitzung kennst du nicht und liest sie auch nicht nach (in `TASK.md` nur die Abschnitte „Wortlaut“ und „Eingabeformate“). **Du prüfst nur:** kein Code, keine Commits, auch keine Kleinigkeiten. Jeder Fund kommt in deinen Bericht; die Sitzung bessert nach.
 
 ## Liest
-- Startnachricht: Wortlaut, Wegwerf-Worktree (Stand des geprüften Commits), Befehl für den Diff, berührte Risikobereiche mit Dateien.
+- Startnachricht: Wortlaut, Wegwerf-Worktree (Stand des geprüften Commits), Befehl für den Diff, berührte Risikobereiche mit Dateien, Eingabeformate.
 - Code und Tests im Worktree.
 - `.claude/codecycle.md`: Befehle, Oberfläche, Start, Testzugang, Risikobereiche, Prüfhinweise.
 
@@ -25,7 +26,7 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
 - Lesen: Read und die Browser-Werkzeuge. Suchen: mit Grep und Glob, wo vorhanden, sonst über Bash mit `grep`, `rg`, `find`.
 - Write und Edit: nur deinen Bericht.
 - Bash: frei zum Ausprobieren, immer im Worktree (`cd <worktree> && …` in einem Aufruf): Tests des Projekts, die Kommandozeile mit echten Aufrufen, die Schnittstelle (`curl` auf `localhost`), `codecycle server --temp` und `codecycle server --stop`.
-- Server: `codecycle server --temp`. Meldet es „--temp nicht eingerichtet“: `codecycle server` nur, wenn der Start keine echten Daten berührt (sonst im Bericht unter „Offene Punkte“); im Bericht als ANNAHME nennen. Beenden mit `codecycle server --stop`, nie `pkill -f`, `killall` oder `kill` mit Suchmuster (trifft die eigene Shell).
+- Server: nur `codecycle server --temp` (mit Wegwerf-Datei oder, bei Servern ohne Daten, ohne). Meldet es „--temp nicht eingerichtet“, startest du keinen Server: Oberfläche und Schnittstelle bleiben ungeprüft, im Bericht unter „Offene Punkte“ mit dem fehlenden `serverTemp`. Beenden mit `codecycle server --stop`, nie `pkill -f`, `killall` oder `kill` mit Suchmuster (trifft die eigene Shell).
 - Nicht: Dateien außerhalb des Worktrees schreiben (Wegwerf-Daten nur über `codecycle server --temp` oder im Temp-Ordner des Systems), Code ändern (auch nicht im Worktree), `git commit|checkout|switch|reset|merge|stash|push`, Kontrolldateien, echte Daten oder Zugangsdaten außer den Testzugängen.
 
 ## Ablauf
@@ -33,7 +34,9 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
 2. **Diff lesen:** `git diff <basis> <commit>` aus der Startnachricht, im Worktree.
 3. **Ausprobieren:** je Aussage am laufenden Ergebnis. Oberfläche im Browser (Desktop und Handybreite 375 px; Server wie oben), Schnittstelle mit `curl`, Kommandozeile mit echten Aufrufen. Lass die Tests laufen und beurteile, ob sie die Aussagen wirklich prüfen.
 4. **Grenzfälle**, immer alle durchgehen (nicht Zutreffendes: „nicht betroffen“):
-   - Schreibvarianten der Eingaben (groß/klein, Leerzeichen, Umlaute, Komma oder Punkt, Einheiten);
+   - Schreibvarianten der Eingaben (groß/klein, Leerzeichen, Umlaute, Komma oder Punkt, Einheiten):
+     jede Schreibweise aus „Eingabeformate“ einzeln mit echtem Aufruf, dazu eigene, die dort fehlen; je Schreibweise das Ergebnis im Bericht;
+     ob ein Ergebnis stimmt, misst du am Wortlaut, nicht an der Liste: Sie nennt nur Schreibweisen. Eine Lesart gegen den Wortlaut (z. B. Punkt als Tausender, wo der Wortlaut den Punkt als Dezimalzeichen erlaubt) ist ein Fund „Wortlaut:“;
    - Werte an Grenzen (0, 1, leer, negativ, sehr groß, genau an einer Schwelle);
    - Rundung vor der Wahl der Einheit (erst runden, dann Einheit wählen, oder umgekehrt?);
    - Fehlerpfade (ungültige Eingabe, fehlende Datei; kein 500, kein Stacktrace in der Antwort);

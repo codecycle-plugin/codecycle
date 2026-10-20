@@ -64,7 +64,7 @@ const HELP = [
   '  commit-tests -m <nachricht>   gestagte Testdateien committen, auch wenn rot (nur Test-Autor, Debugger)',
   '  lint, format      Lint bzw. Format laut Konfiguration',
   '  check [--full]    Lint, Format, Tests; --affected [--staged]: Tests nur zum Diff',
-  '  server [--stop | --temp [--same]]   Dev-Server im Hintergrund (Log unter .codecycle/tmp/); --temp mit Wegwerf-Datendatei (serverTemp), --same behält sie',
+  '  server [--stop | --temp [--same]]   Dev-Server im Hintergrund (Log unter .codecycle/tmp/); --temp mit Wegwerf-Datendatei oder ohne Daten (serverTemp), --same behält sie',
   '  locate "Datei :: Symbol"   datei:start-ende signatur',
   '  callers "Symbol"            Aufrufer, eine Zeile pro Treffer',
   '  tests-for "Symbol"          Tests zum Symbol',
