@@ -33,13 +33,23 @@ export type UpdateResult = {
 }
 
 export type Run = { code: number; stdout: string; stderr: string; missing: boolean }
-/** Prozessaufruf, im Test ersetzbar. `claude` unter Windows über die Shell (claude.cmd aus npm). */
-export type Runner = (argv: string[], cwd: string) => Run
+/**
+ * Prozessaufruf, im Test ersetzbar. `claude` unter Windows über die Shell (claude.cmd aus npm). `timeoutMs`: danach
+ * wird der Prozess beendet und der Aufruf gilt als gescheitert (Code 1); ohne Angabe kein Zeitlimit.
+ */
+export type Runner = (argv: string[], cwd: string, opts?: { timeoutMs?: number }) => Run
 
-export const defaultRunner: Runner = (argv, cwd) => {
+export const defaultRunner: Runner = (argv, cwd, opts) => {
   const [cmd, ...rest] = argv as [string, ...string[]]
   const shell = process.platform === 'win32' && cmd === 'claude'
-  const r = spawnSync(cmd === 'node' ? process.execPath : cmd, rest, { cwd, encoding: 'utf8', shell, windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+  const r = spawnSync(cmd === 'node' ? process.execPath : cmd, rest, {
+    cwd,
+    encoding: 'utf8',
+    shell,
+    windowsHide: true,
+    maxBuffer: 64 * 1024 * 1024,
+    ...(opts?.timeoutMs ? { timeout: opts.timeoutMs } : {}),
+  })
   const missing = (r.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT' || (shell && r.status !== 0 && /not recognized|nicht gefunden|nicht erkannt/i.test(r.stderr ?? ''))
   return { code: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? '', missing }
 }
@@ -55,7 +65,7 @@ function pluginVersionOf(root: string): string {
 
 /** Letzte JSON-Zeile einer Ausgabe (claude … --json druckt eine). */
 /** JSON einer Ausgabe: die ganze Ausgabe (`plugin list --json` druckt mehrzeilig), sonst die letzte JSON-Zeile. */
-function lastJson(text: string): unknown {
+export function lastJson(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch {

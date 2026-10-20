@@ -2,7 +2,7 @@
 // Zeichen und Namen je Rolle. Die Zeichnung selbst steht in `figures.ts`.
 // Reiner Code ohne Node und ohne Mod-API, wie die übrigen Dateien in lib/.
 
-/** Die 17 Rollen laut `agents/` plus `other` für fremde Agenten. */
+/** Die 18 Rollen laut `agents/` plus `other` für fremde Agenten. */
 export const FIGURE_ROLES: readonly string[] = [
   'acceptance',
   'architect',
@@ -18,6 +18,7 @@ export const FIGURE_ROLES: readonly string[] = [
   'reviewer',
   'security-reviewer',
   'setup',
+  'solo-reviewer',
   'surveyor',
   'test-author',
   'toolsmith',
@@ -62,6 +63,7 @@ const LABELS: Record<string, string> = {
   reviewer: 'Prüfer',
   'security-reviewer': 'Sicherheitsprüfer',
   setup: 'Einrichter',
+  'solo-reviewer': 'Solo-Prüfer',
   surveyor: 'Gutachter',
   'test-author': 'Test-Autor',
   toolsmith: 'Werkzeugmeister',
@@ -84,6 +86,7 @@ const GLYPHS: Record<string, string> = {
   reviewer: '◎',
   'security-reviewer': '◈',
   setup: '▲',
+  'solo-reviewer': '◉',
   surveyor: '△',
   'test-author': '◆',
   toolsmith: '⚒',

@@ -156,11 +156,35 @@ export function parseState(text: string, quelle: string): TaskState {
     budget: { geplant: num(budget.geplant), verbraucht: num(budget.verbraucht), nachlauf: num(budget.nachlauf) },
     planrunden: num(scalar(head.planrunden ?? '0')),
     zuletzt: str(scalar(head.zuletzt ?? '')),
+    // Solo-Weg: `weg: solo`; fehlt oder anderer Wert = voller Ablauf
+    weg: str(scalar(head.weg ?? '')) === 'solo' ? 'solo' : 'voll',
+    geprueftAuf: str(scalar(head.geprueftAuf ?? '')),
+    haltepunkt: num(scalar(head.haltepunkt ?? '0')),
     pakete,
     naechsterSchritt: sectionItems(sections['nächster schritt'] ?? []),
     offeneFragen: sectionItems(sections['offene fragen'] ?? []),
     blocker: sectionItems(sections['blocker'] ?? []),
   }
+}
+
+/**
+ * Setzt ein einfaches Feld im YAML-Kopf (`schluessel: wert`): ersetzt die vorhandene Zeile, sonst steht die neue
+ * Zeile vor `pakete:` bzw. am Ende des Kopfs. Kommentar und Rest der Datei bleiben unverändert; wirft ohne YAML-Kopf.
+ */
+export function withHeadField(text: string, key: string, value: string): string {
+  const nl = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  if (lines[0]?.trim() !== '---') throw new Error('STATE.md ohne YAML-Kopf')
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
+  if (end < 0) throw new Error('STATE.md: YAML-Kopf nicht geschlossen')
+  const line = `${key}: ${value}`
+  const at = lines.findIndex((l, i) => i > 0 && i < end && l.startsWith(`${key}:`))
+  if (at >= 0) lines[at] = line
+  else {
+    const pakete = lines.findIndex((l, i) => i > 0 && i < end && /^pakete:/.test(l))
+    lines.splice(pakete >= 0 ? pakete : end, 0, line)
+  }
+  return lines.join(nl)
 }
 
 /** Wählt die aktive Aufgabe: nicht fertig/verworfen, zuletzt geändert zuerst. */

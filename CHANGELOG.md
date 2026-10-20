@@ -2,6 +2,85 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.18.2 / Werkzeug 0.6.2] – 2026-10-20
+
+### Geändert
+
+- `codecycle solo check` setzt bei Grün neben `geprueftAuf` auch `haltepunkt: 3` in `STATE.md`.
+- `/codecycle:solo` und der Solo-Prüfer: Ist `codecycle server --temp` nicht eingerichtet, starten sie den Server mit `codecycle server` und beenden ihn nur mit `codecycle server --stop`, nie mit `pkill -f` oder `killall` (das Suchmuster trifft die eigene Shell). Der Prüfer startet so nur, wenn keine echten Daten berührt werden.
+
+## [0.18.1 / Werkzeug 0.6.1] – 2026-10-20
+
+### Geändert
+
+- `/codecycle:solo`: Ein Risikobereich aus `.claude/codecycle.md` ist kein Grund mehr für eine Frage vorab. `codecycle solo check` nennt berührte Bereiche in einer Zeile `Risikobereiche: …`, und der Solo-Prüfer prüft diese Dateien zusätzlich auf Sicherheit (ungeprüfte Eingaben, Abstürze, Einschleusen, Interna in Antworten). Gefragt wird vorab nur bei schwer Rückgängigem, im Format „Entscheidungen für dich“.
+- `codecycle solo check` kennt die Option `--risiko-bestaetigt` und den Exit-Code 3 nicht mehr.
+
+## [0.18.0 / Werkzeug 0.6.0] – 2026-10-19
+
+### Neu
+
+- `/codecycle:solo <Beschreibung>`: Die Sitzung baut die Aufgabe selbst; ein frischer Prüfer (Rolle `solo-reviewer`, Opus) bekommt nur den Wortlaut und den Diff, probiert Seite, Schnittstelle und Kommandozeile in einem Wegwerf-Worktree aus und geht eine feste Grenzfall-Liste durch; danach eine Runde Nachbesserung und die Merge-Frage. Sechs Haltepunkte; Abgaben einzelner Teile an `builder-logic` oder `builder-routine` sind möglich.
+- `codecycle solo check <ordner>`: `check` grün, alles committet, Risikobereiche der geänderten Dateien (Exit 3: Frage an den Nutzer); hält den geprüften Commit fest. `codecycle solo funde <ordner>`: jeder Fund des Prüfberichts hat einen Status.
+- Risikobereiche in `.claude/codecycle.md` können Pfadmuster tragen: `- Auth: Grund (Pfade: src/auth/**)`.
+- Mod: Der Solo-Prüfer startet nur nach grünem `codecycle solo check`; ein Solo-Branch wird nur mit Prüfbericht und Status je Fund gemergt; in Solo-Aufgaben schreiben nur die Sitzung, die Handwerker und der Prüfer (nur seinen Bericht).
+
+## [0.17.0 / Werkzeug 0.5.4] – 2026-10-19
+
+### Neu
+
+- Die Aufgabe hält den Text des Nutzers unverändert im Abschnitt „Wortlaut“ fest. Plan-Prüfer und Abschlussprüfung prüfen Kriterien, Standards, Plan und Ergebnis dagegen; Standards, die den Wortlaut auslegen, fragt der Bauleiter einzeln.
+- `codecycle effort --record` nennt, wie viele Hauptsitzungen erfasst sind und was nicht erfasst ist.
+
+### Geändert
+
+- Rote Abnahmetests liegen je Paket in dessen Worktree, nicht mehr im Aufgaben-Branch; ein fertiges Paket scheitert nicht mehr an roten Tests eines späteren Pakets.
+- Entscheidungen stehen mit der Antwort des Nutzers im Wortlaut.
+- `.claude/codecycle.md` enthält nur Dauerhaftes; die Browser-Bereitschaft prüft der Selbsttest vor jedem Browser-Prüfer.
+
+### Behoben
+
+- Hauptsitzungen im Kopfmodus und nach `--resume` werden in die Aufgabe gebucht.
+
+## [0.16.1 / Werkzeug 0.5.3] – 2026-10-19
+
+### Geändert
+
+- Aufwandsplan, Ablauf-Skill und Schritte ohne interne Kennungen in Klammern; die Begründungen bleiben.
+- README mit Inhaltsverzeichnis.
+- Ablauf-Skill: unter der Tabelle „Schalter“ steht, dass `assume-and-continue` nur über die Anleitung wirkt und `demo-data` nur die Anzeige betrifft.
+
+## [0.16.0 / Werkzeug 0.5.2] – 2026-10-18
+
+### Neu
+
+- `/codecycle:notiz <Text>` und `codecycle notiz '<Text>'`: Notiz ohne KI in `notizen.md` der offenen Aufgabe; nur mit Schalter `notizen: an`.
+- Selbsttest und Einrichtung prüfen bei Projekten mit Oberfläche die Voraussetzungen des Browser-Prüfers (Playwright-Plugin, Google Chrome, kein zweiter Playwright-Server, Serverbefehl).
+- Bleibt der Browser nach dem Browser-Prüfer offen, zeigt die Bautafel einen Hinweis, und der Bauleiter erfährt es.
+
+### Geändert
+
+- Suchen über Bash (`grep`, `rg`, `find`) zählen wie Grep und Glob; wichtig unter Linux und macOS, wo es diese Werkzeuge nicht gibt. Einige Optionen von ugrep und bfs, die Programme starten oder Dateien schreiben oder löschen, sind für prüfende Rollen gesperrt.
+- Aufwand je Rolle und Bauleiter wird in gewichteten Tokens dieser Sitzung angezeigt; der Anteil am 5-Stunden-Fenster steht nur noch als Näherung daneben, weil dort andere Sitzungen mitzählen.
+- Der Aufgabenordner eines neuen Agenten kommt aus der offenen Aufgabe; ein vertippter Ordner wird berichtigt oder der Start abgelehnt.
+- `codecycle effort` weist darauf hin, wenn eine Aufgabe einen Risikobereich berührt und der Zaun aus ist.
+- `codecycle install-tool` übernimmt den Serverbefehl aus der Projektbeschreibung.
+- Die Bautafel erscheint nur in eingerichteten Projekten; sonst wird `/codecycle:setup` im Eingabefeld vorgeschlagen.
+- Nach `/codecycle:update` steht in der Meldung, dass man `/reload-plugins` eingeben kann, falls nicht neu geladen wird.
+- Feste Form für Fragen an den Nutzer.
+- Seitenleiste im Terminal: In schmalen Ansichten fallen weniger wichtige Angaben weg (zuerst der Anteil am 5-Stunden-Fenster), statt mitten im Text abgeschnitten zu werden; die gewichteten Tokens stehen in der Agentenzeile gleich nach dem Kontext; „1 Lauf“ statt „1 Läufe“.
+- Der Paketleiter (Schalter `package-lead`) kann über Bash suchen und Git lesen; schreiben darf er nur seinen Bericht.
+- Beim Abschluss einer Aufgabe wird `notizen.md` mit committet.
+- Die Meldung von `/codecycle:notiz` bei ausgeschaltetem Schalter nennt die Schreibweise des Schalterblocks (`notizen: an`).
+- Auch prüfende Rollen und der Paketleiter dürfen `codecycle notiz` aufrufen (nur mit Schalter `notizen: an`).
+- Der Selbsttest wartet höchstens 15 Sekunden auf `claude plugin list`; danach meldet er das Playwright-Plugin als „nicht prüfbar“.
+
+### Behoben
+
+- Eine Folgenachricht an einen fertigen Agenten zählte als neuer Start: Register und Lese-Budget begannen von vorn, ein zusätzlicher Lauf wurde gezählt, und Claude Code protokollierte einen Fehler, weil der Mod die Nachricht umschreiben wollte. Jetzt läuft der Agent unter seinem Eintrag weiter, auch nach einem Neuladen des Mods.
+- In Projekten ohne `.claude/codecycle.md` blitzte die Bautafel beim Start kurz auf.
+- Die Meldung beim abgelehnten Agentenstart zeigt den Ordner ohne angehängtes Satzzeichen.
+
 ## [0.15.7 / Werkzeug 0.4.10] – 2026-10-16
 
 ### Geändert

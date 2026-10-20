@@ -15,8 +15,10 @@ export type Package = {
 
 export type RoleCost = {
   rolle: string
-  /** gemessene Prozentpunkte des 5-Stunden-Fensters (Summe der Läufe dieser Aufgabe) */
+  /** gemessene Prozentpunkte des 5-Stunden-Fensters (Summe der Läufe dieser Aufgabe); Konto-Näherung, andere Sitzungen zählen mit */
   prozent: number
+  /** gewichtete Tokens der Rolle (Hauptmaß, `lib/tokens.ts :: weightedTokens`); fehlt bei Beispieldaten */
+  gewichtet?: number
   /** Tokens der Rolle in dieser Aufgabe (Token-Buch); fehlt bei Beispieldaten */
   tokens?: number
   laeufe?: number
@@ -41,6 +43,12 @@ export type TaskState = {
   budget: { geplant: number; verbraucht: number; nachlauf: number }
   planrunden: number
   zuletzt: string
+  /** Weg der Aufgabe: `solo` (Sitzung baut, ein Prüfer am Ende) oder `voll` (Pakete); fehlt in alten STATE.md = voll */
+  weg?: 'solo' | 'voll'
+  /** Solo-Weg: Commit, auf dem `codecycle solo check` zuletzt grün war; leer = noch nie */
+  geprueftAuf?: string
+  /** Solo-Weg: Haltepunkt 1–6, an dem die Aufgabe steht; 0 = nicht gesetzt */
+  haltepunkt?: number
   pakete: Package[]
   naechsterSchritt: string[]
   offeneFragen: string[]
@@ -65,6 +73,12 @@ export type Metrics = {
   /** davon neu (Eingabe, Ausgabe, Cache-Schreiben) und aus dem Cache gelesen */
   frisch: number
   cache: number
+  /** gewichtete Tokens (Hauptmaß, `lib/tokens.ts :: weightedTokens`): gesamt, Agenten (Summe der Rollen), Bauleiter */
+  gewichtet?: number
+  agentenGewichtet?: number
+  bauleiterGewichtet?: number
+  /** Agenten ohne codecycle-Rolle (Zeile `fremd` im Token-Buch); fehlt, wenn es keine gab */
+  fremd?: { gewichtet: number; frisch: number; cache: number }
   /** Modell-Anfragen (Runden) aller Agenten und der Hauptsitzung */
   runden: number
   /** Cache-Lesen ÷ gesamte Eingabe, 0 bis 1 */
@@ -73,7 +87,7 @@ export type Metrics = {
   fehlenderKontext: number
   /** Tokens der Hauptsitzung */
   hauptsitzung: number
-  /** Bauleiter (Hauptsitzung) getrennt von den Agenten: Modell, neu, Cache, Prozentpunkte des 5h-Fensters */
+  /** Bauleiter (Hauptsitzung) getrennt von den Agenten: Modell, neu, Cache, Prozentpunkte des 5h-Fensters (Konto-Näherung) */
   bauleiterModell?: string
   bauleiterFrisch?: number
   bauleiterCache?: number
@@ -162,7 +176,7 @@ declare module 'claude-code' {
        * Einrichtung: .claude/codecycle.md da? Node-Version, 'fehlt' oder null (nicht prüfbar); Konfiguration da?
        * Werkzeug-Kopie: Version, 'fehlt', 'unlesbar' oder null; hooks/lib/setup-check.ts
        */
-      setup: { projekt: boolean; node: string | null; config?: boolean; kopie?: string | null }
+      setup: { projekt: boolean | null; node: string | null; config?: boolean; kopie?: string | null }
     }
   }
 }

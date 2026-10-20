@@ -44,7 +44,7 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
         surface,
         component: 'Pane',
         requestId: 'codecycle-panel',
-        props: { title: 'codecycle', isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
+        props: { title: 'codecycle', isFocused: true, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
       })
     let ui = await pane('terminal')
     // Rolle und „›“ stehen im Knopf der Titelzeile (ganze Titelzeile anklickbar), das Statuszeichen daneben
@@ -67,6 +67,11 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     expect(await narrow.find({ type: 'Text', text: /Kontext 25 % · .*neu 1,5k/ })).toBeUndefined()
     expect(JSON.stringify(await narrow.find({ key: 'kosten-builder-logic' }))).not.toMatch(/neu 1,5k/)
     await narrow.unmount()
+    // mittlere Breite: gewichtete Tokens gleich nach dem Kontext, neu/Cache fallen weg statt abgeschnitten zu werden
+    const mid = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: { ...paneProps, bodyColumns: 60 } })
+    expect(await mid.find({ type: 'Text', text: /Kontext 25 % · [\d,]+k? gew\./ })).toBeDefined()
+    expect(await mid.find({ type: 'Text', text: /Kontext 25 % · .*neu 1,5k/ })).toBeUndefined()
+    await mid.unmount()
 
     // Detailansicht eines Agenten mit aktueller Tätigkeit und Register-Listen, live und mit „Zurück“
     await $.tool.call({ tool: 'Read', file_path: '/proj/src/Group.php', agentId: 'ag1' } as never)
@@ -381,7 +386,8 @@ Paket: P1`, 'codecycle:builder-logic')
     await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
     await stepOnce($, 'ag1')
     const terminal = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
-    expect(await terminal.find({ type: 'Text', text: /gesamt neu 1,5k · Cache 249k/ })).toBeDefined()
+    // Entscheidung 2a: gewichtete Tokens vor neu und Cache
+    expect(await terminal.find({ type: 'Text', text: /gesamt [\d,]+k? gew\. · neu 1,5k · Cache 249k/ })).toBeDefined()
     expect(await terminal.find({ type: 'Text', text: /Tsd/ })).toBeUndefined()
     await terminal.unmount()
     const desktop = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })

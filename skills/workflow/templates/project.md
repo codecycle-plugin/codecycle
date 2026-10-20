@@ -1,21 +1,20 @@
 # codecycle: Projektbeschreibung
 
-Vorlage für `.claude/codecycle.md`. Wird vom Agenten `setup` ausgefüllt, der Nutzer bestätigt.
+Vorlage für `.claude/codecycle.md`. Wird vom Agenten `setup` ausgefüllt, der Nutzer bestätigt. Nur Dauerhaftes: kein Zustand (wie „Projekt ist leer“, „entsteht mit dieser Aufgabe“, „offen“) und keine Angaben zur Umgebung; die Browser-Bereitschaft meldet `codecycle selftest`.
 
 ## Sprache und Struktur
 - Sprache der Agenten-Ausgaben (Berichte, Quittungen, Rückfragen, Commit-Messages): Deutsch
-- Struktur: <Ordner und ihre Aufgabe, Haupt-Sprachen, Frameworks>
+- Struktur: <vorhandene Ordner und ihre Aufgabe, Haupt-Sprachen, Frameworks>
 
 ## Befehle
-Über das Projekt-Werkzeug (`codecycle test`, `lint`, `format`, `check`, `server`); je Befehl oder „nicht vorhanden“.
+Über das Projekt-Werkzeug (`codecycle test`, `lint`, `format`, `check`, `server`); je Befehl oder „nicht vorhanden“. Den Serverbefehl übernimmt `codecycle install-tool` als `commands.server` in `.codecycle/tool.config.json` (`--update-config` ergänzt ihn dort, wenn er fehlt); in der Zeile `server:` steht deshalb nur der Befehl in Backticks oder „nicht vorhanden“.
 - test: <…>
 - lint: <… | nicht vorhanden>
 - format: <… | nicht vorhanden>
-- server: <… | nicht vorhanden>
+- server: <`befehl` | nicht vorhanden>
 
 ## Oberfläche
 - Gibt es eine: <ja | nein>
-- Browser-Voraussetzung für den Browser-Prüfer: ein Browser-Werkzeug (Desktop-App oder Playwright-Plugin; Namen unbestätigt), sonst entfällt der Browser-Prüfer
 - Start: <…>
 - Wegwerf-Daten: <Umgebungsvariable der Datendatei | keine> (steht als `serverTemp.env` in `.codecycle/tool.config.json`; `codecycle server --temp` startet damit den Server mit einer frischen Wegwerf-Datei, damit der Browser-Prüfer echte Daten nicht ändert)
 - Test-Zugang: <Testwerte, keine echten Zugangsdaten>
@@ -25,7 +24,7 @@ Vorlage für `.claude/codecycle.md`. Wird vom Agenten `setup` ausgefüllt, der N
 - Aktualisierung: <Git-Hooks in .githooks/ | von Hand | –>
 
 ## Risikobereiche
-- <Bereich, Grund> (z. B. Mandantentrennung, Auth, Migrationen)
+- <Bereich>: <Grund> (Pfade: <Muster>, …) (z. B. `- Auth: Anmeldung und Rechte (Pfade: src/auth/**, api/login.ts)`; Muster wie in `.gitignore`: `**` beliebige Ordner, `*` innerhalb eines Namens, ohne `/` in jeder Tiefe. Ohne „(Pfade: …)“ erkennt `codecycle solo check` den Bereich nicht und die Sitzung urteilt selbst.)
 
 ## Konventionen
 - <2–3 knappe Regeln je Bereich; Details stehen in der Bereichs-CLAUDE.md>
@@ -63,6 +62,7 @@ plan-html: aus
 auto-resume: aus
 agent-progress: aus
 demo-data: aus   # Beispieldaten auf Bautafel und Seitenleiste, solange keine Aufgabe offen ist
+notizen: aus   # Beobachtungen mit /codecycle:notiz bzw. codecycle notiz in notizen.md der Aufgabe
 assume-and-continue: an
 graph: an   # wenn vorhanden
 cache-ttl-builder: 5m

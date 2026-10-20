@@ -30,3 +30,6 @@ export const switchesLib = (await load('switches')) as typeof import('../lib/swi
 export const projectRootLib = (await load('project-root')) as typeof import('../lib/project-root.ts')
 export const pathsLib = (await load('paths')) as typeof import('../lib/paths.ts')
 export const versionsLib = (await load('versions')) as typeof import('../lib/versions.ts')
+export const tokensLib = (await load('tokens')) as typeof import('../lib/tokens.ts')
+export const riskPathsLib = (await load('risk-paths')) as typeof import('../lib/risk-paths.ts')
+export const soloFindingsLib = (await load('solo-findings')) as typeof import('../lib/solo-findings.ts')

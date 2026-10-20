@@ -25,6 +25,16 @@ function budgetText(b: TaskState['budget']): string {
   return text
 }
 
+/** Namen der sechs Haltepunkte des Solo-Wegs (skills/solo/SKILL.md) */
+const SOLO_STOPS: Record<number, string> = {
+  1: 'Start',
+  2: 'Kurzplan',
+  3: 'Eigene Kontrolle',
+  4: 'Prüfung',
+  5: 'Nachbesserung',
+  6: 'Abschluss',
+}
+
 type Row = { folder: string; state?: TaskState; error?: string; plan?: Plan; planError?: string }
 
 export function tasks(_args: string[], ctx: Ctx): number {
@@ -75,6 +85,15 @@ export function tasks(_args: string[], ctx: Ctx): number {
     if (!s) {
       ctx.out(`${row.folder} · nicht lesbar`)
       ctx.out(`  ! ${row.error}`)
+      continue
+    }
+    // Solo-Weg: kein Paket, sondern der Haltepunkt (1–6)
+    if (s.weg === 'solo') {
+      const halt = s.haltepunkt ? `Haltepunkt ${s.haltepunkt}${SOLO_STOPS[s.haltepunkt] ? ` (${SOLO_STOPS[s.haltepunkt]})` : ''}` : 'Haltepunkt ?'
+      ctx.out(`${s.aufgabe} · ${s.zustand} · solo · ${halt}${s.geprueftAuf ? ` · geprüft auf ${s.geprueftAuf.slice(0, 7)}` : ''} · zuletzt ${s.zuletzt}`)
+      if (s.naechsterSchritt[0]) ctx.out(`  nächster Schritt: ${s.naechsterSchritt[0]}`)
+      for (const hint of gitHints(root, s, main, today)) ctx.out(`  ! ${hint}`)
+      for (const hint of agentHints(root, `${TASKS_DIR}/${row.folder}`, s, today)) ctx.out(`  ! ${hint}`)
       continue
     }
     const done = s.pakete.filter(p => p.status === 'fertig').length

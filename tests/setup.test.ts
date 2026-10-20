@@ -10,6 +10,12 @@ describe('Einrichtung und Werkzeug-Kopie', () => {
     mock.store(on)
     const files: Record<string, string> = { ...FILES }
     fakeWorld(on, files)
+    // Bautafel der Engine (der Mod reicht im nicht eingerichteten Projekt weiter)
+    const engine: string[] = []
+    on('ui.render', { component: 'AbovePrompt' }, (_$, e) => {
+      engine.push(e.surface)
+      return { type: 'engine', ref: 1 } as never
+    })
     let node: 'fehlt' | 'alt' | 'gut' = 'fehlt'
     on('process.run', (_$, e) => {
       if (e.argv[0] === 'git') return { value: { exitCode: 0, stdout: 'git version 2.55.0\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -37,24 +43,36 @@ describe('Einrichtung und Werkzeug-Kopie', () => {
     expect(r.setup).toBeDefined()
     expect(r.kopie).toBeUndefined()
     expect(r.fehlt).toBeDefined()
-    // Bautafel im Terminal: Einrichtung zuerst, Node dahinter als „+1 weitere“; Desktop-App wie bisher
-    const first = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
-    // Hinweis und „+1 weitere“ getrennt: der Hinweis wird gekürzt, der Zusatz bleibt sichtbar
-    expect(await first.find({ type: 'Text', text: /^▲ Projekt noch nicht eingerichtet: \/codecycle:setup$/ })).toBeDefined()
-    expect(await first.find({ type: 'Text', text: '+1 weitere unter Details' })).toBeDefined()
-    expect(await first.find({ type: 'Text', text: /Node fehlt/ })).toBeUndefined()
-    await first.unmount()
-    const desktop = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', ...BAND })
-    expect(await desktop.find({ type: 'Text', text: /nicht eingerichtet: \/codecycle:setup/ })).toBeDefined()
-    expect(await desktop.find({ type: 'Text', text: /Node fehlt/ })).toBeDefined()
-    await desktop.unmount()
+    // Ohne .claude/codecycle.md keine Bautafel, weder im Terminal noch in der Desktop-App (der Mod reicht an die Engine
+    // weiter, oben eine Attrappe); der Hinweis steht in der Seitenleiste (auch Desktop)
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const none = await $.ui.mount({ plugin: 'codecycle', surface, ...BAND })
+      expect(engine.at(-1)).toBe(surface)
+      expect(await none.find({ key: 'panel' })).toBeUndefined()
+      expect(await none.find({ type: 'Text', text: /nicht eingerichtet|Node fehlt/ })).toBeUndefined()
+      await none.unmount()
+    }
+    const deskPane = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', component: 'Pane', requestId: 'codecycle-panel', props: { title: 'codecycle', isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} } })
+    expect(await deskPane.find({ type: 'Text', text: /nicht eingerichtet: \/codecycle:setup/ })).toBeDefined()
+    await deskPane.unmount()
 
-    // .claude/codecycle.md da (frisch geklont), .codecycle/ fehlt: Hinweis auf /codecycle:update statt Einrichtung
+    // .claude/codecycle.md da (frisch geklont), .codecycle/ fehlt: Bautafel da, Hinweis auf /codecycle:update statt Einrichtung
     files['.claude/codecycle.md'] = md
     await $.session.start({ cwd: '/proj', surface: null } as never)
     r = await band()
     expect(r.setup).toBeUndefined()
     expect(r.kopie).toBeDefined()
+    // Bautafel im Terminal: Node (Art setup) vor der Werkzeug-Kopie, die als „+1 weitere“; Desktop-App wie bisher
+    const first = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
+    // Hinweis und „+1 weitere“ getrennt: der Hinweis wird gekürzt, der Zusatz bleibt sichtbar
+    expect(await first.find({ type: 'Text', text: /^▲ Node fehlt/ })).toBeDefined()
+    expect(await first.find({ type: 'Text', text: '+1 weitere unter Details' })).toBeDefined()
+    expect(await first.find({ type: 'Text', text: /Werkzeug-Kopie fehlt/ })).toBeUndefined()
+    await first.unmount()
+    const desktop = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', ...BAND })
+    expect(await desktop.find({ type: 'Text', text: /nicht eingerichtet/ })).toBeUndefined()
+    expect(await desktop.find({ type: 'Text', text: /Node fehlt/ })).toBeDefined()
+    await desktop.unmount()
 
     node = 'alt'
     await $.session.start({ cwd: '/proj', surface: null } as never)
@@ -114,5 +132,43 @@ describe('Vorschlag /codecycle:update', () => {
     await CLOCK.current!.advance(10_000)
     await CLOCK.current!.advance(10_000)
     expect(shown).toEqual(['plugin:/codecycle:update'])
+  })
+
+  test('nicht eingerichtet: /codecycle:setup als Vorschlag beim Start (statt der Bautafel)', async ($, on) => {
+    mock.store(on)
+    const files: Record<string, string> = { ...FILES }
+    delete files['.claude/codecycle.md']
+    fakeWorld(on, files)
+    on('process.run', () => ({ value: { exitCode: 0, stdout: '24.15.0\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+    const shown: string[] = []
+    on('prompt.suggest', (_$, e) => {
+      shown.push(`${e.origin.kind}:${e.text}`)
+      return { isShown: true }
+    })
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    expect(shown).toEqual(['plugin:/codecycle:setup'])
+    // im Takt ohne Änderung kein weiterer Vorschlag
+    await CLOCK.current!.advance(10_000)
+    expect(shown).toEqual(['plugin:/codecycle:setup'])
+  })
+
+  test('vor der ersten Prüfung (kein session.start): Bautafel nur, wenn .claude/codecycle.md da ist (kein Aufblitzen)', async ($, on) => {
+    mock.store(on)
+    const files: Record<string, string> = { ...FILES }
+    delete files['.claude/codecycle.md']
+    fakeWorld(on, files)
+    const engine: string[] = []
+    on('ui.render', { component: 'AbovePrompt' }, (_$, e) => {
+      engine.push(e.surface)
+      return { type: 'engine', ref: 1 } as never
+    })
+    const none = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
+    expect(engine).toEqual(['terminal'])
+    expect(await none.find({ key: 'panel' })).toBeUndefined()
+    await none.unmount()
+    files['.claude/codecycle.md'] = FILES['.claude/codecycle.md']!
+    const shown = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
+    expect(await shown.find({ key: 'panel' })).toBeDefined()
+    await shown.unmount()
   })
 })

@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { serverCommandFromMd } from './browser-check.ts'
 import { git } from './exec.ts'
 import { selectGraph } from './graph/index.ts'
 import { CONFIG_PATH, type ToolConfig, loadConfig } from './project.ts'
@@ -22,6 +23,8 @@ export type TemplateInput = {
   graphAvailable: boolean
   /** Paketmanager laut Lockdatei, Standard npm */
   manager?: 'npm' | 'pnpm' | 'yarn'
+  /** Serverbefehl aus `.claude/codecycle.md` (Befehle, `server:`); null = nicht vorhanden, fehlt = unbekannt */
+  serverCommand?: string | null
 }
 
 function script(pkg: TemplateInput['packageJson'], name: string): string | null {
@@ -55,6 +58,8 @@ export function deriveConfig(input: TemplateInput): ToolConfig {
     },
     graph: { provider: input.graphAvailable ? 'auto' : 'none' },
   }
+  // Der Einrichter schreibt den Serverbefehl nur in .claude/codecycle.md; codecycle server liest commands.server
+  if (input.serverCommand !== undefined) config.commands.server = input.serverCommand
   // Wirkt nur bei `node --test`; gleichzeitig ist es der einzige Weg zur Testzahl für `guard`.
   const withReporters = testScript === null ? null : withJunitReporters(testScript)
   if (withReporters !== null) {
@@ -93,7 +98,17 @@ export function templateFor(root: string): ToolConfig {
     mainBranch: detectMainBranch(root),
     graphAvailable: selectGraph(root, 'auto').adapter !== null,
     manager,
+    serverCommand: readServerCommand(root),
   })
+}
+
+/** Serverbefehl aus `.claude/codecycle.md`; undefined, wenn die Datei fehlt oder keinen nennt. */
+function readServerCommand(root: string): string | null | undefined {
+  try {
+    return serverCommandFromMd(readFileSync(join(root, '.claude', 'codecycle.md'), 'utf8'))
+  } catch {
+    return undefined
+  }
 }
 
 /** Legt `.codecycle/tool.config.json` an, wenn sie fehlt. Gibt die Vorlage zurück, sonst null (nie überschreiben). */
@@ -134,7 +149,7 @@ export function junitFix(root: string, config: ToolConfig): { test: string } | n
 
 /**
  * `install-tool --update-config`: ergänzt fehlende Felder einer bestehenden Konfiguration aus der Vorlage
- * (`mainBranch`, `graph`, `junit` samt Reporter am Testbefehl). Überschreibt nichts Vorhandenes; eine ältere `version` wird auf `TOOL_VERSION` gehoben.
+ * (`mainBranch`, `graph`, `junit` samt Reporter am Testbefehl, `commands.server` aus `.claude/codecycle.md`). Überschreibt nichts Vorhandenes; eine ältere `version` wird auf `TOOL_VERSION` gehoben.
  * `added`: was ergänzt wurde, `notes`: was nur gemeldet wird.
  */
 export function updateConfig(root: string, dryRun: boolean): { added: string[]; notes: string[] } {
@@ -151,6 +166,10 @@ export function updateConfig(root: string, dryRun: boolean): { added: string[]; 
   if (config.graph === undefined && template.graph) {
     data.graph = template.graph
     added.push(`graph.provider: ${template.graph.provider}`)
+  }
+  if (config.commands.server === undefined && typeof template.commands.server === 'string') {
+    data.commands.server = template.commands.server
+    added.push(`commands.server: ${template.commands.server} (aus .claude/codecycle.md)`)
   }
   if (config.junit === undefined) {
     const fix = junitFix(root, config)

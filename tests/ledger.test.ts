@@ -2,7 +2,7 @@
 // Token-Buch, Limit-Messung, Register und Weiterleitung, Projektordner. Attrappen und Hilfen: ./helpers.
 
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { BAND, DIR, STATE, FILES, spawn, WRITES, TOOLS, CLOCK, FIVE, fakeWorld, type Engine, type Ops } from './helpers'
+import { BAND, DIR, STATE, FILES, spawn, WRITES, TOOLS, CLOCK, FIVE, fakeWorld, memStore, type Engine, type Ops } from './helpers'
 
 describe('Token-Buch, Register, Hauptsitzung', () => {
   test('Token-Buch: jede Anfrage verbucht, Hauptsitzung getrennt', async ($, on) => {
@@ -117,12 +117,37 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
       surface: 'terminal',
       component: 'Pane',
       requestId: 'codecycle-panel',
-      props: { title: 'codecycle', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} },
+      props: { title: 'codecycle', isFocused: true, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 120 }, view: {} },
     })
-    expect(await pane.find({ type: 'Text', text: /Agenten: 1,0 % · neu/ })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: /Bauleiter \(opus\): 1,0 % · neu/ })).toBeDefined()
+    // Entscheidung 2a: gewichtete Tokens zuerst (je Anfrage 10 + 5·5 + 80·0,1 = 43), Prozent zuletzt als Konto-Näherung
+    expect(await pane.find({ type: 'Text', text: /^Agenten: 43 gew\. · neu 15 · Cache 80 · Konto ≈ 1,0 %$/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /^Bauleiter \(opus\): 43 gew\. · neu 15 · Cache 80 · Cache warm .* · Konto ≈ 1,0 %$/ })).toBeDefined()
+    // Rollenzeile: gewichtete Tokens als Zahl, Prozent nachrangig
+    expect(await pane.find({ type: 'Text', text: /gewichtete Tokens/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /neu 15 · Cache 80 · 1 Lauf · Konto ≈ 1,0 %/ })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /1\/5 Läufe · Nachlauf 1/ })).toBeDefined()
     await pane.unmount()
+    // schmale Leiste: Prozent (Konto-Näherung) entfällt in den Summenzeilen, statt umzubrechen
+    const narrow = await $.ui.mount({
+      plugin: 'codecycle',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'codecycle-panel',
+      props: { title: 'codecycle', isFocused: true, bodyColumns: 40, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} },
+    })
+    expect(await narrow.find({ type: 'Text', text: /^Agenten: 43 gew\. · neu 15 · Cache 80$/ })).toBeDefined()
+    expect(await narrow.find({ type: 'Text', text: /Konto/ })).toBeUndefined()
+    await narrow.unmount()
+    // Desktop-App: Kurzfassung „Agenten 43 gew.“, Summenzeilen hinter „+3 weitere“ mit Konto-Näherung
+    const desk = await $.ui.mount({
+      plugin: 'codecycle',
+      surface: 'desktop',
+      component: 'Pane',
+      requestId: 'codecycle-panel',
+      props: { title: 'codecycle', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} },
+    })
+    expect(await desk.find({ type: 'Text', text: /^Agenten 43 gew\.$/ })).toBeDefined()
+    await desk.unmount()
     // Terminal: Budget in der Zeile der Aufgabe (ohne Beschriftung „Budget“), Desktop-App wie bisher
     for (const [surface, text] of [['terminal', /1\/5 Läufe · Nachlauf 1/], ['desktop', /Budget 1\/5 Läufe · Nachlauf 1/]] as const) {
       const band = await $.ui.mount({ plugin: 'codecycle', surface, ...BAND })
@@ -373,6 +398,25 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect([...a.geaendert, ...a.erstellt].map((t: { pfad: string }) => t.pfad)).not.toContain('phpunit.xml')
   })
 
+  // Suchen über Bash (Linux/macOS ohne Grep/Glob) zählen im Register wie Grep/Glob
+  test('Suchen per Grep/Glob und per Bash (grep -rn, find, rg) im Register, Filter in der Pipe nicht', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, FILES)
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
+    on('tool.call', () => ({ result: {} }))
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    const run = (tool: string, command: string) => $.tool.call({ tool, command, agentId: 'ag1' } as never)
+    await $.tool.call({ tool: 'Grep', pattern: 'x', agentId: 'ag1' } as never) // 1
+    await $.tool.call({ tool: 'Glob', pattern: '*.php', agentId: 'ag1' } as never) // 2
+    await run('Bash', 'grep -rn Group src') // 3
+    await run('Bash', 'find . -name "*.php" | grep -v vendor') // 4 (grep filtert nur)
+    await run('Bash', 'rg -n Group src && rg --files') // 5, 6
+    await run('Bash', 'git log --oneline | grep fix') // keine Suche
+    await $.session.end({ reason: 'other', sessionId: 's' } as never)
+    const a = JSON.parse(written[`${DIR}/agents.json`]!).agenten.ag1
+    expect(a.suchen).toBe(6)
+  })
+
   test('ohne Arbeitsordner im agent.spawn den Worktree aus dem ersten Pfad ableiten, neue Datei beim Ende aus Git', async ($, on) => {
     mock.store(on)
     const written = fakeWorld(on, { ...FILES, '.claude/codecycle.md': '# Projekt\n' })
@@ -420,7 +464,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
 
 describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
   const USAGE = { model: 'claude-sonnet-5-5', input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 80, cache_creation_input_tokens: 20 }
-  const paneProps = { title: 'codecycle', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} } as const
+  const paneProps = { title: 'codecycle', isFocused: true, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} } as const
   const handlers = (on: Ops) => {
     on('turn.step', async function* (_$, e) {
       return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage: USAGE }
@@ -471,10 +515,10 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     // Fenster 11 % in der Fußzeile, nicht die Summe der Agenten (3 Punkte); im Kopf steht nur der Anteil der Aufgabe
     expect(head).not.toMatch(/Limit 5 Std\./)
     expect(await deskFooter()).toBe('5h 11 %')
-    expect(head).toMatch(/Aufgabe: Agenten 3,0 %/)
+    expect(head).toMatch(/Aufgabe: Agenten 68 gew\. · Bauleiter 0 gew\. · Konto ≈ 3,0 % \/ 0,0 %/)
     await ui.unmount()
     ui = await pane($, 'terminal')
-    expect(await ui.find({ type: 'Text', text: /Agenten: 3,0 % · neu/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Agenten: 68 gew\. · neu/ })).toBeDefined()
     // Terminal: kein Limit in der Seitenleiste, es steht in der Fußzeile rechts
     expect(await ui.find({ type: 'Text', text: /5 Std\./ })).toBeUndefined()
     await ui.unmount()
@@ -507,6 +551,75 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     expect(main.starts[0].vorher.runden).toBe(2)
     expect(main.starts[0].signal).toMatch(/codecycle:new/)
     expect(main.cacheTtl).toBe('1h')
+  })
+
+  const submit = ($: Engine, text: string, command?: { name: string; args: string }) =>
+    $.prompt.submit({ text, wait: false, origin: { kind: 'sdk' }, ...(command ? { command } : {}) } as never)
+
+  test('Kopfmodus -p: Befehl nur über prompt.submit, Anlegen per Bash mit Variable bindet über die Nennung', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, FILES)
+    handlers(on)
+    on('prompt.submit', (_$, e) => ({ text: e.text }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await submit($, '/codecycle:new Probe', { name: 'codecycle:new', args: 'Probe' })
+    await step($)
+    // Lesen einer fertigen oder fremden Aufgabe bindet nicht (keine offene STATE.md)
+    await $.tool.call({ tool: 'Bash', command: 'ls docs/codecycle/alt-fertig' } as never)
+    await step($)
+    await $.tool.call({ tool: 'Bash', command: `D=${DIR}\nsed -i 's/a/b/' $D/STATE.md` } as never)
+    await step($)
+    await $.session.end({ reason: 'other', sessionId: 'test-sitzung' } as never)
+    const main = JSON.parse(written[`${DIR}/costs.json`]!).hauptsitzung
+    expect(main.runden).toBe(3)
+    expect(main.starts.length).toBe(1)
+    expect(main.starts[0].signal).toMatch(/befehl \/codecycle:new/)
+    expect(main.starts[0].vorher.runden).toBe(0)
+  })
+
+  test('ohne Vorlauf bindet eine Nennung nicht (Entwicklungssitzung liest eine Aufgabe)', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, FILES)
+    handlers(on)
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await $.tool.call({ tool: 'Read', file_path: `/proj/${DIR}/STATE.md` } as never)
+    await step($)
+    await $.session.end({ reason: 'other', sessionId: 'test-sitzung' } as never)
+    expect(written[`${DIR}/costs.json`]).toBeUndefined()
+  })
+
+  test('Fortsetzen mit --resume: Vorlauf und Zuordnung überleben das Prozessende, /clear löscht sie', async ($, on) => {
+    const mem = memStore(on)
+    const written = fakeWorld(on, FILES)
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
+    handlers(on)
+    on('prompt.submit', (_$, e) => ({ text: e.text }))
+    // Prozess 1: /codecycle:continue, Rückfrage, Ende ohne Bindung
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await submit($, '/codecycle:continue', { name: 'codecycle:continue', args: '' })
+    await step($)
+    await step($, undefined, 1)
+    await $.session.end({ reason: 'other', sessionId: 'test-sitzung' } as never)
+    expect(written[`${DIR}/costs.json`]).toBeUndefined()
+    expect(Object.keys(mem.mainClaims as object)).toEqual(['test-sitzung'])
+    // Prozess 2 (dieselbe Sitzungs-ID): Antwort ohne Befehl, dann ein Agent mit Aufgabenordner
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await submit($, '1a, 2a.')
+    await step($)
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-routine')
+    await $.session.end({ reason: 'other', sessionId: 'test-sitzung' } as never)
+    let main = JSON.parse(written[`${DIR}/costs.json`]!).hauptsitzung
+    expect(main.runden).toBe(3)
+    expect(main.starts.length).toBe(1)
+    expect(main.starts[0].signal).toMatch(/codecycle:continue/)
+    // Prozess 3: gebunden fortgesetzt, bucht weiter ohne neuen Startstand
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await step($)
+    await $.session.end({ reason: 'clear', sessionId: 'test-sitzung' } as never)
+    main = JSON.parse(written[`${DIR}/costs.json`]!).hauptsitzung
+    expect(main.runden).toBe(4)
+    expect(main.starts.length).toBe(1)
+    expect(Object.keys(mem.mainClaims as object)).toEqual([])
   })
 
   test('Agent mit Aufgabenordner bindet; Dashboard zeigt Cache der Hauptsitzung', async ($, on) => {

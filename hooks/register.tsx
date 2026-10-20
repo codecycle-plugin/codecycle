@@ -18,6 +18,7 @@ import { type PanelData, renderPanel } from './panel.tsx'
 import { renderFooterDesk } from './desk.tsx'
 import { supportsRichText } from './lib/desk-parts.ts'
 import { DEFAULT_THRESHOLD, budgetText, warnings } from './lib/budget.ts'
+import { BROWSER_CLOSE_TOOL, type BrowserUse, browserAfter, browserOpenContext, browserOpenHint, tracksBrowser } from './lib/browser-close.ts'
 import { type Hint, type HintKind, effortFromArgs, rankHints, savedChanged, savedEffortOf, savedMark, startEffortOf } from './lib/term-parts.ts'
 import {
   buildPackage,
@@ -54,6 +55,7 @@ import {
   writeTargetsOf,
 } from './lib/fence.ts'
 import { bashReadTargets } from '../lib/bash-read-targets.ts'
+import { bashSearchCount } from '../lib/bash-search.ts'
 import { bashWriteTargets } from '../lib/bash-write-targets.ts'
 import { hookBypass } from '../lib/guard-bypass.ts'
 import { baselineCall, commitTestsCall, pythonCall } from '../lib/guard-calls.ts'
@@ -120,13 +122,29 @@ import {
   progressOf,
 } from './lib/agent-view.ts'
 import { TASKS_DIR, TOOL_CONFIG, mainBranchFrom } from '../lib/paths.ts'
-import { type ClaimSignal, NO_CLAIM, claimAfter, mainTarget, promptSkill, skillKind, taskDirOfPath } from './lib/main-claim.ts'
+import {
+  type ClaimSignal,
+  type PendingSince,
+  NO_CLAIM,
+  claimAfter,
+  mainTarget,
+  promptSkill,
+  savedClaimOf,
+  skillKind,
+  taskDirOfPath,
+  taskDirsMentioned,
+  withSavedClaim,
+  withoutSavedClaim,
+} from './lib/main-claim.ts'
+import { correctedNote, resolveTaskDir } from './lib/task-dir.ts'
+import { SOLO_REVIEWER, mergedBranches, reviewerStartProblem, soloMergeProblem, soloWriteDeny } from './lib/solo.ts'
 import type { CrewHead } from './lib/agent-svg.ts'
 import { type NodeState, type SetupState, copyStateFrom, nodeStateFrom, nodeWarning, setupHint, splitUpdateOutput, toolCopyHint } from './lib/setup-check.ts'
 import { TOOL_VERSION } from '../tool/version.ts'
 import type { Signatur } from '../lib/signatures.ts'
 import { bookWritable, parseState as parseTaskState } from '../lib/state-file.ts'
 import { parseTask, type Task } from '../lib/task-file.ts'
+import { SOLO_REPORT } from '../lib/solo-findings.ts'
 import {
   type Effort,
   type Switches,
@@ -168,7 +186,7 @@ const crew = atom({ plugin: 'codecycle', key: 'crew' } as const, [])
 const crewNow = atom({ plugin: 'codecycle', key: 'crewNow' } as const, 0)
 const selectedAgent = atom({ plugin: 'codecycle', key: 'selectedAgent' } as const, null)
 const closedSections = atom({ plugin: 'codecycle', key: 'closedSections' } as const, [])
-const setupState = atom({ plugin: 'codecycle', key: 'setup' } as const, { projekt: true, node: null, config: true, kopie: null })
+const setupState = atom({ plugin: 'codecycle', key: 'setup' } as const, { projekt: null, node: null, config: true, kopie: null })
 /** Effort der Hauptsitzung, gemessen (turn.step ohne agentId, /effort mit Stufe, gespeicherte Änderung im 2-s-Takt); leer = unbekannt */
 const mainEffort = atom({ plugin: 'codecycle', key: 'mainEffort' } as const, '')
 /** Startwert des Efforts (Umgebung, gespeicherte Stufe, Standard des Modells), gedimmt, bis ein gemessener Wert kommt */
@@ -179,6 +197,8 @@ const STORE_COLLAPSED = 'collapsed'
 const STORE_LIMITS = 'lastLimits'
 /** Gesperrte Sitzungen `{ Sitzungs-ID: Sperrzeit }`: die Sperre überlebt so einen Neustart der App */
 const STORE_LOCKED = 'lockedSessions'
+/** Zuordnung der Hauptsitzung je Sitzungs-ID über das Prozessende hinaus (hooks/lib/main-claim.ts :: SavedClaim) */
+const STORE_CLAIMS = 'mainClaims'
 const COMMIT_TESTS_DENY =
   'codecycle: rote Tests committet nur der Test-Autor bzw. Debugger (codecycle commit-tests). Melde den Stand im Bericht unter „Offene Punkte“; der Bauleiter entscheidet.'
 const BASELINE_DENY =
@@ -396,8 +416,17 @@ const STEP_TOOL = 'codecycle_step'
 const RELOAD_TOOL = 'codecycle_reload'
 /** Vorschlag im leeren Eingabefeld (Tab, Enter), solange die Werkzeug-Kopie veraltet ist oder fehlt */
 const UPDATE_COMMAND = '/codecycle:update'
+/** ebenso, solange das Projekt nicht eingerichtet ist (dann gibt es keine Bautafel mit dem Hinweis) */
+const SETUP_COMMAND = '/codecycle:setup'
 /** `codecycle update` lässt über guard die Tests einmal laufen; höchstens zehn Minuten (Grenze von $.process.run) */
 const UPDATE_TIMEOUT_MS = 600_000
+/**
+ * Meldung nach /codecycle:update mit Neuladen. Ehrlich: In der Desktop-App lief /reload-plugins per command.run an, meldete
+ * aber selbst „isn't available over a remote connection“; command.run lehnt dann nicht ab, der Rückfall greift nicht.
+ */
+const RELOAD_PLANNED = 'Neuladen eingeplant: /reload-plugins läuft gleich. Falls nicht neu geladen wird: /reload-plugins eingeben.'
+/** `codecycle notiz` hängt nur eine Zeile an */
+const NOTIZ_TIMEOUT_MS = 15_000
 /**
  * Token-Buch für Läufe ohne Aufgabe (Einrichter, Werkzeugmeister). Die Hauptsitzung bucht nur dann
  * hierher, wenn diese Sitzung /codecycle:setup aufrief oder einen codecycle-Agenten ohne Aufgabe startete (claimMain; sonst
@@ -432,6 +461,8 @@ type Runtime = {
   bericht?: string
   /** Verweigerungen des Lese-Zauns in Folge; ab READER_STOP_AFTER (hooks/lib/fence.ts) kommt der Stopp-Hinweis */
   verweigert?: number
+  /** Browser-Prüfer: war der letzte Browser-Aufruf `browser_close`? (hooks/lib/browser-close.ts) */
+  browser?: BrowserUse
 }
 
 /** saved: Inhalt ohne Zeitstempel, wie zuletzt gelesen oder geschrieben (bookSnapshot) */
@@ -448,6 +479,8 @@ let profiles: ProfilesFile | null = null
 
 let protectedConfig: ProtectedConfig | null = null
 
+// Durchschnitt je Rolle in Prozentpunkten des 5h-Fensters für codecycle_budget: Konto-Näherung (andere Sitzungen zählen
+// mit); das Budget braucht das Fenster und bleibt deshalb bei Prozent (Entscheidung 2a)
 let roleAvg: Record<string, { laeufe: number; prozent: number }> = {}
 
 const agents = new Map<string, Runtime>()
@@ -546,6 +579,12 @@ const relPath = (p: string, roots: readonly (string | null | undefined)[]): stri
  * Aufgabenordner und Paket; gilt, bis für dasselbe Paket ein Agent ohne Problem startet oder keine Aufgabe aktiv ist.
  */
 const packageHints = new Map<string, { dir: string; text: string }>()
+
+/**
+ * Browser-Prüfer, die ohne `browser_close` endeten (Agent-ID → Hinweis dem Bauleiter schon als Kontext gegeben).
+ * Bleibt auf der Bautafel, bis die Hauptsitzung `browser_close` aufruft oder derselbe Agent ihn per Folgenachricht schließt.
+ */
+const browserOpen = new Map<string, { gemeldet: boolean }>()
 
 const books = new Map<string, Book>()
 
@@ -916,12 +955,15 @@ async function spawnPackage($: EngineInterface, s: SpawnScope): Promise<{ text: 
   return { text: built.text, mitgeliefert: built.mitgeliefert }
 }
 
-async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; parentAgentId?: string }, role: string): Promise<Spawn> {
+async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; parentAgentId?: string }, role: string): Promise<Spawn | { deny: string }> {
   await reloadConfig($)
   const parsed = parseSpawnPrompt(e.prompt, role)
   // Start aus einem codecycle-Agenten heraus (Paketleiter): fehlende Angaben erbt er vom Eltern-Agenten
   const parent = e.parentAgentId ? agents.get(e.parentAgentId) : undefined
-  const dir = parsed.aufgabeDir ?? parent?.dir ?? (await activeDir($))
+  // Aufgabenordner aus der aktiven Aufgabe, nicht aus dem Text (spawnTaskDir); falscher Ordner → kein Start
+  const taskDir = await spawnTaskDir($, parsed.aufgabeDir, parent)
+  if (taskDir.kind === 'deny') return { deny: taskDir.text }
+  const dir = taskDir.kind === 'ok' ? taskDir.dir : (parent?.dir ?? (await activeDir($)))
   const paketId = parsed.paket ?? parent?.paket ?? null
   const planned = dir ? await planOf($, dir) : null
   const state = dir ? await stateOf($, dir) : null
@@ -951,11 +993,14 @@ async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; pa
   }
   warnRestart($, 'agent-progress', STEP_TOOL)
   warnRestart($, 'register-forwarding', OWNER_TOOL)
+  if (taskDir.kind === 'ok' && taskDir.corrected && dir) text = appendNote(text, correctedNote(dir, taskDir.corrected))
   // Bericht in den Hauptordner, nicht in den Paket-Worktree
   const root = await rootOf($)
   let bericht: string | undefined
   if (root) {
-    bericht = reportPath({ root, dir, paket: paketId, rolle: role, ...(parsed.bericht ? { bericht: parsed.bericht } : {}) })
+    // Solo-Prüfer: fester Name, den Merge-Sperre und `codecycle solo funde` lesen
+    const named = role === SOLO_REVIEWER ? SOLO_REPORT : parsed.bericht
+    bericht = reportPath({ root, dir, paket: paketId, rolle: role, ...(named ? { bericht: named } : {}) })
     // Pflicht ausdrücklich, weil allgemeine Vorgaben der Umgebung von Berichts-Dateien abraten
     text = appendNote(text, reportNote(bericht))
   }
@@ -973,6 +1018,38 @@ async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; pa
     explicitDir: !!parsed.aufgabeDir,
     bericht,
   })
+}
+
+/**
+ * Offene Aufgabenordner (`docs/codecycle/x` mit STATE.md, nicht fertig/verworfen; unlesbare STATE.md zählt als offen
+ * wie bei bookWritable). null, wenn docs/codecycle/ nicht lesbar ist: dann prüft spawnTaskDir nichts.
+ */
+async function openTaskDirs($: EngineInterface): Promise<string[] | null> {
+  try {
+    if (!(await projectExists($, TASKS_DIR))) return []
+    const out: string[] = []
+    for (const entry of await $.fs.list(await projectPath($, TASKS_DIR))) {
+      if (entry.kind !== 'dir') continue
+      const dir = `${TASKS_DIR}/${entry.name}`
+      if (bookWritable(await readText($, `${dir}/STATE.md`))) out.push(dir)
+    }
+    return out
+  } catch (err) {
+    $.ui.log(`codecycle: ${TASKS_DIR} nicht lesbar (${String(err)})`, { to: 'debug' })
+    return null
+  }
+}
+
+/**
+ * Aufgabenordner eines neuen Agenten aus der aktiven Aufgabe statt aus dem Text der Startnachricht (Regel in
+ * hooks/lib/task-dir.ts): Aufgabe des Eltern-Agenten, sonst die dieser Sitzung (claimMain), sonst die einzige offene.
+ * Davon leiten sich Bericht, Quittung, Kontextpaket und der Lese-Rollen-Zaun (Runtime.bericht) ab.
+ * Ein Netz gegen Versehen (vertippter Ordner, Satzpunkt), keine Sicherheitsgrenze.
+ */
+async function spawnTaskDir($: EngineInterface, named: string | undefined, parent: Runtime | undefined) {
+  const target = mainTarget(claim)
+  const claimed = target.kind === 'dir' && target.dir.startsWith(`${TASKS_DIR}/`) ? target.dir : null
+  return resolveTaskDir({ named, open: await openTaskDirs($), expected: parent ? parent.dir : claimed, fromParent: !!parent })
 }
 
 /** Schalter an, Werkzeug aber nicht angemeldet: einmal melden, dass ein Neustart der Sitzung nötig ist. */
@@ -1109,9 +1186,11 @@ let sessionMain: MainEntry = emptyMain()
 /** Vorlauf nach /codecycle:new|continue, bis feststeht, welche Aufgabe; geht dann ganz in diese Aufgabe */
 let pendingMain: MainEntry = emptyMain()
 /** Startstand beim Beginn des Vorlaufs (Stand von sessionMain vor dem Befehl) */
-let pendingSince: { zeit: string; signal: string; vorher: Omit<MainEntry, 'modell' | 'limitProzent' | 'starts' | 'cacheTtl'> } | null = null
-/** Kennung der Sitzung (Zeit von session.start), damit Startstände je Sitzung einmal eingetragen werden */
+let pendingSince: PendingSince | null = null
+/** Kennung der Sitzung (Zeit des ersten session.start dieser Sitzungs-ID), damit Startstände je Sitzung einmal eingetragen werden */
 let sessionKey = ''
+/** Sitzungs-ID, zu der claim, Töpfe und sessionKey gehören (Wechsel ohne session.start: /clear, /resume) */
+let claimSession: string | null = null
 /** Letzte Anfrage der Hauptsitzung (ms) und ob sie gerade arbeitet: Cache-Zeit des Bauleiters */
 let mainLastStep: number | null = null
 let mainBusy = false
@@ -1126,8 +1205,58 @@ function resetClaim(at: number): void {
   pendingMain = emptyMain()
   pendingSince = null
   sessionKey = iso(at)
+  claimSession = null
   mainLastStep = null
   mainBusy = false
+}
+
+/**
+ * Zuordnung der Sitzung `id` aus dem Store zurückholen (Fortsetzen mit --resume in einem neuen Prozess, /resume); ohne
+ * Eintrag frisch. Bindet sie an eine Aufgabe, gehen die Buchungen dort weiter; im Vorlauf bleiben Topf und Startstand.
+ */
+async function restoreClaim($: EngineInterface, id: string): Promise<void> {
+  resetClaim(await $.clock.now())
+  claimSession = id
+  try {
+    const saved = savedClaimOf(await $.store.get(STORE_CLAIMS), id)
+    if (!saved) return
+    claim = saved.claim
+    sessionKey = saved.sessionKey
+    pendingMain = saved.pending
+    pendingSince = saved.since
+    sessionMain = saved.session
+  } catch (err) {
+    $.ui.log(`codecycle: Zuordnung der Hauptsitzung nicht gelesen (${String(err)})`, { to: 'debug' })
+  }
+}
+
+/** Zuordnung der Sitzung `id` ablegen (Sitzungsende), nach /clear löschen. */
+async function saveClaim($: EngineInterface, id: string, clear: boolean): Promise<void> {
+  try {
+    const raw = await $.store.get(STORE_CLAIMS)
+    if (clear) {
+      if (savedClaimOf(raw, id)) await $.store.set(STORE_CLAIMS, withoutSavedClaim(raw, id))
+      return
+    }
+    if (mainTarget(claim).kind === 'none' && sessionMain.runden === 0 && !savedClaimOf(raw, id)) return
+    const saved = { claim, sessionKey, pending: pendingMain, since: pendingSince, session: sessionMain, at: await $.clock.now() }
+    await $.store.set(STORE_CLAIMS, withSavedClaim(raw, id, saved))
+  } catch (err) {
+    $.ui.log(`codecycle: Zuordnung der Hauptsitzung nicht abgelegt (${String(err)})`, { to: 'debug' })
+  }
+}
+
+/** Gehört der Zustand zu einer anderen Sitzungs-ID (Wechsel ohne session.start), die richtige zurückholen. */
+async function syncClaimSession($: EngineInterface): Promise<void> {
+  try {
+    const id = await $.session.id()
+    if (!id || id === claimSession) return
+    // noch keiner Sitzung zugeordnet und schon Signale gesehen: übernehmen statt verwerfen
+    if (claimSession === null && (mainTarget(claim).kind !== 'none' || sessionMain.runden > 0)) claimSession = id
+    else await restoreClaim($, id)
+  } catch (err) {
+    $.ui.log(`codecycle: Sitzungs-ID nicht gelesen (${String(err)})`, { to: 'debug' })
+  }
 }
 
 /** Signal „diese Sitzung arbeitet an …“ verarbeiten: Ziel setzen, beim Binden Vorlauf und Startstand ins Buch. */
@@ -1164,6 +1293,21 @@ async function mainWriteSignal($: EngineInterface, input: { tool: string; file_p
   for (const t of targets) {
     const dir = taskDirOfPath(relPath(t, [root]))
     if (dir) return claimMain($, { kind: 'dir', dir }, 'schreiben')
+  }
+}
+
+/** Im Vorlauf: Aufgabenordner, die ein Aufruf der Hauptsitzung nennt (Pfad, Muster, Befehl); sonst keine. */
+function mentionedDirs(input: { file_path?: unknown; notebook_path?: unknown; path?: unknown; command?: unknown }): string[] {
+  if (mainTarget(claim).kind !== 'pending') return []
+  const texts = [input.file_path, input.notebook_path, input.path, input.command].filter((t): t is string => typeof t === 'string')
+  return [...new Set(texts.flatMap(taskDirsMentioned))]
+}
+
+/** Nach dem Aufruf: der erste genannte Aufgabenordner mit offener STATE.md bindet (Rückfall für Bash mit Variablen). */
+async function mentionSignal($: EngineInterface, dirs: string[], tool: string): Promise<void> {
+  for (const dir of dirs) {
+    if (mainTarget(claim).kind !== 'pending') return
+    if (bookWritable(await readText($, `${dir}/STATE.md`))) return claimMain($, { kind: 'dir', dir }, `genannt ${tool}`)
   }
 }
 
@@ -1215,6 +1359,11 @@ async function complete($: EngineInterface, e: { agentId?: string; reason: strin
     return
   }
   if (rt) {
+    // Browser-Prüfer ohne browser_close am Ende: dem Bauleiter melden (Bautafel, Kontext beim nächsten Prompt)
+    if (tracksBrowser(rt.rolle)) {
+      if (rt.browser === 'offen') browserOpen.set(rt.id, { gemeldet: false })
+      else browserOpen.delete(rt.id)
+    }
     // Urteil aus der Quittung; ohne Quittung bleibt das Feld leer. Live unbestätigt, ob text bei Sub-Agenten die Quittung ist.
     try {
       const v = parseReceiptStatus(text)
@@ -1571,13 +1720,15 @@ async function updatePending($: EngineInterface): Promise<boolean> {
 }
 
 /**
- * /codecycle:update als grauer Vorschlag ins leere Eingabefeld legen, nur beim Sitzungsstart und wenn der Hinweis neu
+ * /codecycle:update (im nicht eingerichteten Projekt /codecycle:setup) als grauer Vorschlag ins leere Eingabefeld legen, nur beim Sitzungsstart und wenn der Hinweis neu
  * auftaucht; erscheint nicht, solange dort Text steht oder ein Zug läuft. Claudes eigener Vorschlag nach einem Zug hat
  * Vorrang (Nutzer): kein `prompt.suggest`-Hook, der ihn ersetzt.
  */
 async function suggestUpdate($: EngineInterface): Promise<void> {
-  if (!(await updatePending($))) return
-  await $.prompt.suggest({ text: UPDATE_COMMAND }).catch(err => $.ui.log(`codecycle: Vorschlag ${UPDATE_COMMAND}: ${String(err)}`, { to: 'debug' }))
+  // Nicht eingerichtet: /codecycle:setup vorschlagen (ohne Bautafel der einzige Hinweis außerhalb der Seitenleiste)
+  const text = (await read($, setupState)).projekt === false ? SETUP_COMMAND : (await updatePending($)) ? UPDATE_COMMAND : null
+  if (!text) return
+  await $.prompt.suggest({ text }).catch(err => $.ui.log(`codecycle: Vorschlag ${text}: ${String(err)}`, { to: 'debug' }))
 }
 
 // ---------------------------------------------------------------------------
@@ -1722,16 +1873,17 @@ function liveCosts(b: Board): { kosten: Board['kosten']; kennzahlen: Board['kenn
 
 /**
  * Hinweise für Bautafel und Seitenleiste, mit Art (`hooks/lib/term-parts.ts :: Hint`): Node und Einrichtung = setup,
- * Werkzeug-Kopie = update, alles andere sonstig. Terminal: mit Einrichtungshinweis, ohne Limit-Hinweise (das Limit steht
- * in der Fußzeile), in fester Rangfolge Setup vor Update vor allem anderen. Desktop-App: Inhalt und Reihenfolge
- * wie bisher (Limit ab 80 %, Sonnet bei sparsam, große Hauptsitzung; Einrichtungshinweis getrennt).
+ * Werkzeug-Kopie = update, alles andere sonstig. Beide: mit Einrichtungshinweis (sichtbar nur in der Seitenleiste, die
+ * Bautafel fehlt dann). Terminal: ohne Limit-Hinweise (das Limit steht in der Fußzeile), in fester Rangfolge Setup vor
+ * Update vor allem anderen. Desktop-App: Reihenfolge wie bisher (Limit ab 80 %, Sonnet bei sparsam, große Hauptsitzung).
  */
 async function currentWarnings($: EngineInterface, surface: string): Promise<Hint[]> {
   const terminal = surface === 'terminal'
   const hint = (art: HintKind, text: string): Hint => ({ art, text })
   const lim = await read($, limits)
   const setup = await read($, setupState)
-  const setupText = terminal ? setupHint(setup) : null
+  // Einrichtungshinweis in beiden Oberflächen in der Liste: die Bautafel fehlt im nicht eingerichteten Projekt, er steht nur in der Seitenleiste
+  const setupText = setupHint(setup)
   const node = nodeWarning(setup.node)
   const copy = toolCopyHint(setup, TOOL_VERSION)
   const dir = await activeDir($)
@@ -1741,6 +1893,7 @@ async function currentWarnings($: EngineInterface, surface: string): Promise<Hin
     ...(node ? [hint('setup', node)] : []),
     ...(copy ? [hint('update', copy)] : []),
     ...(staleEffortSwitch ? [hint('sonstig', STALE_EFFORT_HINT)] : []),
+    ...(browserOpen.size > 0 ? [hint('sonstig', browserOpenHint(browserOpen.size)!)] : []),
     ...hints.map(t => hint('sonstig', t)),
     ...warnings({
       fuenf: terminal ? null : lim.fuenfStunden,
@@ -1777,6 +1930,7 @@ type ProfileMatcher = { readonly command: 'profile' }
 type ModeMatcher = { readonly component: 'SessionMode' }
 type EffortMatcher = { readonly command: 'effort' }
 type UpdateMatcher = { readonly command: 'codecycle:update' }
+type NotizMatcher = { readonly command: 'codecycle:notiz' }
 
 /** Eingabe eines Werkzeugaufrufs, soweit der Mod sie liest (Dateipfade, Bereich, Befehl) */
 type ToolInput = { tool: string; file_path?: string; notebook_path?: string; offset?: number; limit?: number; command?: string }
@@ -1792,9 +1946,10 @@ async function safeStep($: EngineInterface, what: string, run: () => Promise<unk
   }
 }
 
-/** Neue Sitzung arbeitet an keiner Aufgabe, bis ein Signal kommt */
+/** Neue Sitzung arbeitet an keiner Aufgabe, bis ein Signal kommt; eine fortgesetzte (--resume) behält ihre Zuordnung */
 async function resetSessionClaim($: EngineInterface): Promise<void> {
   resetClaim(await $.clock.now())
+  await restoreClaim($, await $.session.id())
 }
 
 async function loadStoredProfile($: EngineInterface): Promise<void> {
@@ -1881,7 +2036,8 @@ async function onSessionEnd($: EngineInterface, e: Evt<'session.end'>, next: Nxt
     await update($, locked, () => false)
   }
   await end($)
-  // Zuordnung der Hauptsitzung gilt bis Sitzungsende oder /clear
+  // Zuordnung der Hauptsitzung gilt bis /clear, auch für das Fortsetzen derselben Sitzung in einem neuen Prozess
+  await saveClaim($, e.sessionId || claimSession || '', e.reason === 'clear')
   resetClaim(await $.clock.now())
   return next(e)
 }
@@ -1905,11 +2061,20 @@ async function onSkillPrompt($: EngineInterface, e: Evt<'skill.prompt'>, next: N
 
 // Rückfall zu skill.prompt: der getippte Befehl am Anfang des Prompts (falls der Text dort noch unverändert steht)
 async function onPromptSubmit($: EngineInterface, e: Evt<'prompt.submit'>, next: Nxt<'prompt.submit'>) {
-  const skill = promptSkill(e.text)
+  await syncClaimSession($)
+  // Slash-Befehl laut Engine (`command`, im Kopfmodus -p belegt), sonst der Anfang des Textes
+  const named = typeof e.command?.name === 'string' ? e.command.name.toLowerCase() : null
+  const skill = (named && skillKind(named) ? named : null) ?? promptSkill(e.text)
   const kind = skill ? skillKind(skill) : null
   if (kind === 'task') await claimMain($, { kind: 'skill', which: 'task' }, `befehl /${skill}`)
   if (kind === 'setup') await claimMain($, { kind: 'skill', which: 'setup', setupDir: SETUP_DIR }, `befehl /${skill}`)
-  return next(e)
+  // Browser offen nach dem Browser-Prüfer: einmal als Kontext, den nur das Modell liest (auch an der Benachrichtigung
+  // über das Agentenende, Herkunft task-notification); bei einem Slash-Befehl nicht, dort gilt nur der Befehl
+  const offen = [...browserOpen].filter(([, v]) => !v.gemeldet).map(([id]) => id)
+  const note = e.command ? null : browserOpenContext(offen)
+  if (note === null) return next(e)
+  for (const id of offen) browserOpen.set(id, { gemeldet: true })
+  return next({ ...e, context: [...(e.context ?? []), note] })
 }
 
 // Cache-Laufzeit der Hauptsitzung, wenn Claude Code sie meldet (nur beim Modellwechsel); nur beobachten
@@ -2003,14 +2168,25 @@ async function bandData($: EngineInterface, surface: string, bodyColumns: number
     isCollapsed: await shownCollapsed($),
     notes: await currentWarnings($, surface),
     running: (await read($, crew)).filter(a => a.status === 'laeuft').length,
-    hint: setupHint(await read($, setupState)),
     maxRows,
   }
 }
 
-// Bautafel über dem Eingabefeld (Darstellung: hooks/band.tsx; hier nur Daten sammeln und Rückrufe mit `$` bereitstellen)
+/**
+ * Projekt eingerichtet, für die Bautafel. Vor der ersten Prüfung (checkSetup beim Sitzungsstart, oder Mod neu geladen
+ * ohne session.start) nur die Datei nachsehen, ohne beim Zeichnen den Zustand zu schreiben; nicht prüfbar = eingerichtet.
+ */
+async function projectShown($: EngineInterface): Promise<boolean> {
+  const projekt = (await read($, setupState)).projekt
+  if (projekt !== null) return projekt
+  return projectExists($, CODECYCLE_MD).catch(() => true)
+}
+
+// Bautafel über dem Eingabefeld (Darstellung: hooks/band.tsx; hier nur Daten sammeln und Rückrufe mit `$` bereitstellen).
+// Nur im eingerichteten Projekt (`.claude/codecycle.md`; nicht prüfbar zählt als eingerichtet, vor der ersten Prüfung beim Sitzungsstart keine
+// Tafel, sonst blitzt sie in fremden Projekten kurz auf): in fremden Projekten keine Tafel; dort führen der Vorschlag /codecycle:setup im Eingabefeld (suggestUpdate) und die Seitenleiste zur Einrichtung.
 async function onRenderBand($: EngineInterface, e: MEvt<MatchedHook<'ui.render', BandMatcher>>, next: MNxt<MatchedHook<'ui.render', BandMatcher>>) {
-  if (e.props.hasSurvey) return next(e)
+  if (e.props.hasSurvey || !(await projectShown($))) return next(e)
   return renderBand($.ui.resolve(e), await bandData($, e.surface, e.props.bodyColumns, e.props.maxRows), {
     onTogglePanel: () => void togglePanel($),
     // Fokus nach dem Klick nicht versetzen
@@ -2072,7 +2248,24 @@ async function onUpdateCommand($: EngineInterface, e: MEvt<MatchedHook<'command.
   if (run.exitCode !== 0 || result === null) return next({ ...e, args: `Das Werkzeug meldete (Exit ${run.exitCode}):\n${text}` })
   await refreshSetup($)
   if (result.neuLaden) runReload($)
-  return { text: result.neuLaden ? `${text}\nNeuladen eingeplant: /reload-plugins läuft gleich.` : text }
+  return { text: result.neuLaden ? `${text}\n${RELOAD_PLANNED}` : text }
+}
+
+/**
+ * /codecycle:notiz ohne KI (Schalter `notizen`): `codecycle notiz` aus dem laufenden Plugin hängt den Text an notizen.md der
+ * offenen Aufgabe und meldet „Notiz gespeichert in …“, bei Schalter aus, wie man ihn einschaltet. Die Ausgabe ist die Antwort;
+ * nur wenn der Prozess nicht startet (ohne Node, ohne Prozess-Zugriff), läuft der Skill mit der KI.
+ */
+async function onNotizCommand($: EngineInterface, e: MEvt<MatchedHook<'command.run', NotizMatcher>>, next: MNxt<MatchedHook<'command.run', NotizMatcher>>) {
+  if (e.args.trim() === '') return { text: 'Notiz ohne Text: /codecycle:notiz <Text>' }
+  let run: { exitCode: number; stdout: string }
+  try {
+    run = await $.process.run(['node', `${$.plugin.root}/tool/cli.ts`, 'notiz', e.args], { cwd: (await rootOf($)) ?? undefined, timeoutMs: NOTIZ_TIMEOUT_MS })
+  } catch (err) {
+    $.ui.log(`codecycle: codecycle notiz nicht gestartet: ${String(err)}`, { to: 'debug' })
+    return next(e)
+  }
+  return { text: run.stdout.trim() || `codecycle notiz ohne Ausgabe (Exit ${run.exitCode})` }
 }
 
 /** Detailansicht eines Agenten (Klick auf „Details“ in seiner Zeile); live über crew und crewNow */
@@ -2101,6 +2294,9 @@ async function panelData($: EngineInterface, surface: string, bodyColumns: numbe
     fuenf: lim.fuenfStunden,
     agenten: agentenProzent,
     bauleiter: kennzahlen?.bauleiterProzent ?? null,
+    // Hauptmaß: gewichtete Tokens (Agenten = Summe der Rollen, wie bei den Prozentwerten)
+    agentenGew: kosten.reduce((n, k) => n + (k.gewichtet ?? 0), 0),
+    bauleiterGew: kennzahlen?.bauleiterGewichtet ?? null,
   }
   return {
     surface,
@@ -2148,14 +2344,70 @@ async function lockProfile($: EngineInterface): Promise<void> {
   }
 }
 
+/**
+ * Folgenachricht an einen fertigen Agenten: Claude Code meldet sie als agent.spawn mit `resume` und verwirft jede
+ * Änderung am Inhalt. Kein neuer Start: Startnachricht unverändert, Registereintrag und
+ * Läufe laufen weiter (den neuen Lauf öffnet turn.step). Nach einem Neuladen des Mods den Agenten aus dem Register
+ * wieder kennen (loadBook), sonst buchte er als fremder Agent.
+ */
+async function resumeAgent($: EngineInterface, id: string): Promise<void> {
+  try {
+    if (agents.has(id)) return
+    for (const dir of [await activeDir($), SETUP_DIR]) {
+      if (dir) await bookOf($, dir)
+      if (agents.has(id)) return
+    }
+    for (const dir of (await openTaskDirs($)) ?? []) {
+      await bookOf($, dir)
+      if (agents.has(id)) return
+    }
+  } catch (err) {
+    $.ui.log(`codecycle: fortgesetzter Agent ${id} nicht im Register (${String(err)})`, { to: 'debug' })
+  }
+}
+
+/**
+ * Startsperre des Solo-Prüfers: STATE.md frisch gelesen (der Cache wüsste vom eben geschriebenen geprueftAuf nichts),
+ * geänderte Dateien zwischen geprueftAuf und dem Aufgaben-Branch ohne den Aufgabenordner. Regel: hooks/lib/solo.ts.
+ */
+async function soloReviewerLock($: EngineInterface, dir: string | null): Promise<string | null> {
+  const text = dir ? await readText($, `${dir}/STATE.md`) : null
+  let state: ReturnType<typeof parseTaskState> | null = null
+  try {
+    state = text === null ? null : parseTaskState(text, `${dir}/STATE.md`)
+  } catch {
+    state = null
+  }
+  let changed: string[] | null = null
+  if (state?.weg === 'solo' && state.geprueftAuf && dir) {
+    const root = (await rootOf($)) ?? undefined
+    const tip = state.branch || 'HEAD'
+    const out = await runIn($, ['git', '-c', 'core.quotepath=false', 'diff', '--name-only', '--no-renames', state.geprueftAuf, tip], root)
+    changed = out === null ? null : out.split(/\r?\n/).filter(p => p !== '' && p !== dir && !p.startsWith(`${dir}/`))
+  }
+  return reviewerStartProblem(state, dir, changed)
+}
+
 async function onAgentSpawn($: EngineInterface, e: Evt<'agent.spawn'>, next: Nxt<'agent.spawn'>) {
   const role = roleOf(e.subagentType)
   if (!role) return next(e)
+  if (e.resume) {
+    await resumeAgent($, e.resume.agentId)
+    return next(e)
+  }
   let info: Spawn | undefined
   try {
-    info = await prepare($, e, role)
+    const prepared = await prepare($, e, role)
+    // Aufgabenordner falsch oder nicht vorhanden: kein Start, die Meldung nennt dem Bauleiter den richtigen Pfad
+    if ('deny' in prepared) return { deny: prepared.deny }
+    info = prepared
   } catch (err) {
     $.ui.log(`codecycle: agent.spawn ohne Änderung (${String(err)})`, { to: 'debug' })
+  }
+  // Solo-Prüfer erst nach grünem codecycle solo check auf dem Stand des Aufgaben-Branchs (fail-closed)
+  if (role === SOLO_REVIEWER) {
+    const locked = await soloReviewerLock($, info?.dir ?? (await activeDir($)))
+    if (locked) return { deny: locked }
   }
   const result = await next(rewriteSpawn(e, info))
   if (info && result.deny === undefined) {
@@ -2315,7 +2567,8 @@ async function* onTurnStep($: EngineInterface, e: Evt<'turn.step'>, next: Nxt<'t
 // Python-Sperre: Hauptsitzung und alle Agenten, unabhängig von Schaltern
 async function denyPython($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
-  const kind = typeof command === 'string' ? pythonCall(command, e.tool === 'PowerShell' ? 'powershell' : 'bash') : null
+  // als string vergleichen: die Werkzeugtypen entstehen je Rechner, unter Linux und macOS fehlt PowerShell darin
+  const kind = typeof command === 'string' ? pythonCall(command, (e.tool as string) === 'PowerShell' ? 'powershell' : 'bash') : null
   if (kind === 'repl') return { deny: PYTHON_REPL }
   if (kind === 'call' && (await onWindows($)) && !realPython) return { deny: PYTHON_STUB }
   return next(e)
@@ -2349,6 +2602,38 @@ function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   return hit ? { deny: `codecycle: ${hit} ist verboten (Git-Hooks sind die Prüfung, nicht umgehen). Fehler beheben statt überspringen.` } : next(e)
 }
 
+// Merge eines Solo-Aufgaben-Branchs (`git merge codecycle/<thema>`) nur mit Prüfbericht und vollständigen Funden, für alle.
+// Gelesen wird der committete Stand des Branchs (der Aufgabenordner liegt nur dort); Regel: hooks/lib/solo.ts soloMergeProblem.
+async function denySoloMerge($: EngineInterface, e: ToolEvt, next: ToolNxt) {
+  const command = (e as unknown as { command?: unknown }).command
+  const branches = typeof command === 'string' ? mergedBranches(command) : []
+  if (branches.length === 0) return next(e)
+  try {
+    const root = (await rootOf($)) ?? undefined
+    const show = (ref: string) => runIn($, ['git', '-c', 'core.quotepath=false', 'show', ref], root)
+    for (const branch of branches) {
+      const list = await runIn($, ['git', '-c', 'core.quotepath=false', 'ls-tree', '-d', '--name-only', `${branch}:${TASKS_DIR}`], root)
+      for (const name of (list ?? '').split(/\r?\n/).filter(Boolean)) {
+        const dir = `${TASKS_DIR}/${name}`
+        const text = await show(`${branch}:${dir}/STATE.md`)
+        if (text === null) continue
+        let state: ReturnType<typeof parseTaskState>
+        try {
+          state = parseTaskState(text, `${dir}/STATE.md`)
+        } catch {
+          continue
+        }
+        if (state.weg !== 'solo' || state.branch !== branch) continue
+        const problem = soloMergeProblem(dir, await show(`${branch}:${dir}/${SOLO_REPORT}`), await show(`${branch}:${dir}/TASK.md`))
+        if (problem) return { deny: problem }
+      }
+    }
+  } catch (err) {
+    $.ui.log(`codecycle: Merge-Sperre nicht geprüft (${String(err)})`, { to: 'debug' })
+  }
+  return next(e)
+}
+
 /** Ein Werkzeugaufruf eines codecycle-Agenten: seine Laufzeit, der Hauptordner, die Eingabe und der Dateipfad */
 type ToolCtx = { rt: Runtime; rootNow: string | null; input: ToolInput; path: string | undefined }
 
@@ -2372,6 +2657,13 @@ async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> 
   // Entscheidungen des Zauns: reine Funktionen in hooks/lib/fence.ts; hier nur Daten holen und Meldungen weitergeben
   const call = { tool: input.tool, command: input.command, path }
   const fenceEnv = { root: c.rootNow, plugin: $.plugin.root || null, rel: (p: string): string => repoPath(c, p) }
+
+  // Solo-Aufgabe: schreiben dürfen nur die Sitzung, SOLO_WRITERS und jede Rolle ihren Bericht; der Solo-Prüfer mit Write
+  // und Edit nur seinen Bericht (Regel: hooks/lib/solo.ts). Lese-Rollen hält ihr eigener Zaun darunter.
+  if (!isReaderRole(rt.rolle) && (rt.rolle === SOLO_REVIEWER || (rt.dir && (await stateOf($, rt.dir))?.weg === 'solo'))) {
+    const denied = soloWriteDeny(rt.rolle, call, { rel: fenceEnv.rel, bericht: rt.bericht })
+    if (denied) return denied
+  }
 
   // Lese-Rollen: Write nur auf den eigenen Bericht (setup zusätzlich .claude/codecycle.md), Bash nur
   // nach Erlaubtliste, kein PowerShell. Gilt unabhängig vom Schalter fence wie beim Doku-Pfleger.
@@ -2405,7 +2697,7 @@ async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> 
     try {
       const entry = (await bookOf($, rt.dir)).registry.agenten[rt.id]
       const limit = parseReadBudget(switchValue(switches, 'read-budget'))
-      const budgetDeny = readBudgetDeny(entry, limit, input.tool, path)
+      const budgetDeny = readBudgetDeny(entry, limit, input.tool, path, input.command)
       if (budgetDeny) return budgetDeny
     } catch (err) {
       $.ui.log(`codecycle: Lese-Budget-Prüfung fehlgeschlagen, Aufruf bleibt erlaubt (${String(err)})`, { to: 'debug' })
@@ -2435,6 +2727,8 @@ type Touches = {
   bashTargets: string[]
   /** Lesen per Bash/PowerShell ins Register (gelesen), ohne Wirkung auf das Lese-Budget */
   bashReads: string[]
+  /** Suchstufen eines Bash-Befehls (grep/rg/find …, lib/bash-search.ts bashSearchCount): zählen wie Grep/Glob als `suche` */
+  bashSearches: number
   /** Schreibziele und ob sie vorher existierten */
   before: Map<string, boolean>
   /** Write auf eine schon vorhandene Datei = geändert, sonst erstellt */
@@ -2447,10 +2741,11 @@ async function touchesBefore($: EngineInterface, c: ToolCtx): Promise<Touches> {
   const bashTargets = input.tool === 'Bash' && input.command ? bashWriteTargets(input.command) : []
   const shellTool = input.tool === 'Bash' || input.tool === 'PowerShell'
   const bashReads = shellTool && input.command ? bashReadTargets(input.command, input.tool === 'PowerShell' ? 'powershell' : 'bash') : []
+  const bashSearches = input.tool === 'Bash' && input.command ? bashSearchCount(input.command) : 0
   const before = new Map<string, boolean>()
   for (const t of bashTargets) before.set(t, await exists(t))
   const existed = input.tool === 'Write' && path ? await exists(path) : true
-  return { bashTargets, bashReads, before, existed }
+  return { bashTargets, bashReads, bashSearches, before, existed }
 }
 
 /** Aktuelle Tätigkeit für die Detailansicht (Werkzeug und Ziel, Pfad relativ zum Projekt, Befehl gekürzt) */
@@ -2464,7 +2759,7 @@ async function noteActivity($: EngineInterface, c: ToolCtx, e: ToolEvt): Promise
   }
 }
 
-/** Bash-Berührungen ins Register: gelesene Dateien (je Datei einmal) und geänderte/erstellte Ziele; liefert die Anzahl der Einträge */
+/** Bash-Berührungen ins Register: Suchen, gelesene Dateien (je Datei einmal) und geänderte/erstellte Ziele; liefert die Anzahl der Einträge */
 async function recordBashTouches(
   $: EngineInterface,
   c: ToolCtx,
@@ -2476,6 +2771,9 @@ async function recordBashTouches(
   const rt = c.rt
   let n = 0
   const entry = b.registry.agenten[rt.id]
+  // Suchen über Bash zählen wie Grep/Glob (Linux/macOS haben diese Werkzeuge nicht; beide Wege immer)
+  for (let k = 0; k < touches.bashSearches; k++) recordTouch(b.registry, rt.id, 'suche', '', now)
+  n += touches.bashSearches
   for (const r of touches.bashReads) {
     const p = rel(r)
     // nur Vorhandenes, und jede Datei einmal (kein Aufblähen durch wiederholtes `cat`)
@@ -2510,7 +2808,7 @@ async function recordToolCall($: EngineInterface, c: ToolCtx, touches: Touches):
     else if (input.tool === 'NotebookEdit' && path) recordTouch(b.registry, rt.id, 'geaendert', rel(path), now)
     else if (input.tool === 'Write' && path) recordTouch(b.registry, rt.id, touches.existed ? 'geaendert' : 'erstellt', rel(path), now)
     else if (input.tool === 'Glob' || input.tool === 'Grep') recordTouch(b.registry, rt.id, 'suche', '', now)
-    else if (touches.bashTargets.length > 0 || touches.bashReads.length > 0) {
+    else if (touches.bashTargets.length > 0 || touches.bashReads.length > 0 || touches.bashSearches > 0) {
       if ((await recordBashTouches($, c, b, touches, now, rel)) === 0) return
     } else return
     b.dirty = true
@@ -2521,12 +2819,39 @@ async function recordToolCall($: EngineInterface, c: ToolCtx, touches: Touches):
   }
 }
 
+/** Schreibversuch eines fremden Agenten in einer Solo-Aufgabe dieser Sitzung (mainTarget); Regel: hooks/lib/solo.ts */
+async function foreignSoloDeny($: EngineInterface, input: ToolInput): Promise<string | null> {
+  const target = mainTarget(claim)
+  if (target.kind !== 'dir' || !target.dir.startsWith(`${TASKS_DIR}/`)) return null
+  const call = { tool: input.tool, command: input.command, path: input.file_path ?? input.notebook_path }
+  if (writeTargetsOf(call).length === 0) return null
+  if ((await stateOf($, target.dir))?.weg !== 'solo') return null
+  const root = await rootOf($)
+  return soloWriteDeny(null, call, { rel: p => relPath(p, [root]) })
+}
+
 async function onToolCall($: EngineInterface, e: Evt<'tool.call'>, next: Nxt<'tool.call'>) {
   const rt = e.agentId ? agents.get(e.agentId) : undefined
+  // Agent ohne codecycle-Rolle, während die Sitzung an einer Solo-Aufgabe arbeitet: nur lesen
+  if (!rt && e.agentId) {
+    const denied = await foreignSoloDeny($, e as unknown as ToolInput)
+    if (denied) return { deny: denied }
+  }
   if (!rt) {
     // Schreiben der Hauptsitzung in docs/codecycle/X/ = diese Sitzung arbeitet an X (nur Signal, ändert den Aufruf nicht)
     if (!e.agentId) await mainWriteSignal($, e as unknown as ToolInput)
-    return next(e)
+    // im Vorlauf: genannter Aufgabenordner bindet, wenn seine STATE.md nach dem Aufruf offen ist (bei new erst danach da)
+    const named = e.agentId ? [] : mentionedDirs(e as unknown as Record<string, unknown>)
+    if (named.length > 0 && e.tool !== BROWSER_CLOSE_TOOL) {
+      const result = await next(e)
+      await mentionSignal($, named, e.tool)
+      return result
+    }
+    if (e.agentId || e.tool !== BROWSER_CLOSE_TOOL) return next(e)
+    // Bauleiter schließt den Browser: Hinweis „Browser offen“ erledigt
+    const closed = await next(e)
+    if (closed.deny === undefined && closed.isError !== true) browserOpen.clear()
+    return closed
   }
   const input = e as unknown as ToolInput
   const c: ToolCtx = { rt, rootNow: await rootOf($), input, path: input.file_path ?? input.notebook_path }
@@ -2537,6 +2862,10 @@ async function onToolCall($: EngineInterface, e: Evt<'tool.call'>, next: Nxt<'to
   await noteActivity($, c, e)
   const result = await next(e)
   if (result.deny !== undefined || result.isError === true) return result
+  if (tracksBrowser(rt.rolle)) {
+    rt.browser = browserAfter(rt.browser ?? 'nie', e.tool)
+    if (rt.browser === 'zu') browserOpen.delete(rt.id)
+  }
   await recordToolCall($, c, touches)
   return result
 }
@@ -2616,6 +2945,7 @@ export const register: Register = on => {
   on('command.run', { command: 'codecycle-panel' }, onPanelCommand)
   on('command.run', { command: 'effort' }, onEffortCommand)
   on('command.run', { command: 'codecycle:update' }, onUpdateCommand)
+  on('command.run', { command: 'codecycle:notiz' }, onNotizCommand)
   on('ui.close', onUiClose)
   on('ui.focus', onUiFocus)
   on('ui.render', { component: 'AbovePrompt' }, onRenderBand)
@@ -2627,6 +2957,7 @@ export const register: Register = on => {
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyCommitTests)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyBaseline)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyHookBypass)
+  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denySoloMerge)
   on('tool.call', onToolCall)
   on('tool.call', { tool: /^mcp__codecycle__codecycle_budget$/ }, toolBudget)
   on('tool.call', { tool: /^mcp__codecycle__codecycle_step$/ }, toolStep)

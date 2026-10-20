@@ -57,6 +57,30 @@ export function bandWidth(bodyColumns: number): number {
   return Math.max(40, bodyColumns || 100)
 }
 
+/**
+ * Teile einer Zeile mit „ · “ verbinden, so dass sie in `width` Zeichen passen: statt am Ende abzuschneiden fällt
+ * zuerst der Teil mit der höchsten `prio`-Zahl weg (bei Gleichstand der hintere), die Reihenfolge bleibt. Leere
+ * Teile zählen nicht. Passt auch der wichtigste Teil allein nicht, bleibt er stehen (abschneiden macht der Text).
+ * Anlass: In der schmalen Leiste wurden „Konto ≈ 0,…“ und sogar „gew.“ abgeschnitten.
+ */
+export function fitParts(parts: readonly { text: string; prio: number }[], width: number): string {
+  const keep = parts.filter(p => p.text !== '')
+  const len = (list: readonly { text: string }[]) => [...list.map(p => p.text).join(' · ')].length
+  while (keep.length > 1 && len(keep) > width) {
+    let drop = 0
+    keep.forEach((p, i) => {
+      if (p.prio >= keep[drop]!.prio) drop = i
+    })
+    keep.splice(drop, 1)
+  }
+  return keep.map(p => p.text).join(' · ')
+}
+
+/** „1 Lauf“, „2 Läufe“ */
+export function runsCount(n: number): string {
+  return `${n} ${n === 1 ? 'Lauf' : 'Läufe'}`
+}
+
 // ---- Rahmen der Bautafel ---------------------------------------------------------------------------------------
 
 /** Titel im oberen Rand der Bautafel */

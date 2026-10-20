@@ -1,10 +1,10 @@
 // Agenten-Leiste mit Figuren.
 // Rein, ohne Node und ohne Mod-API. Der Mod hält den Live-Zustand je Agent (Status, Kontext,
 // gemeldete Schritte) und legt das Token-Buch daneben; hier entstehen daraus die Zeilen.
-// Kosten werden als Tokens, Cache-Trefferquote und Limit-Anteil gezeigt, nie in Dollar.
+// Kosten werden als gewichtete Tokens (Hauptmaß), Tokens, Cache-Trefferquote und Limit-Anteil (Konto-Näherung) gezeigt, nie in Dollar.
 
 import type { AgentStatus, LiveAgent } from '../../types'
-import { type Costs, freshTokens, hitRate, shortTokens, totalTokens } from './ledger-costs.ts'
+import { type Costs, freshTokens, hitRate, shortTokens, totalTokens, weightedTokens } from './ledger-costs.ts'
 import type { AgentEntry } from './ledger-registry.ts'
 import { roleLabel } from './figure-meta.ts'
 
@@ -16,8 +16,11 @@ export type AgentRow = LiveAgent & {
   /** neu verarbeitet (Eingabe, Ausgabe, Cache-Schreiben) und aus dem Cache gelesen */
   frisch: number
   cache: number
+  /** gewichtete Tokens (Hauptmaß, `lib/tokens.ts :: weightedTokens`) */
+  gewichtet: number
   runden: number
   trefferquote: number | null
+  /** Prozentpunkte des 5h-Fensters (Konto-Näherung: andere Sitzungen zählen mit) */
   limitProzent: number | null
   /** Kontextfüllung in Prozent des Fensters */
   kontextProzent: number
@@ -87,6 +90,7 @@ export function agentRows(live: readonly LiveAgent[], costs: Costs | null): Agen
       tokens: c ? totalTokens(c) : 0,
       frisch: c ? freshTokens(c) : 0,
       cache: c?.cacheRead ?? 0,
+      gewichtet: weightedTokens(c),
       runden: c?.runden ?? 0,
       trefferquote: c ? hitRate(c) : null,
       limitProzent: c?.limitProzent ?? null,
@@ -189,6 +193,7 @@ export function crewSummary(rows: readonly AgentRow[]): {
   tokens: number
   frisch: number
   cache: number
+  gewichtet: number
   limitProzent: number
 } {
   return {
@@ -198,6 +203,7 @@ export function crewSummary(rows: readonly AgentRow[]): {
     tokens: rows.reduce((n, r) => n + r.tokens, 0),
     frisch: rows.reduce((n, r) => n + r.frisch, 0),
     cache: rows.reduce((n, r) => n + r.cache, 0),
+    gewichtet: rows.reduce((n, r) => n + r.gewichtet, 0),
     limitProzent: Math.round(rows.reduce((n, r) => n + (r.limitProzent ?? 0), 0) * 10) / 10,
   }
 }
@@ -214,6 +220,16 @@ export function parseStep(input: { done?: unknown; total?: unknown; note?: unkno
 /** Verbrauch kurz: „neu 54k · Cache 120k“; getrennt von der Kontextfüllung. */
 export function usageText(frisch: number, cache: number): string {
   return `neu ${shortTokens(frisch)} · Cache ${shortTokens(cache)}`
+}
+
+/** Gewichtete Tokens kurz: „1,7 Mio gew.“ (Hauptmaß, Entscheidung 2a). */
+export function weightedText(n: number): string {
+  return `${shortTokens(n)} gew.`
+}
+
+/** Prozentpunkte des 5h-Fensters, als Konto-Näherung gekennzeichnet: „Konto ≈ 2,3 %“ (nachrangig, andere Sitzungen zählen mit). */
+export function kontoText(prozent: number): string {
+  return `Konto ≈ ${prozent.toFixed(1).replace('.', ',')} %`
 }
 
 const ZIEL_MAX = 60
@@ -251,7 +267,9 @@ export function agentDetail(r: AgentRow, entry: AgentEntry | undefined, now: num
   if (r.schritte) kopf.push(`Schritte ${r.schritte.done}/${r.schritte.total}${r.schritte.note ? `: ${r.schritte.note}` : ''}`)
   if (r.taetigkeit) kopf.push(`${r.status === 'laeuft' ? 'Jetzt' : 'Zuletzt'}: ${r.taetigkeit.werkzeug}${r.taetigkeit.ziel ? ` ${r.taetigkeit.ziel}` : ''}`)
   if (entry) kopf.push(`Letzte Aktivität ${entry.letzteAktivitaet.replace('T', ' ').replace(/\.\d+Z$|Z$/, '')}${entry.suchen > 0 ? ` · ${entry.suchen} Suchen` : ''}`)
-  kopf.push(`Kontext ${r.kontextProzent} % · ${usageText(r.frisch, r.cache)}${r.runden > 0 ? ` · ${r.runden} Runden` : ''}`)
+  kopf.push(
+    `Kontext ${r.kontextProzent} % · ${weightedText(r.gewichtet)} · ${usageText(r.frisch, r.cache)}${r.runden > 0 ? ` · ${r.runden} Runden` : ''}${r.limitProzent !== null ? ` · ${kontoText(r.limitProzent)}` : ''}`,
+  )
   const list = (titel: string, touches: readonly { pfad: string; abschnitt?: string }[]) => ({
     titel: touches.length > DETAIL_ITEMS ? `${titel} (${touches.length}, die letzten ${DETAIL_ITEMS})` : `${titel} (${touches.length})`,
     items: touches

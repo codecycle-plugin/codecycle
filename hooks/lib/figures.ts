@@ -68,6 +68,14 @@ const COSTUMES: Record<string, (f: Fill) => void> = {
     f(24, 1, 3, 3, GLASS, 'it')
     f(25, 5, 1, 5, '#7A4A26', 'it')
   },
+  // Solo-Prüfer: Detektiv mit grauem Hut und Brille; die Lupe tastet die Fläche ab.
+  'solo-reviewer': f => {
+    body(f, true, 'it')
+    hat(f, ['.....gggggggg.....', '....gggggggggg....', '....gggggggggg....', '....kkkkkkkkkk....', '.gggggggggggggggg.'], { g: '#5E6470', k: '#2E2E33' })
+    stamp(f, 23, 0, ['.kkk.', 'k...k', 'k...k', 'k...k', '.kkk.'], { k: '#3A3A3C' }, 'it')
+    f(24, 1, 3, 3, GLASS, 'it')
+    f(25, 5, 1, 5, '#5E6470', 'it')
+  },
   // Wachmann mit Schirmmütze und Wappen; das Schild wiegt hin und her.
   'security-reviewer': f => {
     body(f)
@@ -227,6 +235,7 @@ const MOTION: Record<string, [string, string][]> = {
   'builder-logic': [['it', 'transform-origin:100% 100%;animation:cc-twist .5s ease-in-out infinite']],
   'builder-routine': [['flag', 'transform-origin:0 50%;animation:cc-wave .25s steps(1) infinite'], ['la', 'animation-duration:.25s'], ['lb', 'animation-duration:.25s;animation-delay:-.125s']],
   reviewer: [['it', 'animation:cc-scan 1s steps(1) infinite']],
+  'solo-reviewer': [['it', 'animation:cc-scan .8s steps(1) infinite']],
   'security-reviewer': [['it', 'transform-origin:50% 0;animation:cc-sway 1s ease-in-out infinite']],
   refuter: [['it', 'transform-origin:50% 100%;animation:cc-strike .8s ease-in-out infinite']],
   'plan-reviewer': [['it', 'animation:cc-write .5s steps(1) infinite']],

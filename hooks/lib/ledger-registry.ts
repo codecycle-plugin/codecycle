@@ -1,6 +1,7 @@
 // Agenten-Register (agents.json): wer was gelesen, geändert und erstellt hat, Urteile, Lese-Budget.
 // Rein, ohne Node und ohne Mod-API. Das Token-Buch (costs.json) steht in `ledger-costs.ts`.
 
+import { bashSearchCount } from '../../lib/bash-search.ts'
 import { normPath } from '../../lib/paths.ts'
 
 export type Verdict = 'grün' | 'rot' | 'blockiert'
@@ -44,7 +45,7 @@ export type AgentEntry = {
   gelesen: Touch[]
   geaendert: Touch[]
   erstellt: Touch[]
-  /** Glob-/Grep-Aufrufe */
+  /** Suchen: Aufrufe von Grep/Glob und erkannte Suchstufen in Bash-Befehlen (`lib/bash-search.ts :: bashSearchCount`) */
   suchen: number
   /** Agent, der diesen gestartet hat (Paketleiter, Schalter `package-lead`); fehlt = Hauptsitzung */
   eltern?: string
@@ -255,10 +256,20 @@ export function extraReadCount(a: AgentEntry): number {
   return extraReads(a).length + a.suchen
 }
 
-/** Zählt dieser Aufruf zum Lese-Budget? Read einer nicht mitgelieferten, noch nicht gelesenen Datei; jede Suche. */
-export function isExtraRead(a: AgentEntry, tool: string, pfad?: string): boolean {
-  if (tool === 'Grep' || tool === 'Glob') return true
-  if (tool !== 'Read' || !pfad) return false
-  if (a.mitgeliefert.some(m => samePath(pfad, m))) return false
-  return !a.gelesen.some(g => !g.bash && (samePath(g.pfad, pfad) || samePath(pfad, g.pfad)))
+/**
+ * Wie viele zusätzliche Lese- oder Suchaufrufe kostet dieser Aufruf? Read einer nicht mitgelieferten, noch nicht
+ * gelesenen Datei: 1; Grep, Glob: 1; Bash: je erkannte Suchstufe 1 (`bashSearchCount`, beide Wege immer, ohne das
+ * System zu erkennen). Lesen per Bash (`cat` …) kostet nichts.
+ */
+export function extraReadCost(a: AgentEntry, tool: string, pfad?: string, command?: string): number {
+  if (tool === 'Grep' || tool === 'Glob') return 1
+  if (tool === 'Bash') return command ? bashSearchCount(command) : 0
+  if (tool !== 'Read' || !pfad) return 0
+  if (a.mitgeliefert.some(m => samePath(pfad, m))) return 0
+  return a.gelesen.some(g => !g.bash && (samePath(g.pfad, pfad) || samePath(pfad, g.pfad))) ? 0 : 1
+}
+
+/** Zählt dieser Aufruf zum Lese-Budget? (`extraReadCost` > 0) */
+export function isExtraRead(a: AgentEntry, tool: string, pfad?: string, command?: string): boolean {
+  return extraReadCost(a, tool, pfad, command) > 0
 }

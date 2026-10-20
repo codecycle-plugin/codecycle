@@ -25,7 +25,7 @@ function withoutDropped(plan: EffortPlan, dropped: string[]): EffortPlan {
 /**
  * `effort <aufgabenordner> [--set k=v …] [--drop rolle[=grund] …] [--confirm-risk] | --record`
  * Steuerung des Aufwands: Merkmale → Rollen-Set und Läufe in `aufwand.json`;
- * `--record` schreibt die Messung (Läufe, Nachläufe, Diff-Zeilen, Agenten- und Bauleiter-Prozent aus costs.json). Exit 0 ok, 1 Schutzrolle ohne
+ * `--record` schreibt die Messung (Läufe, Nachläufe, Diff-Zeilen, gewichtete Tokens von Agenten und Bauleiter aus costs.json, Prozent als Konto-Näherung, erfasste Hauptsitzungen) und nennt, was nicht erfasst ist. Exit 0 ok, 1 Schutzrolle ohne
  * `--confirm-risk` (nichts geschrieben), 2 Aufruffehler.
  */
 export function effort(args: string[], ctx: Ctx): number {
@@ -73,6 +73,10 @@ export function effort(args: string[], ctx: Ctx): number {
   }
   // --keep hebt eine Streichung auf
   data.gestrichen = data.gestrichen.filter(g => !keeps.includes(g.rolle))
+  const codecycleMd = join(root, '.claude', 'codecycle.md')
+  const projectMd = existsSync(codecycleMd) ? readFileSync(codecycleMd, 'utf8') : null
+  // Risikobereich, aber Zaun aus: nur melden (gehört in die Auftragsfreigabe), nicht umschalten
+  const fenceHint = switchesLib.fenceHint(projectMd, data.merkmale.risiko === true)
   const missing = REQUIRED.filter(k => data.merkmale[k] === undefined)
   if (missing.length > 0) {
     // ohne vollständige Merkmale ist unbekannt, welche Rollen Schutzrollen sind
@@ -80,11 +84,11 @@ export function effort(args: string[], ctx: Ctx): number {
     data.plan = null
     writeAufwand(path, data)
     ctx.out(`effort ${name}: fehlt: ${missing.join(', ')}`)
+    if (fenceHint) ctx.out(fenceHint)
     return 0
   }
 
-  const codecycleMd = join(root, '.claude', 'codecycle.md')
-  const switches = switchesLib.parseSwitches(existsSync(codecycleMd) ? readFileSync(codecycleMd, 'utf8') : null)
+  const switches = switchesLib.parseSwitches(projectMd)
   const full = effortLib.planEffort(data.merkmale as Features, switches)
 
   // Mindestschutz: Schutzrollen nur mit ausdrücklicher Bestätigung streichbar
@@ -127,5 +131,6 @@ export function effort(args: string[], ctx: Ctx): number {
   ctx.out(plan.nachlaufErlaubt === null
     ? 'Nachlauf: Risikobereich, kein fester Deckel; jeder ungeplante Lauf mit Grund in STATE.md'
     : `Nachlauf: höchstens ${plan.nachlaufErlaubt} ungeplanter Lauf (kein Risikobereich)`)
+  if (fenceHint) ctx.out(fenceHint)
   return 0
 }

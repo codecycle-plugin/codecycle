@@ -35,6 +35,8 @@ const DEFAULT_OFF = [
   'agent-progress',
   // Beispieldaten auf Bautafel und Seitenleiste, wenn keine Aufgabe offen ist
   'demo-data',
+  // Beobachtungen mit `codecycle notiz` bzw. `/codecycle:notiz` festhalten (notizen.md im Aufgabenordner)
+  'notizen',
 ]
 
 export function defaultSwitches(): Switches {
@@ -83,6 +85,44 @@ export function isOn(sw: Switches, name: string): boolean {
 
 export function switchValue(sw: Switches, name: string): string {
   return sw[name]?.value ?? ''
+}
+
+/**
+ * Einträge im Abschnitt „Risikobereiche“ von `.claude/codecycle.md` (Listenpunkte, ohne den Platzhalter der Vorlage
+ * `<…>` und ohne „keine“/„–“).
+ */
+export function riskAreas(markdown: string | null | undefined): string[] {
+  if (!markdown) return []
+  const out: string[] = []
+  let level = 0
+  for (const line of markdown.replace(/\r\n/g, '\n').split('\n')) {
+    const h = line.match(/^(#{1,6})\s+(.*?)\s*$/)
+    if (h) {
+      const l = h[1]!.length
+      if (level > 0 && l <= level) level = 0
+      if (level === 0 && /^risikobereich/i.test(h[2]!)) level = l
+      continue
+    }
+    if (level === 0) continue
+    const item = line.match(/^\s*[-*]\s+(.*?)\s*$/)?.[1]
+    if (!item || item.startsWith('<') || /^(keine?|nichts|–|-)(\b|$|\s)/i.test(item)) continue
+    out.push(item)
+  }
+  return out
+}
+
+/**
+ * Hinweis für die Auftragsfreigabe (`codecycle effort`): Die Aufgabe berührt einen Risikobereich (`risiko=ja`),
+ * `.claude/codecycle.md` nennt einen, aber der Schalter `fence` ist aus. Dann setzt der Mod „Kontrolldateien ändert nur
+ * der Werkzeugmeister“ u. ä. für Bau-Rollen nicht durch. Nur ein Hinweis, kein Umschalten: der Nutzer entscheidet.
+ * Sonst null.
+ */
+export function fenceHint(markdown: string | null | undefined, risiko: boolean): string | null {
+  if (!risiko || isOn(parseSwitches(markdown), 'fence')) return null
+  const areas = riskAreas(markdown)
+  if (areas.length === 0) return null
+  const named = areas.slice(0, 3).join('; ') + (areas.length > 3 ? ' …' : '')
+  return `Zaun: Schalter fence ist aus, obwohl die Aufgabe einen Risikobereich berührt (.claude/codecycle.md: ${named}). In die Auftragsfreigabe aufnehmen; einschalten mit „fence: an“ im Abschnitt „Schalter“ von .claude/codecycle.md (wirkt ab dem nächsten Agentenstart).`
 }
 
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'

@@ -18,10 +18,10 @@ export type NodeState = string | 'fehlt' | null
 export type CopyState = string | 'fehlt' | 'unlesbar' | null
 
 /**
- * `projekt`: `.claude/codecycle.md` vorhanden. `config`: `.codecycle/tool.config.json` vorhanden.
+ * `projekt`: `.claude/codecycle.md` vorhanden. null = noch nicht geprüft (Sitzungsstart; dann keine Bautafel und kein Hinweis). `config`: `.codecycle/tool.config.json` vorhanden.
  * `kopie`: Stand der Werkzeug-Kopie. Fehlende Felder gelten als „nicht geprüft“.
  */
-export type SetupState = { projekt: boolean; node: NodeState; config?: boolean; kopie?: CopyState }
+export type SetupState = { projekt: boolean | null; node: NodeState; config?: boolean; kopie?: CopyState }
 
 /** Hauptversion aus „24.15.0“ oder „v24.15.0“; null bei Unlesbarem. */
 export function nodeMajor(version: string): number | null {
@@ -41,7 +41,7 @@ export function nodeWarning(node: NodeState): string | null {
 
 /** Kurzer Hinweis, solange das Projekt nicht eingerichtet ist (keine `.claude/codecycle.md`); null sonst. */
 export function setupHint(s: SetupState): string | null {
-  return s.projekt ? null : 'Projekt noch nicht eingerichtet: /codecycle:setup'
+  return s.projekt !== false ? null : 'Projekt noch nicht eingerichtet: /codecycle:setup'
 }
 
 /**

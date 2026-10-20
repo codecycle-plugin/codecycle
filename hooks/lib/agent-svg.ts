@@ -3,7 +3,7 @@
 // die Zeilen aus lib/agent-view.ts und setzt das Ergebnis in `<Svg source=…>`.
 // Im Terminal zeichnet der Mod dieselben Zeilen als Text (hooks/register.tsx, Seitenleiste).
 
-import { type AgentRow, cacheState, cacheText, crewSummary, modelName, progressLabel, timeText, usageText } from './agent-view.ts'
+import { type AgentRow, cacheState, cacheText, crewSummary, kontoText, modelName, progressLabel, timeText, weightedText } from './agent-view.ts'
 import { figureDocument, figureSvg } from './figures.ts'
 import { modelColor, roleLabel } from './figure-meta.ts'
 import { shortTokens } from './ledger-costs.ts'
@@ -39,16 +39,18 @@ export function fit(s: string, size: number, width: number): string {
   return s.length > max ? `${s.slice(0, Math.max(1, max - 1))}…` : s
 }
 
-const pct = (n: number) => `${String(Math.round(n * 10) / 10).replace('.', ',')} %`
-
-/** Kennzahlen einer Zeile als Text (auch für das Terminal): Kontext, Verbrauch, Limit, Arbeitszeit, Cache-Zeit. */
+/**
+ * Kennzahlen einer Zeile als Text (Desktop-App, SVG und Alt-Text): Kontext, gewichtete Tokens (Hauptmaß), Arbeitszeit,
+ * Cache-Zeit und zuletzt der Limit-Anteil als Konto-Näherung (wird bei Platzmangel zuerst abgeschnitten). Neu und Cache
+ * stehen der Kürze halber nur noch in der Detailansicht und im Kopf (Entscheidung 2a: Platz ist knapp).
+ */
 export function statsText(r: AgentRow, now: number): string {
   // Kontextfüllung und Verbrauch als getrennte Angaben
-  const parts = [`Kontext ${r.kontextProzent} %`, usageText(r.frisch, r.cache)]
-  if (r.limitProzent !== null) parts.push(`Limit ${pct(r.limitProzent)}`)
+  const parts = [`Kontext ${r.kontextProzent} %`, weightedText(r.gewichtet)]
   parts.push(timeText(r, now))
   const cache = cacheText(cacheState(r, now))
   if (cache) parts.push(cache)
+  if (r.limitProzent !== null) parts.push(kontoText(r.limitProzent))
   return parts.join(' · ')
 }
 
@@ -99,14 +101,22 @@ ${statusMark(W - 8, 12, r, color)}`
   return figureDocument(W, ROW_H, `${THEME}${body}`)
 }
 
-/** Werte für den Kopf: echtes 5-Stunden-Fenster und der Anteil dieser Aufgabe (Prozentpunkte aus dem Token-Buch). */
-export type CrewHead = { fuenf: number | null; agenten: number; bauleiter: number | null }
+/**
+ * Werte für den Kopf: echtes 5-Stunden-Fenster, gewichtete Tokens dieser Aufgabe (Hauptmaß; `agentenGew`, `bauleiterGew`)
+ * und die Prozentpunkte aus dem Token-Buch (`agenten`, `bauleiter`; Konto-Näherung).
+ */
+export type CrewHead = { fuenf: number | null; agenten: number; bauleiter: number | null; agentenGew: number; bauleiterGew: number | null }
 
 const oneDecimal = (n: number) => `${n.toFixed(1).replace('.', ',')} %`
 
-/** Zeile unter den Kennzahlen: Anteil der Aufgabe, getrennt nach Agenten und Bauleiter. */
-export function shareText(h: CrewHead): string {
-  return `Aufgabe: Agenten ${oneDecimal(h.agenten)}${h.bauleiter !== null ? ` · Bauleiter ${oneDecimal(h.bauleiter)}` : ''} (Prozentpunkte, Näherung)`
+/**
+ * Zeile unter den Kennzahlen: Aufwand der Aufgabe in gewichteten Tokens, getrennt nach Agenten und Bauleiter; mit
+ * `konto` dahinter die Prozentpunkte als Konto-Näherung („Konto ≈ 3,0 % / 2,5 %“, Reihenfolge wie davor).
+ */
+export function shareText(h: CrewHead, konto = true): string {
+  const main = `Aufgabe: Agenten ${weightedText(h.agentenGew)}${h.bauleiterGew !== null ? ` · Bauleiter ${weightedText(h.bauleiterGew)}` : ''}`
+  if (!konto) return main
+  return `${main} · Konto ≈ ${oneDecimal(h.agenten)}${h.bauleiter !== null ? ` / ${oneDecimal(h.bauleiter)}` : ''}`
 }
 
 /**
@@ -125,7 +135,10 @@ export function crewHeadSvg(width: number, rows: readonly AgentRow[], head: Crew
     return `<text class="s" x="${x}" y="13" font-family="${FONT}" font-size="12">${xml(fit(k, 12, colW - 8))}</text>
 <text class="t" x="${x}" y="31" font-family="${FONT}" font-size="14" font-weight="500" font-variant-numeric="tabular-nums">${xml(v)}</text>`
   }
+  // Prozent (Konto-Näherung) nur, wenn die ganze Zeile passt; sonst lieber weglassen als mitten darin abschneiden
+  const full = shareText(head)
+  const share = fit(full, 12, W - 4) === full ? full : shareText(head, false)
   const body = `${stat(0, 'Agenten neu', shortTokens(s.frisch))}${stat(1, 'Agenten Cache', shortTokens(s.cache))}
-<text class="s" x="2" y="48" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">${xml(fit(shareText(head), 12, W - 4))}</text>`
+<text class="s" x="2" y="48" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">${xml(fit(share, 12, W - 4))}</text>`
   return figureDocument(W, HEAD_H, `${THEME}${body}`)
 }

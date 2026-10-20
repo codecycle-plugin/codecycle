@@ -99,6 +99,41 @@ function optionOutsideList(args: readonly string[], list: OptionList): string | 
   return null
 }
 
+/**
+ * grep, egrep, fgrep, ugrep: Optionen, die Programme starten, Dateien schreiben oder eine Konfiguration laden. Auf
+ * Linux und macOS ist `grep` in Claude Code eine Shell-Funktion auf das eingebaute ugrep (sie gibt genau diese
+ * Optionen an das System-grep weiter, das sie meist nicht kennt); anderswo kann ugrep das echte grep sein. ugrep:
+ * `--filter` startet Filterprogramme, `--pager` einen Anzeiger, `-Q`/`--query` eine Oberfläche, die mit `--view`
+ * oder PAGER/EDITOR Programme startet, `--save-config` schreibt eine Datei, `--config`/`---` liest eine Konfiguration,
+ * die wieder `filter=` setzen kann. ugrep kennt keine Abkürzungen langer Optionen (geprüft mit 7.8.4: `--pag` ist
+ * ungültig); GNU grep hat keine solchen Optionen. Gezielte Sperre statt Erlaubtliste: die Lese-Optionen von GNU grep und
+ * ugrep sind sehr viele, die gefährlichen wenige und benannt.
+ */
+const GREP_NAMES = new Set(['grep', 'egrep', 'fgrep', 'ugrep'])
+const GREP_BAD_LONG = /^--(filter|pager|view|query|save-config|config)(=|-|$)/
+/** kurze Optionen mit Wert (GNU grep und ugrep): danach ist der Rest der Gruppe der Wert */
+const GREP_SHORT_VALUED = 'efABCmdDgtOMNJK'
+
+function grepProblem(name: string, args: readonly string[]): string | null {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!
+    if (a === '--') return null
+    if (a === '-' || !a.startsWith('-')) continue
+    if (a.startsWith('---') || GREP_BAD_LONG.test(a)) return `${name} ${a} ist nicht erlaubt (startet ein Programm, schreibt eine Datei oder lädt eine Konfiguration)`
+    if (a.startsWith('--')) continue
+    const s = a.slice(1)
+    for (let k = 0; k < s.length; k++) {
+      const c = s[k]!
+      if (c === 'Q') return `${name} ${a} ist nicht erlaubt (-Q startet die Suchoberfläche von ugrep, die Programme starten kann)`
+      if (GREP_SHORT_VALUED.includes(c)) {
+        if (k === s.length - 1) i++
+        break
+      }
+    }
+  }
+  return null
+}
+
 /** Ein sed-Befehl `p` mit Zeilenadresse: `5p`, `$p`, `10,20p`, `3,$p`, `1,+4p`. */
 const SED_PRINT = /^(\d+|\$)(,(\d+|\$|\+\d+))?p$/
 
@@ -253,9 +288,10 @@ function readerGitProblem(args: readonly string[]): string | null {
 
 /**
  * codecycle-Befehle für Lese-Rollen; `server` nur mit `server: true` (Browser-Prüfer). Ohne `effort`: es schreibt
- * `aufwand.json` auch ohne Optionen neu; der Plan-Prüfer liest `aufwand.json` direkt.
+ * `aufwand.json` auch ohne Optionen neu; der Plan-Prüfer liest `aufwand.json` direkt. `notiz` hängt nur eine Zeile an
+ * `notizen.md` an, und nur mit Schalter `notizen` an.
  */
-export const READER_TOOL_COMMANDS = ['test', 'locate', 'callers', 'tests-for', 'impact', 'info', 'tasks', 'rework', 'package-info', 'selftest', 'guard'] as const
+export const READER_TOOL_COMMANDS = ['test', 'locate', 'callers', 'tests-for', 'impact', 'info', 'tasks', 'rework', 'package-info', 'selftest', 'guard', 'notiz'] as const
 
 /** Browser-Prüfer: `server` nur in den festen Formen, keine freien Eingaben. */
 function serverProblem(rest: readonly string[]): string | null {
@@ -354,9 +390,14 @@ function allowlistProblem(command: string, allowed: DocKeeperAllowed, profile: A
       problem = `${name} ${args.find(DOC_KEEPER_BAD_OPTION[name]!)} ist nicht erlaubt (startet ein Programm oder schreibt eine Datei)`
     } else if (name === 'sed') {
       problem = sedProblem(args)
-    } else if (name === 'find') {
-      const bad = args.find(a => /^-(delete|exec|execdir|ok|okdir|fprint\w*|fls)$/.test(a))
-      if (bad) problem = `find ${bad} ist nicht erlaubt`
+    } else if (GREP_NAMES.has(name)) {
+      problem = grepProblem(name, args)
+    } else if (name === 'find' || name === 'bfs') {
+      // GNU find und bfs (auf Linux/macOS in Claude Code die Shell-Funktion `find`): Aktionen, die löschen
+      // (`-delete`, bfs auch `-rm`), Programme starten (`-exec`, `-execdir`, `-ok`, `-okdir`) oder Dateien schreiben
+      // (`-fprint`, `-fprint0`, `-fprintf`, `-fls`)
+      const bad = args.find(a => /^-(delete|rm|exec|execdir|ok|okdir|fprint\w*|fls)$/.test(a))
+      if (bad) problem = `${name} ${bad} ist nicht erlaubt`
     } else if (!DOC_KEEPER_PLAIN.has(name)) problem = `${name} ist für ${profile.who} nicht erlaubt`
   })
   return problem

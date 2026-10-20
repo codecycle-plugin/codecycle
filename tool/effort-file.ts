@@ -17,10 +17,20 @@ export type Aufwand = {
     diffZeilen: number
     laeufeJe100Zeilen: number | null
     aufgenommen: string
-    /** aus costs.json (Summe limitProzent der Rollen bzw. Hauptsitzung); fehlt, wenn dort kein Wert steht */
+    /**
+     * Hauptmaß aus costs.json (Entscheidung 2a): gewichtete Tokens der Agenten (Summe der Rollen), des Bauleiters und
+     * fremder Agenten, Anteil des Bauleiters an allem in %; fehlt ohne lesbare costs.json bzw. ohne `fremd`
+     */
+    agentenGewichtet?: number
+    bauleiterGewichtet?: number
+    fremdGewichtet?: number
+    bauleiterAnteil?: number
+    /** Konto-Näherung aus costs.json (Summe limitProzent der Rollen bzw. Hauptsitzung); fehlt, wenn dort kein Wert steht */
     agentenProzent?: number
     bauleiterProzent?: number
     bauleiterModell?: string
+    /** Hauptsitzungen mit Startstand in costs.json (`hauptsitzung.starts[]`, je Sitzung einmal); fehlt bei Büchern ohne Startstände */
+    hauptsitzungen?: number
   } | null
 }
 

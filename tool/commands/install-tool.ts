@@ -12,7 +12,7 @@ import { CONFIG_PATH, findProjectRoot } from '../project.ts'
 /**
  * `install-tool [--from <plugin-ordner>] [--dry-run] [--update-config]`: legt `.codecycle/tool/` im Hauptordner
  * des Projekts an oder erneuert es (Werkzeug, `lib/`, `githooks/`). Idempotent.
- * `--update-config` ergänzt fehlende Felder einer bestehenden Konfiguration (junit, mainBranch, graph), nie Vorhandenes; hebt eine ältere `version` auf den Werkzeugstand.
+ * `--update-config` ergänzt fehlende Felder einer bestehenden Konfiguration (junit, mainBranch, graph, commands.server), nie Vorhandenes; hebt eine ältere `version` auf den Werkzeugstand.
  */
 export function installTool(args: string[], ctx: Ctx): number {
   let from: string | null = null
@@ -51,7 +51,10 @@ export function installTool(args: string[], ctx: Ctx): number {
   const created = writeConfigIfMissing(root, dryRun)
   if (created) {
     const c = created.commands
-    const cmds = (['test', 'lint', 'format'] as const).map(k => `${k}: ${c[k] === null ? 'null' : c[k]}`).join('; ')
+    const cmds = (['test', 'lint', 'format', 'server'] as const)
+      .filter(k => k !== 'server' || c[k] !== undefined)
+      .map(k => `${k}: ${c[k] === null ? 'null' : c[k]}`)
+      .join('; ')
     ctx.out(`${dryRun ? 'würde ' : ''}${CONFIG_PATH} ${dryRun ? 'anlegen' : 'angelegt'} (Vorlage: ${cmds}; graph ${created.graph?.provider}${created.junit ? `; junit ${created.junit}` : ''}). Bitte prüfen und anpassen.`)
   }
   let updated = false

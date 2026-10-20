@@ -9,12 +9,14 @@ import { info } from './commands/info.ts'
 import { installTool } from './commands/install-tool.ts'
 import { format, lint } from './commands/lint.ts'
 import { locate } from './commands/locate.ts'
+import { notiz } from './commands/notiz.ts'
 import { packageInfo } from './commands/package-info.ts'
 import { planHtml } from './commands/plan-html.ts'
 import { rework } from './commands/rework.ts'
 import { effort } from './commands/effort.ts'
 import { selftest } from './commands/selftest.ts'
 import { server } from './commands/server.ts'
+import { solo } from './commands/solo.ts'
 import { tasks } from './commands/tasks.ts'
 import { update } from './commands/update.ts'
 import { test } from './commands/test.ts'
@@ -50,6 +52,8 @@ COMMANDS.effort = effort
 COMMANDS['package-info'] = packageInfo
 COMMANDS['plan-html'] = planHtml
 COMMANDS.update = (args, ctx) => update(args, ctx)
+COMMANDS.notiz = notiz
+COMMANDS.solo = solo
 
 const HELP = [
   'codecycle <befehl> [optionen]',
@@ -67,10 +71,13 @@ const HELP = [
   '  impact [--staged]           betroffene Dateien/Symbole des Diffs mit Risiko',
   '  hooks install|status        Git-Hooks (.githooks/) einrichten bzw. prüfen',
   '  update            Plugin aktualisieren, Werkzeug-Kopie, Hooks, guard-Grundlage, Selbsttest (ohne KI; Exit 3: Entscheidung nötig)',
+  "  notiz '<Text>'    Beobachtung mit Datum und Uhrzeit an notizen.md der offenen Aufgabe anhängen (Schalter notizen; ohne Aufgabe .codecycle/setup/)",
   '  install-tool [--update-config]   Werkzeug-Kopie nach .codecycle/tool/ anlegen oder erneuern; --update-config ergänzt fehlende Felder (junit, mainBranch, graph)',
   '  exclude [--share] [--gitignore] [--gitattributes]   .claude/, .codecycle/, .githooks/ lokal halten (--share: nur .claude/settings.local.json); optional auch .gitignore bzw. .gitattributes ergänzen',
   '  guard [--base <ref>]        Kontrolldateien, Abhängigkeitsdateien, Test-Autor-Tests, Testzahl (--record vorher)',
   '  rework <aufgabenordner>     Commits nach fertig auf denselben Dateien (Nacharbeit)',
+  '  solo check <ordner>         Solo-Weg vor dem Prüfer: check grün, alles committet; nennt berührte Risikobereiche für den Prüfauftrag',
+  '  solo funde <ordner>         Solo-Weg vor dem Merge: jeder Fund aus reports/pruefung.md mit Status in TASK.md',
   '  effort <ordner> [--set k=v] [--drop rolle] [--keep rolle] [--record]   Rollen-Set und Läufe aus Merkmalen (aufwand.json)',
   '  package-info "Datei :: Symbol" …   JSON für das Kontextpaket: Graph-Treffer, Signaturen',
   '  plan-html <aufgabenordner>  schreibt plan.html (Pakete, Kriterien, Budget) in den Aufgabenordner',

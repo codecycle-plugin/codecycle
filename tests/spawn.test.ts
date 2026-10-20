@@ -262,5 +262,117 @@ describe('Agentenstart: Modellwahl, Kontextpaket, Paketleiter, Effort', () => {
     expect(await pane.find({ type: 'Text', text: /^▎ ▲ Schalter effort-by-size ist wirkungslos/ })).toBeDefined()
     await pane.unmount()
   })
+
+  // Anlass: der Bauleiter schrieb den Aufgabenordner mit Satzpunkt in die Startnachricht
+  test('Aufgabenordner mit Satzpunkt: berichtigt, Bericht und Lese-Zaun im Ordner der aktiven Aufgabe', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, FILES)
+    let seen = ''
+    on('agent.spawn', (_$, e) => {
+      seen = e.prompt
+      return { model: e.model ?? 'inherit', agentId: 'pr1' }
+    })
+    on('tool.call', () => ({ result: {} }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    const res = await spawn($, `Prüfe den Plan in ${DIR}.\nBericht: ${DIR}./reports/plan-reviewer.md`, 'codecycle:plan-reviewer')
+    expect(res.deny).toBeUndefined()
+    expect(seen).toMatch(new RegExp(`Bericht: /proj/${DIR}/reports/plan-reviewer\\.md`))
+    expect(seen).toMatch(new RegExp(`Aufgabenordner: ${DIR} \\(die Startnachricht nannte ${DIR}\\.;`))
+    const write = (file_path: string) => $.tool.call({ tool: 'Write', file_path, content: 'x', agentId: 'pr1' } as never)
+    expect((await write(`/proj/${DIR}/reports/plan-reviewer.md`)).deny).toBeUndefined()
+    expect((await write(`/proj/${DIR}./reports/plan-reviewer.md`)).deny).toMatch(/Lese-Rolle plan-reviewer/)
+    // Register und Buch in der aktiven Aufgabe, nicht im vertippten Ordner
+    await $.session.end({ reason: 'other', sessionId: 's' } as never)
+    expect(JSON.parse(written[`${DIR}/agents.json`]!).agenten.pr1.rolle).toBe('plan-reviewer')
+    expect(Object.keys(written).some(k => k.startsWith(`${DIR}./`))).toBe(false)
+  })
+
+  test('Aufgabenordner existiert nicht oder passt nicht zur Sitzung: Start verweigert, Meldung nennt den richtigen Pfad', async ($, on) => {
+    mock.store(on)
+    const OTHER = 'docs/codecycle/aufgabe-u'
+    const DONE = 'docs/codecycle/aufgabe-alt'
+    fakeWorld(on, {
+      ...FILES,
+      [`${OTHER}/STATE.md`]: FILES[`${DIR}/STATE.md`]!.replace('aufgabe: aufgabe-t', 'aufgabe: aufgabe-u'),
+      [`${DONE}/STATE.md`]: FILES[`${DIR}/STATE.md`]!.replace('zustand: in-arbeit', 'zustand: fertig'),
+    })
+    let n = 0
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: `ag${++n}` }))
+    on('skill.prompt', (_$, e) => ({ text: e.text }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    // zwei offene Aufgaben, Sitzung ohne Bindung: ein nicht vorhandener Ordner → Liste der offenen
+    const missing = await spawn($, 'Aufgabenordner: docs/codecycle/gibt-es-nicht', 'codecycle:surveyor')
+    expect(missing.deny).toMatch(/Agent nicht gestartet.*docs\/codecycle\/gibt-es-nicht.*keine offene Aufgabe.*Offene Aufgaben: .*aufgabe-t.*aufgabe-u/)
+    expect(n).toBe(0)
+    // fertige Aufgabe zählt nicht als offen
+    expect((await spawn($, `Aufgabenordner: ${DONE}`, 'codecycle:surveyor')).deny).toMatch(/keine offene Aufgabe/)
+    // existierender offener Ordner bei unbekannter Sitzungs-Aufgabe: gilt und bindet die Sitzung
+    expect((await spawn($, `Aufgabenordner: ${DIR}`, 'codecycle:surveyor')).deny).toBeUndefined()
+    expect(n).toBe(1)
+    // jetzt arbeitet die Sitzung an aufgabe-t: der andere offene Ordner wird verweigert, die Meldung nennt den richtigen
+    const wrong = await spawn($, `Aufgabenordner: ${OTHER}\nPaket: P1`, 'codecycle:builder-logic')
+    expect(wrong.deny).toMatch(new RegExp(`nennt den Aufgabenordner ${OTHER}, diese Sitzung arbeitet aber an ${DIR}\\. Richtig: „Aufgabenordner: ${DIR}“`))
+    expect(wrong.deny).toMatch(/codecycle:continue/)
+    // vertippt, Sitzung gebunden: der Pfad der Sitzung steht in der Meldung
+    expect((await spawn($, 'Aufgabenordner: docs/codecycle/aufgabe-tt', 'codecycle:surveyor')).deny).toMatch(new RegExp(`Richtig: „Aufgabenordner: ${DIR}“`))
+    expect(n).toBe(1)
+    // ohne Ordner in der Startnachricht: die Aufgabe der Sitzung
+    expect((await spawn($, 'Prüfe die Abnahme.', 'codecycle:acceptance')).deny).toBeUndefined()
+    // /codecycle:continue löst die Bindung: der andere offene Ordner gilt wieder
+    await $.skill.prompt({ skill: 'codecycle:continue', text: 'Ablauf …' })
+    expect((await spawn($, `Aufgabenordner: ${OTHER}`, 'codecycle:surveyor')).deny).toBeUndefined()
+  })
+
+  test('Folgenachricht an einen fertigen Agenten (resume): kein neuer Start, Register und Läufe laufen weiter', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, {
+      ...FILES,
+      // Agent aus einem früheren Lauf des Mods (nur im Register bekannt)
+      [`${DIR}/agents.json`]: JSON.stringify({
+        version: 1,
+        aufgabe: 'aufgabe-t',
+        agenten: {
+          alt1: { id: 'alt1', rolle: 'surveyor', paket: null, modell: 'haiku', gestartet: '2026-10-18T08:00:00.000Z', mitgeliefert: [], letzteAktivitaet: '2026-10-18T08:01:00.000Z', gelesen: [], geaendert: [], erstellt: [], suchen: 2 },
+        },
+      }),
+    })
+    let n = 0
+    const seen: string[] = []
+    on('agent.spawn', (_$, e) => {
+      seen.push(e.prompt)
+      return { model: e.model ?? 'inherit', agentId: e.resume?.agentId ?? `ag${++n}` }
+    })
+    on('tool.call', () => ({ result: {} }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    await spawn($, `Aufgabenordner: ${DIR}\nPaket: P1`, 'codecycle:reviewer')
+    await $.tool.call({ tool: 'Bash', command: 'grep -rn remove src', agentId: 'ag1' } as never)
+    const resume = (agentId: string, prompt: string, subagentType: string) =>
+      $.agent.spawn({
+        tool_use_id: 'tu2',
+        prompt,
+        description: 'Test',
+        subagentType,
+        provider: { plugin: 'engine', tier: 'core' },
+        parentModel: 'claude-sonnet-5-5',
+        background: false,
+        fork: false,
+        resume: { agentId },
+      } as never)
+    const again = await resume('ag1', 'Bitte noch Befund K2 prüfen.', 'codecycle:reviewer')
+    expect(again.deny).toBeUndefined()
+    // Startnachricht unverändert (Claude Code verwirft Änderungen beim Fortsetzen), kein neuer Agent
+    expect(seen.at(-1)).toBe('Bitte noch Befund K2 prüfen.')
+    expect(n).toBe(1)
+    await $.tool.call({ tool: 'Bash', command: 'grep -rn add src', agentId: 'ag1' } as never)
+    // nach einem Neuladen des Mods: Agent aus dem Register wieder bekannt, Suchen zählen weiter
+    await resume('alt1', 'Noch eine Frage.', 'codecycle:surveyor')
+    await $.tool.call({ tool: 'Bash', command: 'find src -name "*.php"', agentId: 'alt1' } as never)
+    await $.session.end({ reason: 'other', sessionId: 's' } as never)
+    const reg = JSON.parse(written[`${DIR}/agents.json`]!)
+    expect(reg.agenten.ag1.paket).toBe('P1')
+    expect(reg.agenten.ag1.suchen).toBe(2)
+    expect(reg.agenten.alt1.suchen).toBe(3)
+    expect(JSON.parse(written[`${DIR}/costs.json`]!).rollen.reviewer.laeufe).toBe(1)
+  })
 })
 

@@ -165,9 +165,16 @@ export function fakeWorld(
     WRITES.push(rel(e.path))
     return { value: undefined }
   })
-  on('fs.list', (_$, e) => ({
-    value: rel(e.path) === 'docs/codecycle' ? [{ name: 'aufgabe-t', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] : [],
-  }))
+  // Aufgabenordner unter docs/codecycle/: aufgabe-t immer, dazu jeder Ordner mit Dateien in `files` oder geschriebenen
+  on('fs.list', (_$, e) => {
+    if (rel(e.path) !== 'docs/codecycle') return { value: [] }
+    const names = new Set(['aufgabe-t'])
+    for (const k of Object.keys({ ...files, ...written })) {
+      const m = k.match(/^docs\/codecycle\/([^/]+)\//)
+      if (m) names.add(m[1]!)
+    }
+    return { value: [...names].map(name => ({ name, kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false })) }
+  })
   FIVE.percent = 42
   FIVE.fail = false
   FIVE.none = false

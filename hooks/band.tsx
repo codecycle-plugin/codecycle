@@ -44,12 +44,10 @@ export type BandData = {
   board: Board
   isLocked: boolean
   isCollapsed: boolean
-  /** Hinweise mit Art; im Terminal in fester Rangfolge und mit Einrichtungshinweis, sonst wie bisher */
+  /** Hinweise mit Art; im Terminal in fester Rangfolge, sonst wie bisher (Einrichtungshinweis nie: die Bautafel gibt es nur im eingerichteten Projekt) */
   notes: Hint[]
   /** Anzahl laufender codecycle-Agenten */
   running: number
-  /** Einrichtungshinweis oder null (Desktop-App; im Terminal steht er in `notes`) */
-  hint: string | null
   /** Zeilen, die die Leiste bekommt (`e.props.maxRows`) */
   maxRows: number
   /** Engine kennt `weight`, `size`, `tabular`, Abstandsstufen (ab 2.1.299) */
@@ -302,7 +300,7 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
   // Terminal und Desktop-App haben je eine eigene Darstellung
   if (d.surface === 'terminal') return renderBandTerminal(ui, d, act)
   const { Box, Button, Text } = ui
-  const { active, board: b, isLocked, isCollapsed, running, hint } = d
+  const { active, board: b, isLocked, isCollapsed, running } = d
   const notes = d.notes.map(n => n.text)
   const current = currentPackage(b)
   const done = b.pakete.filter(p => p.status === 'fertig').length
@@ -415,7 +413,7 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
             {running} {running === 1 ? 'Agent läuft' : 'Agenten laufen'}
           </Text>
         )}
-        {hint ? <Text color="suggestion">{hint}</Text> : b.quelle === 'beispiel' && <Text dimColor>(Beispieldaten)</Text>}
+        {b.quelle === 'beispiel' && <Text dimColor>(Beispieldaten)</Text>}
       </Box>
       {notes.length > 0 && (
         <Box key="row-warn" flexDirection="column" rowGap={0}>

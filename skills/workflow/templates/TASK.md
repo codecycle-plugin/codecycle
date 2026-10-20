@@ -1,7 +1,12 @@
 # <Thema>
 
+## Wortlaut
+> <Beschreibung des Nutzers unverändert, `> ` vor jeder Zeile.>
+
+<!-- Nie bearbeiten. Nachträge des Nutzers beim Klären nur anhängen, als Zitat mit Datum (`> <JJJJ-MM-TT>: …`), nie umformulieren. Kommt der Auftrag aus dem Brainstorming: oben die Worte des Nutzers aus dem Gespräch, darunter der freigegebene Entwurf als `> Entwurf, freigegeben am <JJJJ-MM-TT>: …`. Maßstab für Plan-Prüfer und Abschlussprüfung. -->
+
 ## Ziel
-<Zweck in 1–3 Sätzen. Bei Neuanlage: Beschreibung des Nutzers wörtlich.>
+<Zusammenfassung in 1–3 Sätzen.>
 
 ## Erfolgskriterium
 Fertig, wenn <…>.
@@ -13,9 +18,10 @@ Fertig, wenn <…>.
 <Weg, gewählt am <JJJJ-MM-TT>. Begründung in 1–2 Sätzen. Bei klein: entfällt.>
 
 ## Entscheidungen
-| Frage | Entscheidung | Datum |
-|---|---|---|
-| <Frage> | <Entscheidung> | <JJJJ-MM-TT> |
+| Frage | Entscheidung | Nutzer (Wortlaut) | Datum |
+|---|---|---|---|
+| <Frage> | <Entscheidung> | „<Antwort des Nutzers>“ | <JJJJ-MM-TT> |
+| <Frage> | Empfehlung übernommen: <Standard> | „<z. B. nimm deine Empfehlung>“ | <JJJJ-MM-TT> |
 
 ## Abnahmekriterien
 | ID | Kriterium | Prüfweg |
@@ -31,4 +37,15 @@ Prüfwege: `Test`, `Befehl <…>`, `Browser` (Browser-Prüfer; früher `TÜV`, w
 
 ## Änderungen
 Nach der Freigabe nur hier ergänzen (Datum, was, warum).
+- keine
+
+## Kurzplan
+<Nur Solo-Weg: 3–10 Zeilen, Dateien, Vorgehen, Prüfweg.>
+
+## Annahmen
+<Nur Solo-Weg: je still entschiedenem Punkt eine Zeile `- <Annahme> (Grund)`.>
+- keine
+
+## Funde
+<Nur Solo-Weg: je Fund aus `reports/pruefung.md` eine Zeile `- M1: behoben (<commit>)`, `- M2: verworfen: <Grund>` oder `- M3: offen: Frage an den Nutzer`.>
 - keine

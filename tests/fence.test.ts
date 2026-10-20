@@ -63,6 +63,26 @@ describe('Zaun und Sperren', () => {
     expect((await call('Edit', '/wt/P1/src/Group.php')).deny).toBeUndefined()
   })
 
+  // Linux/macOS haben in Claude Code kein Grep/Glob, gesucht wird über Bash; derselbe Ablauf wie oben, nur über Bash
+  test('Lese-Budget (Wert 2) mit Suche über Bash: grep -rn und find zählen, Filter in der Pipe nicht', async ($, on) => {
+    mock.store(on)
+    fakeWorld(on, { ...FILES, '.claude/codecycle.md': `${FILES['.claude/codecycle.md']}- read-budget: an, 2\n` })
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
+    on('tool.call', () => ({ result: {} }))
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    const read = (file_path: string) => $.tool.call({ tool: 'Read', file_path, agentId: 'ag1' } as never)
+    const bash = (command: string) => $.tool.call({ tool: 'Bash', command, agentId: 'ag1' } as never)
+    expect((await read('/wt/P1/src/Group.php')).deny).toBeUndefined() // mitgeliefert
+    expect((await read('/wt/P1/src/A.php')).deny).toBeUndefined() // 1
+    expect((await bash('git log --oneline | grep fix')).deny).toBeUndefined() // Filter: keine Suche
+    expect((await bash('grep -rn Group src')).deny).toBeUndefined() // 2
+    expect((await read('/wt/P1/src/A.php')).deny).toBeUndefined() // dieselbe Datei: frei
+    expect((await bash('find . -name "*.php"')).deny).toMatch(/Lese-Budget erschöpft \(2 /)
+    expect((await bash('rg Group')).deny).toMatch(/Lese-Budget erschöpft/)
+    expect((await bash('git status')).deny).toBeUndefined()
+    expect((await read('/wt/P1/tests/GroupTest.php')).deny).toBeUndefined() // mitgeliefert
+  })
+
   test('Zaun: Test-Autor mit Paket alle schützt die Tests aller Pakete', async ($, on) => {
     mock.store(on)
     fakeWorld(on, { ...FILES, [`${DIR}/PLAN.md`]: PLAN.replace('- Ändern: src/Other.php\n', '- Ändern: src/Other.php\n- Tests: tests/P2Test.php\n') })

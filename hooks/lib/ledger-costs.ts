@@ -6,7 +6,11 @@
 // (TurnUsage/ModelUsage) liefern nur `cache_creation_input_tokens` als Summe.
 
 import type { Metrics, RoleCost } from '../../types'
+import { weightedTokens } from '../../lib/tokens.ts'
 import type { Registry } from './ledger-registry.ts'
+
+// Gewichtete Tokens (Hauptmaß, Entscheidung 2a) und Kurzform stehen im Kern, weil auch das Werkzeug sie braucht.
+export { TOKEN_WEIGHTS, shortTokens, weightedTokens } from '../../lib/tokens.ts'
 
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number }
 
@@ -33,7 +37,10 @@ export type AgentCost = CostEntry & {
   modell: string
   /** Dateien, die der Agent las, ohne dass sie mitgeliefert waren */
   zusaetzlichGelesen: number
-  /** gemessene Prozentpunkte des 5-Stunden-Fensters über seine Züge (Näherung, bei parallelen Läufen unscharf) */
+  /**
+   * gemessene Prozentpunkte des 5-Stunden-Fensters über seine Züge. Konto-Näherung: das Fenster gehört dem ganzen
+   * Konto, andere Sitzungen zählen mit; bei parallelen Läufen unscharf. Hauptmaß sind die gewichteten Tokens.
+   */
   limitProzent?: number
   /** Läufe (Start bzw. Folgenachricht bis Ende) mit eigenen Tokens; fehlt in älteren costs.json */
   laeufe?: Run[]
@@ -49,7 +56,7 @@ export type MainStart = { sitzung: string; zeit: string; signal: string; vorher:
 export type MainEntry = CostEntry & {
   /** zuletzt gemeldetes Modell der Hauptsitzung */
   modell?: string
-  /** Prozentpunkte des 5-Stunden-Fensters aus Zügen der Hauptsitzung, ohne die Anteile der Agenten (Näherung) */
+  /** Prozentpunkte des 5-Stunden-Fensters aus Zügen der Hauptsitzung, ohne die Anteile der Agenten (Konto-Näherung) */
   limitProzent?: number
   /** Startstände je Sitzung, die an dieser Aufgabe arbeitete */
   starts?: MainStart[]
@@ -261,6 +268,13 @@ export function metricsOf(costs: Costs): Metrics {
     tokens: totalTokens(sum),
     frisch: freshTokens(sum),
     cache: sum.cacheRead,
+    // Hauptmaß (Entscheidung 2a): gewichtete Tokens; Agenten = Summe der Rollen wie bei den Prozentwerten
+    gewichtet: weightedTokens(sum),
+    agentenGewichtet: Object.values(costs.rollen).reduce((n, r) => n + weightedTokens(r), 0),
+    bauleiterGewichtet: weightedTokens(costs.hauptsitzung),
+    ...(costs.fremd
+      ? { fremd: { gewichtet: weightedTokens(costs.fremd), frisch: freshTokens(costs.fremd), cache: costs.fremd.cacheRead } }
+      : {}),
     runden: sum.runden,
     trefferquote: hitRate(sum),
     fehlenderKontext: Object.keys(costs.fehlenderKontext).length,
@@ -274,32 +288,25 @@ export function metricsOf(costs: Costs): Metrics {
   }
 }
 
-/** Kosten pro Rolle für die Anzeige: gemessene Prozentpunkte des 5h-Fensters, sonst Anteil an den Tokens. */
+/**
+ * Kosten pro Rolle für die Anzeige: gewichtete Tokens (Hauptmaß, Sortierung), daneben die gemessenen Prozentpunkte
+ * des 5h-Fensters (Konto-Näherung) und der Anteil an den Tokens.
+ */
 export function roleCosts(costs: Costs): RoleCost[] {
   const roles = Object.entries(costs.rollen)
   const grand = roles.reduce((n, [, r]) => n + totalTokens(r), 0)
   return roles
     .map(([rolle, r]) => ({
       rolle,
-      prozent: r.limitProzent,
+      prozent: r.limitProzent ?? 0,
+      gewichtet: weightedTokens(r),
       tokens: totalTokens(r),
       laeufe: r.laeufe,
       frisch: freshTokens(r),
       cache: r.cacheRead,
       anteil: grand > 0 ? (totalTokens(r) / grand) * 100 : 0,
     }))
-    .sort((a, b) => b.tokens - a.tokens)
-}
-
-/**
- * Kurzform: „870“, „1,5k“, „34k“, „1,2 Mio“. Unter 10 000 eine Nachkommastelle
- * (ohne „,0“), darüber ganze Tausender; ab 999 500 in Millionen.
- */
-export function shortTokens(n: number): string {
-  if (n >= 999_500) return `${(n / 1_000_000).toFixed(1).replace('.', ',').replace(/,0$/, '')} Mio`
-  if (n >= 10_000) return `${Math.round(n / 1_000)}k`
-  if (n >= 1_000) return `${(Math.round(n / 100) / 10).toFixed(1).replace('.', ',').replace(/,0$/, '')}k`
-  return String(n)
+    .sort((a, b) => b.gewichtet - a.gewichtet || b.tokens - a.tokens)
 }
 
 /**

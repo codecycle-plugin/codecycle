@@ -481,6 +481,8 @@ describe('/codecycle:update ohne KI', () => {
     expect(r.text).toMatch(/^Plugin 0\.11\.1 → 0\.12\.0/)
     expect(r.text).not.toMatch(/UPDATE_RESULT/)
     expect(r.text).toMatch(/Neuladen eingeplant/)
+    // Desktop-App: /reload-plugins kann anlaufen und selbst scheitern, ohne dass command.run ablehnt
+    expect(r.text).toMatch(/Falls nicht neu geladen wird: \/reload-plugins eingeben\.$/)
     expect(skill).toEqual([])
     await CLOCK.current!.advance(10)
     expect(reloads).toEqual(['reload-plugins'])
@@ -496,5 +498,57 @@ describe('/codecycle:update ohne KI', () => {
     expect(skill[0]).toMatch(/^Das Werkzeug meldete \(Exit 3\):\n\.codecycle\/tool\.config\.json fehlt/)
     await CLOCK.current!.advance(10)
     expect(reloads).toEqual([])
+  })
+})
+
+// /codecycle:notiz beantwortet der Mod mit `codecycle notiz`; der Skill (KI) läuft nur, wenn der Prozess nicht startet
+describe('/codecycle:notiz ohne KI', () => {
+  function world(on: Ops, run: { exitCode: number; stdout: string } | 'fehlt') {
+    mock.store(on)
+    fakeWorld(on, FILES)
+    const argv: string[][] = []
+    on('process.run', (_$, e) => {
+      if (e.argv.includes('notiz')) {
+        argv.push([...e.argv])
+        if (run === 'fehlt') throw new Error('spawn node ENOENT')
+        return { value: { ...run, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+      }
+      return { value: { exitCode: 0, stdout: '24.15.0\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    const skill: string[] = []
+    on('command.run', { command: 'codecycle:notiz' }, (_$, e) => {
+      skill.push(e.args)
+      return { text: 'Skill lief' }
+    })
+    return { argv, skill }
+  }
+
+  test('gespeichert: Ausgabe des Werkzeugs, Text als ein Argument, Skill läuft nicht', async ($, on) => {
+    const { argv, skill } = world(on, { exitCode: 0, stdout: 'Notiz gespeichert in docs/codecycle/x/notizen.md\n' })
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    const r = await $.command.run({ ...RUN, command: 'codecycle:notiz', args: 'Knopf "Details" springt; prüfen' })
+    expect(r.text).toBe('Notiz gespeichert in docs/codecycle/x/notizen.md')
+    expect(argv.length).toBe(1)
+    expect(argv[0]!.slice(-2)).toEqual(['notiz', 'Knopf "Details" springt; prüfen'])
+    expect(skill).toEqual([])
+  })
+
+  test('Schalter aus: Hinweis des Werkzeugs, ohne KI', async ($, on) => {
+    const { skill } = world(on, { exitCode: 1, stdout: 'Schalter notizen ist aus; nichts gespeichert. Einschalten: …\n' })
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    const r = await $.command.run({ ...RUN, command: 'codecycle:notiz', args: 'x' })
+    expect(r.text).toMatch(/^Schalter notizen ist aus/)
+    expect(skill).toEqual([])
+  })
+
+  test('ohne Text: kurzer Hinweis, kein Prozess; Prozess startet nicht: Skill übernimmt', async ($, on) => {
+    const { argv, skill } = world(on, 'fehlt')
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    const leer = await $.command.run({ ...RUN, command: 'codecycle:notiz', args: '  ' })
+    expect(leer.text).toMatch(/Notiz ohne Text/)
+    expect(argv).toEqual([])
+    const r = await $.command.run({ ...RUN, command: 'codecycle:notiz', args: 'y' })
+    expect(r.text).toBe('Skill lief')
+    expect(skill).toEqual(['y'])
   })
 })

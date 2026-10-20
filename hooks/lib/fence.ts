@@ -7,11 +7,13 @@ import { docKeeperBashProblem, readerBashAllowedText, readerBashProblem } from '
 import { bashWriteTargets } from '../../lib/bash-write-targets.ts'
 import { ALL_PACKAGES, type Plan } from '../../lib/plan-file.ts'
 import { isControlFile, isDocPath, type ProtectedConfig } from '../../lib/protected.ts'
-import { extraReadCount, isExtraRead, samePath, type AgentEntry, type Registry } from './ledger-registry.ts'
+import { extraReadCost, extraReadCount, samePath, type AgentEntry, type Registry } from './ledger-registry.ts'
 
 /**
  * Lese-Rollen: Rollen, die nur ihren Bericht schreiben (setup zusätzlich `.claude/codecycle.md`).
- * `inspector` ist der frühere Name des Browser-Prüfers.
+ * `inspector` ist der frühere Name des Browser-Prüfers. `package-lead` (Paketleiter) zählt mit: Er startet Agenten und
+ * schreibt nur seinen Bericht; Bash nur für Suchen, lesendes git und codecycle-Lesebefehle (unter Linux und macOS gibt
+ * es kein Grep und Glob).
  */
 export const READER_ROLES: ReadonlySet<string> = new Set([
   'surveyor',
@@ -23,6 +25,7 @@ export const READER_ROLES: ReadonlySet<string> = new Set([
   'browser-reviewer',
   'inspector',
   'setup',
+  'package-lead',
 ])
 /** Ab so vielen Verweigerungen in Folge hängt der Lese-Zaun den Stopp-Hinweis an */
 export const READER_STOP_AFTER = 3
@@ -113,7 +116,7 @@ export function readerCheck(rt: FenceAgent, call: ToolCall, env: FenceEnv): Read
       ? ` Stopp: ${verweigert} Verweigerungen in Folge. Versuche keine weiteren Wege; schreibe jetzt deinen Bericht mit dem, was du hast (Fehlendes unter „Offene Punkte“), und quittiere.`
       : ''
   return {
-    deny: `codecycle-Zaun (Lese-Rolle ${rt.rolle}): ${why}. Erlaubt sind: Lesen mit Read, Grep, Glob; Write nur auf ${own.join(' und ')}; Bash nur für ${readerBashAllowedText(server)}. Nicht erlaubt: andere Dateien schreiben, Umleitungen (>), codecycle check/lint/format, Hilfsskripte, PowerShell. Nicht umgehen; was dir fehlt, im Bericht unter „Offene Punkte“ melden.${stop}`,
+    deny: `codecycle-Zaun (Lese-Rolle ${rt.rolle}): ${why}. Erlaubt sind: Lesen mit Read; Suchen mit Grep und Glob, wo vorhanden, sonst über Bash mit grep, rg, find; Write nur auf ${own.join(' und ')}; Bash nur für ${readerBashAllowedText(server)}. Nicht erlaubt: andere Dateien schreiben, Umleitungen (>), codecycle check/lint/format, Hilfsskripte, PowerShell. Nicht umgehen; was dir fehlt, im Bericht unter „Offene Punkte“ melden.${stop}`,
     verweigert,
   }
 }
@@ -196,8 +199,10 @@ export function fenceDenyText(reason: string, tool: string): string {
 // Lese-Budget (Schalter `read-budget`)
 
 /** Meldung, wenn dieser Aufruf das Lese-Budget überschreitet; sonst null. */
-export function readBudgetDeny(entry: AgentEntry | undefined, limit: number, tool: string, path: string | undefined): string | null {
-  if (entry && isExtraRead(entry, tool, path) && extraReadCount(entry) >= limit) {
+export function readBudgetDeny(entry: AgentEntry | undefined, limit: number, tool: string, path: string | undefined, command?: string): string | null {
+  // ein Bash-Befehl mit mehreren Suchstufen kostet so viele Aufrufe wie Stufen; er muss ganz ins Budget passen
+  const cost = entry ? extraReadCost(entry, tool, path, command) : 0
+  if (entry && cost > 0 && extraReadCount(entry) + cost > limit) {
     return `codecycle-Lese-Budget erschöpft (${limit} zusätzliche Lese- oder Suchaufrufe). Arbeite mit dem, was du hast, und nenne im Bericht unter „Offene Punkte“, welche Dateien oder Symbole dir gefehlt haben.`
   }
   return null

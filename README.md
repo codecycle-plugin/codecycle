@@ -2,6 +2,8 @@
 
 Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl nach Abo-Profil (sparsam, großzügig, extrem), Rollen nach den Merkmalen der Aufgabe, Fortschritt in Dateien im Repo. Ausgelegt auf Genauigkeit statt auf möglichst wenig Limit-Verbrauch. Dazu ein optionaler Mod mit Bautafel und Seitenleiste.
 
+**Inhalt:** [Voraussetzungen](#voraussetzungen) · [Installation](#installation) · [Erste Schritte](#erste-schritte) · [Befehle](#befehle) · [Profile](#profile) · [Schalter](#schalter) · [Mod (optional)](#mod-optional) · [Aktualisieren](#aktualisieren) · [Abschalten und entfernen](#abschalten-und-entfernen) · [Lizenz und Beiträge](#lizenz-und-beiträge)
+
 ## Voraussetzungen
 
 - Claude Code (Terminal oder Desktop-App; gebaut und getestet mit 2.1.299), **Git**, **Node.js ab Version 24** (das Projekt-Werkzeug ist TypeScript und läuft direkt mit Node; Claude Code bringt kein Node mit; kein `npm install` nötig).
@@ -25,7 +27,7 @@ Der erste Befehl trägt das Repo als Marktplatz ein (ein Katalog, aus dem Claude
 claude plugin list
 ```
 
-Erwartet: `codecycle@codecycle`, Status `enabled`. Das Plugin ist dann in jeder Sitzung auf dem Gerät geladen; in Projekten ohne codecycle zeigt die Bautafel „Projekt noch nicht eingerichtet: /codecycle:setup“.
+Erwartet: `codecycle@codecycle`, Status `enabled`. Das Plugin ist dann in jeder Sitzung auf dem Gerät geladen; in Projekten ohne codecycle zeigt der Mod keine Bautafel, sondern schlägt beim Start `/codecycle:setup` grau im Eingabefeld vor (Tab übernimmt ihn).
 
 ## Erste Schritte
 
@@ -40,7 +42,7 @@ In einer Sitzung im Zielprojekt:
 
 Der Pre-Commit-Hook aus `hooks install` prüft bei jedem Commit im Projekt Lint, Format und die Tests zur Änderung (nicht die ganze Suite) und stoppt den Commit, wenn etwas rot ist; ohne Node wird die Prüfung übersprungen. Die ganze Suite läuft am Ende eines Pakets und vor dem Merge (`codecycle check --full`). Wer die Hooks nicht möchte, setzt `git config --unset core.hooksPath`; dann laufen keine codecycle-Hooks mehr, auch nicht die, die nach Commit, Checkout und Merge den Code-Graphen aktualisieren. Die Tests im Ordner `tests/` dieses Plugins prüfen nur den Mod selbst und laufen in Projekten nie mit.
 
-Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `info`, `selftest`, `tasks`, `test [--affected]`, `lint`, `format`, `check [--full]`, `server`, `locate`, `callers`, `tests-for`, `impact`, `hooks install|status`, `install-tool`, `guard`, `rework`, `package-info`, `plan-html`, `update`.
+Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `info`, `selftest`, `tasks`, `test [--affected]`, `lint`, `format`, `check [--full]`, `server`, `locate`, `callers`, `tests-for`, `impact`, `hooks install|status`, `install-tool`, `guard`, `rework`, `solo check|funde`, `package-info`, `plan-html`, `update`.
 
 ## Befehle
 
@@ -48,13 +50,15 @@ Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `in
 |---|---|
 | `/codecycle:setup` | Projekt einrichten: `.claude/codecycle.md`, Doku-Aufbau, Werkzeug-Kopie (`install-tool`), Hooks (`hooks install`), Graph-Anbieter, Ablage, Profil |
 | `/codecycle:new <Beschreibung>` | neue Aufgabe: Klären, Planen, Umsetzen, Prüfen, Abnahme, Abschluss |
+| `/codecycle:solo <Beschreibung>` | Solo-Weg: die Sitzung baut selbst, ein frischer Prüfer (Opus) prüft gegen den Wortlaut und probiert aus, berührte Risikobereiche zusätzlich auf Sicherheit, eine Runde Nachbesserung, Merge-Frage; ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfbericht und Status je Fund kein Merge |
 | `/codecycle:continue [Ordner]` | Aufgabe fortsetzen; Git ist die Wahrheit, fragt zuerst nach ausstehenden Merges, schlägt die zuletzt bearbeitete vor |
 | `/codecycle:status` | Übersicht aller Aufgaben mit Git-Abgleich; fragt zuerst nach ausstehenden Merges |
 | `/codecycle:ideas [Stichwort]` | Brainstorming ohne Code, Ergebnis ist ein Auftrags-Entwurf |
 | `/codecycle:check [--full]` | Lint, Format und Tests über das Projekt-Werkzeug |
 | `/codecycle:update` | Neueste Version in einem Durchgang: Plugin aktualisieren, Werkzeug-Kopie, Konfiguration, Hooks und guard-Grundlage aus der neuen Version, danach Plugin neu laden; die Bautafel weist auf eine veraltete Kopie hin |
+| `/codecycle:notiz <Text>` | Beobachtung mit Uhrzeit in `notizen.md` der offenen Aufgabe festhalten, ohne KI (Schalter `notizen`, Standard aus) |
 
-Alle sieben Befehle starten nur auf Aufruf des Nutzers (`disable-model-invocation: true`). Das automatische Brainstorming (`ideas-auto`) läuft über den Bauleiter in `/codecycle:new`.
+Alle neun Befehle starten nur auf Aufruf des Nutzers (`disable-model-invocation: true`). Das automatische Brainstorming (`ideas-auto`) läuft über den Bauleiter in `/codecycle:new`.
 
 ## Profile
 
@@ -93,12 +97,13 @@ Zusatzteile sind einzeln schaltbar, im Abschnitt „Schalter“ von `.claude/cod
 | `plan-html` | aus | Plan zur Freigabe als HTML |
 | `auto-resume` | aus | nach Limit-Reset automatisch fortsetzen |
 | `agent-progress` | aus | Agenten melden Schritte an die Agenten-Leiste (`codecycle_step`) |
+| `notizen` | aus | Beobachtungen ohne KI festhalten: `/codecycle:notiz <Text>` hängt sie mit Uhrzeit an `notizen.md` der offenen Aufgabe (ohne Aufgabe `.codecycle/setup/notizen.md`); der Abschluss liest sie mit |
 | `graph` | an, wenn vorhanden | Code-Graph nutzen (sonst Outline/Suche); Anbieter über `graph.provider` in `.codecycle/tool.config.json` |
 | `cache-ttl-builder` | 5m | Cache-Laufzeit der Agenten: Hauptsitzung im Abo automatisch 1h, Architekt 1h per Frontmatter (`experimental.cacheTtl`), alle anderen Agenten 5m |
 
 ## Mod (optional)
 
-Bautafel über dem Eingabefeld, Seitenleiste (`/codecycle-panel`), `/profile`. Ohne Mod läuft der Ablauf gleich, nur ohne Bautafel, Limit-Prüfung, Token-Buch und technischen Zaun.
+Bautafel über dem Eingabefeld (nur in eingerichteten Projekten), Seitenleiste (`/codecycle-panel`), `/profile`. Ohne Mod läuft der Ablauf gleich, nur ohne Bautafel, Limit-Prüfung, Token-Buch und technischen Zaun.
 
 ## Aktualisieren
 

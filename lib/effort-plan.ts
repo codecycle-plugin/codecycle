@@ -26,7 +26,7 @@ export type Features = {
   /** Pakete, die einen Risikobereich berühren oder eine Schnittstelle ändern */
   risikoPakete?: number
   ungetestet?: boolean
-  /** R2 (12): ein Handwerker schreibt die Doku vollständig im Paket (README, CLAUDE.md, Beispiele, Changelog); undefined = noch offen */
+  /** Ein Handwerker schreibt die Doku vollständig im Paket (README, CLAUDE.md, Beispiele, Changelog); undefined = noch offen */
   dokuImPaket?: boolean
   /** Größe laut Gutachter; senkt die Größe nur ohne Risiko, ohne Schnittstelle und bei einem Paket */
   gutachterGroesse?: Size
@@ -139,7 +139,7 @@ export function planEffort(f: Features, sw: Switches): EffortPlan {
       // Genau ein Risiko-/Schnittstellenpaket neben einfachen: eine Abschlussprüfung statt Prüfer plus Abnahme
       // (lockert den Mindestschutz im Risikobereich mit Zustimmung des Nutzers; sie ist dann die Schutzrolle).
       // Zurückdrehen: diesen Zweig entfernen, dann gilt wieder Prüfer je Risikopaket plus Abnahme.
-      add('reviewer', 1, `ein Paket mit Risiko oder Schnittstelle neben einfachen: eine Abschlussprüfung über alles (Paket: alle) statt Prüfer plus Abnahme (R2)${f.risiko ? ' mit Sicherheitsprüfliste' : ''}`, f.risiko)
+      add('reviewer', 1, `ein Paket mit Risiko oder Schnittstelle neben einfachen: eine Abschlussprüfung über alles (Paket: alle) statt Prüfer plus Abnahme${f.risiko ? ' mit Sicherheitsprüfliste' : ''}`, f.risiko)
     } else {
       add('reviewer', risikoPakete, 'je Paket mit Risikobereich oder Schnittstelle', f.risiko)
       add('acceptance', 1, 'Abnahme über alle Pakete', f.risiko)
@@ -149,7 +149,7 @@ export function planEffort(f: Features, sw: Switches): EffortPlan {
     // (mit `Sicherheitsprüfung: ja`) ein Sicherheitsrisiko meldet (unsicherer Lauf). Zurückdrehen: unsicher=true im mittleren Zweig entfernen.
     if (f.risiko && isOn(sw, 'security-reviewer')) {
       if (f.unumkehrbar) add('security-reviewer', risikoPakete, 'Risikobereich, unumkehrbar (Prüfer bekommt zusätzlich „Sicherheitsprüfung: ja“)')
-      else if (f.pakete === undefined || f.pakete > 1) add('security-reviewer', risikoPakete, 'nur, wenn der Prüfer ein Sicherheitsrisiko meldet (R2); der Prüfer bekommt „Sicherheitsprüfung: ja“', false, true)
+      else if (f.pakete === undefined || f.pakete > 1) add('security-reviewer', risikoPakete, 'nur, wenn der Prüfer ein Sicherheitsrisiko meldet; der Prüfer bekommt „Sicherheitsprüfung: ja“', false, true)
       else notizen.push('Sicherheit: kein eigener Sicherheitsprüfer (ein Paket); Startnachricht des Prüfers mit „Sicherheitsprüfung: ja“')
     }
   }
@@ -159,8 +159,8 @@ export function planEffort(f: Features, sw: Switches): EffortPlan {
   // Schreibt ein Handwerker die Doku vollständig im Paket, entfällt der Doku-Pfleger (Abnahme/Abschlussprüfung gleicht ab).
   // Zurückdrehen: den dokuImPaket-Zweig entfernen.
   if (doku === 'mehr' && !klein) {
-    if (f.dokuImPaket === true) notizen.push('Doku: Handwerker schreibt sie im Paket, Abnahme/Abschlussprüfung gleicht sie ab; kein Doku-Pfleger (R2)')
-    else add('doc-keeper', 1, f.dokuImPaket === false ? 'Doku über den Changelog hinaus' : 'nur, wenn kein Paket die Doku vollständig schreibt (R2)', false, f.dokuImPaket === undefined)
+    if (f.dokuImPaket === true) notizen.push('Doku: Handwerker schreibt sie im Paket, Abnahme/Abschlussprüfung gleicht sie ab; kein Doku-Pfleger')
+    else add('doc-keeper', 1, f.dokuImPaket === false ? 'Doku über den Changelog hinaus' : 'nur, wenn kein Paket die Doku vollständig schreibt', false, f.dokuImPaket === undefined)
   }
   else if (doku === 'changelog') notizen.push('Changelog: Handwerker im Paket, Bauleiter prüft')
   else if (doku === 'mehr') notizen.push('Doku: klein, du ziehst die wenigen Zeilen selbst nach')

@@ -16,7 +16,10 @@ export type BudgetInput = {
   resetWoche?: string
   /** angefragte Rolle */
   role?: string
-  /** Durchschnitt der Prozentpunkte des 5h-Fensters pro Lauf je Rolle */
+  /**
+   * Durchschnitt der Prozentpunkte des 5h-Fensters pro Lauf je Rolle. Konto-Näherung: das Fenster gehört dem ganzen
+   * Konto, andere Sitzungen zählen mit. Bleibt trotzdem in Prozent, weil die Empfehlung mit dem Fenster rechnet (Entscheidung 2a).
+   */
   avg: Record<string, RoleAverage>
   threshold?: number
 }
@@ -104,7 +107,7 @@ export function budgetText(
   lines.push(
     roles.length === 0
       ? 'Durchschnittskosten pro Rolle: noch keine Läufe gemessen'
-      : `Durchschnittskosten pro Rolle (Prozentpunkte des 5h-Fensters je Lauf): ${roles.map(([r, v]) => `${r} ${v.toFixed(1)}`).join(', ')}`,
+      : `Durchschnittskosten pro Rolle (Prozentpunkte des 5h-Fensters je Lauf, Konto-Näherung: andere Sitzungen zählen mit):${roles.map(([r, v]) => `${r} ${v.toFixed(1)}`).join(', ')}`,
   )
   lines.push(
     i.autoResume

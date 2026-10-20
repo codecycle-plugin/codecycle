@@ -18,7 +18,8 @@
       "acceptance": "sonnet",
       "browser-reviewer": "sonnet",
       "doc-keeper": "haiku",
-      "package-lead": "sonnet"
+      "package-lead": "sonnet",
+      "solo-reviewer": "opus"
     },
     "grosszuegig": {
       "setup": "sonnet",
@@ -37,7 +38,8 @@
       "acceptance": "opus",
       "browser-reviewer": "sonnet",
       "doc-keeper": "sonnet",
-      "package-lead": "sonnet"
+      "package-lead": "sonnet",
+      "solo-reviewer": "opus"
     },
     "extrem": {
       "setup": "sonnet",
@@ -56,7 +58,8 @@
       "acceptance": "fable",
       "browser-reviewer": "sonnet",
       "doc-keeper": "sonnet",
-      "package-lead": "sonnet"
+      "package-lead": "sonnet",
+      "solo-reviewer": "opus"
     }
   }
 }

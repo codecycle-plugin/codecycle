@@ -1,4 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { browserChecks, browserInputs, hasUi } from '../browser-check.ts'
 
 import { COPY_DIR, copyFiles, readCopyInfo, treeHash } from '../copy.ts'
 import { junitFix } from '../config-template.ts'
@@ -8,14 +11,16 @@ import type { Ctx } from '../main.ts'
 import { OWN_LAYOUT, layoutOf, pluginToolDir } from '../paths.ts'
 import { CONFIG_PATH, findProjectRoot, loadConfig } from '../project.ts'
 import { MIN_NODE, TOOL_VERSION } from '../version.ts'
+import { type Runner, defaultRunner, lastJson } from './update.ts'
 
 type Check = { name: string; mark: '✔' | '✘' | '!'; detail: string }
 
 /**
  * Funktioniert das Werkzeug in diesem Projekt? Ein `✘` heißt Exit 2 (Werkzeug kaputt); `!` ist ein
- * Hinweis (Graph, Hooks, Kopie veraltet; ein Hook-Ordner, der fehlt, ist aber ein `✘`), der den Ablauf nicht stoppt (Rückfall ohne Graph).
+ * Hinweis (Graph, Hooks, Kopie veraltet, Voraussetzungen des Browser-Prüfers; ein Hook-Ordner, der fehlt, ist aber ein `✘`),
+ * der den Ablauf nicht stoppt (Rückfall ohne Graph). `run` startet `claude plugin list --json` (im Test ersetzbar).
  */
-export function selftest(_args: string[], ctx: Ctx): number {
+export function selftest(_args: string[], ctx: Ctx, run: Runner = defaultRunner): number {
   const checks: Check[] = []
   const major = Number(process.versions.node.split('.')[0])
   checks.push({
@@ -31,8 +36,10 @@ export function selftest(_args: string[], ctx: Ctx): number {
     checks.push({ name: 'Git-Repository', mark: '✘', detail: (err as Error).message })
   }
   if (root) {
+    let serverCommand: string | null | undefined
     try {
       const config = loadConfig(root)
+      serverCommand = config.commands.server
       checks.push({ name: 'Konfiguration', mark: '✔', detail: CONFIG_PATH })
       const t = config.commands.test
       checks.push({
@@ -60,6 +67,7 @@ export function selftest(_args: string[], ctx: Ctx): number {
     checks.push(copyCheck(root))
     checks.push(graphCheck(root))
     checks.push(hooksCheck(root))
+    checks.push(...uiChecks(root, serverCommand, run))
   }
   for (const c of checks) ctx.out(`${c.mark} ${c.name}: ${c.detail}`)
   return checks.some(c => c.mark === '✘') ? 2 : 0
@@ -86,6 +94,18 @@ function copyCheck(root: string): Check {
     mark: '!',
     detail: `veraltet (Kopie ${info.version}/${info.hash}, Plugin ${plugin.version}/${plugin.hash}); Update: /codecycle:update (in Claude), im Terminal codecycle install-tool`,
   }
+}
+
+/** Zeitlimit für `claude plugin list --json`: hängt `claude`, soll der Selbsttest nicht mithängen. */
+export const PLUGIN_LIST_TIMEOUT_MS = 15_000
+
+/** Nur bei einer Oberfläche laut `.claude/codecycle.md`: Voraussetzungen des Browser-Prüfers (tool/browser-check.ts). */
+function uiChecks(root: string, serverCommand: string | null | undefined, run: Runner): Check[] {
+  const md = join(root, '.claude', 'codecycle.md')
+  if (!existsSync(md) || !hasUi(readFileSync(md, 'utf8'))) return []
+  const list = run(['claude', 'plugin', 'list', '--json'], root, { timeoutMs: PLUGIN_LIST_TIMEOUT_MS })
+  const pluginList = list.code === 0 ? lastJson(list.stdout) : null
+  return browserChecks(browserInputs(root, pluginList, serverCommand))
 }
 
 function graphCheck(root: string): Check {

@@ -5,11 +5,11 @@
 
 import type { ElementTable, RenderChildren } from 'claude-code'
 
-import type { Board, Limits, Package, Profile } from '../types'
+import type { Board, Limits, Metrics, Package, Profile } from '../types'
 import { TASKS_DIR } from '../lib/paths.ts'
 import { BOX, PROFILE_LABEL, bar, percent, resetText, type ShownLimits } from './state'
 import { runsText } from './lib/budget.ts'
-import { type AgentRow, type agentDetail, cacheState, cacheText, crewSummary, modelName, progressLabel, timeText, usageText } from './lib/agent-view.ts'
+import { type AgentRow, type agentDetail, cacheState, cacheText, crewSummary, kontoText, modelName, progressLabel, timeText, usageText, weightedText } from './lib/agent-view.ts'
 import { type CrewHead, HEAD_H, ROW_H, agentRowSvg, crewHeadSvg, metaText, shareText, statsText } from './lib/agent-svg.ts'
 import { modelColor, modelFamily, roleGlyph, roleLabel } from './lib/figure-meta.ts'
 import { shortTokens } from './lib/ledger-costs.ts'
@@ -23,11 +23,13 @@ import {
   type Hint,
   comma,
   costBarLength,
+  fitParts,
   isWide,
   levelColor,
   paneWidth,
   quoteLines,
   rule,
+  runsCount,
 } from './lib/term-parts.ts'
 
 /** Breite (CSS-Pixel), die der Knopf › rechts neben einer Agentenzeile bekommt (geschätzt, live prüfen) */
@@ -75,7 +77,40 @@ export type PanelActions = {
 /** Kopfzeile der Leiste als Text (Terminal, Alt-Text): Fenster wie Statuszeile, Anteil der Aufgabe getrennt. */
 function crewAlt(rows: readonly AgentRow[], head: CrewHead): string {
   const s = crewSummary(rows)
-  return `${s.laufend} ${s.laufend === 1 ? 'läuft' : 'laufen'}, ${s.fertig} fertig${s.abgebrochen > 0 ? `, ${s.abgebrochen} abgebrochen` : ''} · ${usageText(s.frisch, s.cache)} · 5 Std. ${percent(head.fuenf)} · ${shareText(head)}`
+  return `${s.laufend} ${s.laufend === 1 ? 'läuft' : 'laufen'}, ${s.fertig} fertig${s.abgebrochen > 0 ? `, ${s.abgebrochen} abgebrochen` : ''} · ${weightedText(s.gewichtet)} · ${usageText(s.frisch, s.cache)} · 5 Std. ${percent(head.fuenf)} · ${shareText(head)}`
+}
+
+/**
+ * Summenzeilen unter „Kosten pro Rolle“ (beide Oberflächen): Agenten (Summe der Rollen), Bauleiter und, falls es welche
+ * gab, fremde Agenten. Zuerst die gewichteten Tokens (Hauptmaß), dann neu und Cache; die Prozentpunkte des 5h-Fensters
+ * nur mit `konto` und zuletzt, als Konto-Näherung gekennzeichnet (Entscheidung 2a).
+ */
+export function costSumLines(k: Metrics, agentenProzent: number, mainCache: string, konto: boolean): { key: string; text: string }[] {
+  const gew = (n: number | undefined) => (n === undefined ? '' : `${weightedText(n)} · `)
+  const fremdFrisch = k.fremd?.frisch ?? 0
+  const fremdCache = k.fremd?.cache ?? 0
+  const family = k.bauleiterModell ? modelFamily(k.bauleiterModell) : null
+  const lines = [
+    {
+      key: 'agenten',
+      text: `Agenten: ${gew(k.agentenGewichtet)}${usageText((k.frisch ?? k.tokens) - (k.bauleiterFrisch ?? 0) - fremdFrisch, (k.cache ?? 0) - (k.bauleiterCache ?? 0) - fremdCache)}${konto ? ` · ${kontoText(agentenProzent)}` : ''}`,
+    },
+    {
+      key: 'bauleiter',
+      text: `Bauleiter${k.bauleiterModell ? ` (${family === 'other' ? k.bauleiterModell : family})` : ''}: ${gew(k.bauleiterGewichtet)}${
+        k.bauleiterFrisch !== undefined ? usageText(k.bauleiterFrisch, k.bauleiterCache ?? 0) : shortTokens(k.hauptsitzung)
+      }${mainCache ? ` · ${mainCache}` : ''}${konto ? ` · ${kontoText(k.bauleiterProzent ?? 0)}` : ''}`,
+    },
+  ]
+  if (k.fremd) lines.push({ key: 'fremd', text: `Fremde Agenten: ${weightedText(k.fremd.gewichtet)} · ${usageText(k.fremd.frisch, k.fremd.cache)}` })
+  return lines
+}
+
+/** Summenzeilen im Terminal: je Zeile mit Konto-Näherung, wenn sie in `width` passt, sonst ohne. */
+function sumLinesFitting(k: Metrics, agentenProzent: number, mainCache: string, wide: boolean, width: number): { key: string; text: string }[] {
+  const without = costSumLines(k, agentenProzent, mainCache, false)
+  if (!wide) return without
+  return costSumLines(k, agentenProzent, mainCache, true).map((l, i) => ([...l.text].length <= width ? l : without[i]!))
 }
 
 export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
@@ -295,7 +330,7 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
   // Titel kurz, ohne Erklärzeile (die Zeile „Prozentpunkte …“ darunter war überflüssig);
   // bei Beispieldaten steht „Beispielwerte“ rechts in der Kurzfassung, die letzte Aufgabe nennt schon der Kopf
   const kostenTitle = 'Kosten pro Rolle'
-  const kostenSummary = b.quelle === 'beispiel' ? 'Beispielwerte' : `Agenten ${comma1(agentenProzent)} %`
+  const kostenSummary = b.quelle === 'beispiel' ? 'Beispielwerte' : kennzahlen?.agentenGewichtet !== undefined ? `Agenten ${weightedText(kennzahlen.agentenGewichtet)}` : `Agenten ${comma1(agentenProzent)} %`
   const kostenBody = [
     kosten.length === 0 ? <Text key="keine" dimColor>– noch keine Läufe gebucht</Text> : null,
     ...kosten.map(k => (
@@ -303,43 +338,34 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
         <Box key="rolle" width={18} flexShrink={0}>
           <Text>{roleLabel(k.rolle)}</Text>
         </Box>
+        {/* Hauptmaß gewichtete Tokens; Beispieldaten haben nur Prozent */}
         <Box key="wert" width={7} flexShrink={0} justifyContent="flex-end">
-          <Text {...num}>{comma1(k.prozent)} %</Text>
+          <Text {...num}>{k.gewichtet !== undefined ? shortTokens(k.gewichtet) : `${comma1(k.prozent)} %`}</Text>
         </Box>
         {k.tokens !== undefined ? (
           <Text dimColor wrap="truncate-end">
-            {usageText(k.frisch ?? k.tokens, k.cache ?? 0)} · {k.laeufe ?? 0} Läufe
+            {`${k.gewichtet !== undefined ? 'gew. · ' : ''}${usageText(k.frisch ?? k.tokens, k.cache ?? 0)} · ${runsCount(k.laeufe ?? 0)} · ${kontoText(k.prozent)}`}
           </Text>
         ) : null}
       </Box>
     )),
-    // Die drei Summenzeilen erst nach „+3 weitere“
-    kennzahlen ? moreButton('kosten', 3) : null,
+    // Die Summenzeilen (gesamt, Agenten, Bauleiter, ggf. fremde Agenten) erst nach „+n weitere“
+    kennzahlen ? moreButton('kosten', kennzahlen.fremd ? 4 : 3) : null,
     kennzahlen && more('kosten') ? (
       <Text key="gesamt" dimColor>
-        gesamt {usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0)} · {kennzahlen.runden} Runden · Cache-Treffer{' '}
+        gesamt {kennzahlen.gewichtet !== undefined ? `${weightedText(kennzahlen.gewichtet)} · ` : ''}
+        {usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0)} · {kennzahlen.runden} Runden · Cache-Treffer{' '}
         {kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`} · fehlender Kontext in{' '}
         {kennzahlen.fehlenderKontext} Dateien
       </Text>
     ) : null,
-    kennzahlen && more('kosten') ? (
-      <Text key="agenten" dimColor>
-        {/* Summe genau der oben gezeigten Rollenwerte, eine Nachkommastelle */}
-        Agenten: {comma1(agentenProzent)} % ·{' '}
-        {usageText((kennzahlen.frisch ?? kennzahlen.tokens) - (kennzahlen.bauleiterFrisch ?? 0), (kennzahlen.cache ?? 0) - (kennzahlen.bauleiterCache ?? 0))}
-      </Text>
-    ) : null,
-    kennzahlen && more('kosten') ? (
-      <Text key="bauleiter" dimColor>
-        Bauleiter
-        {kennzahlen.bauleiterModell
-          ? ` (${modelFamily(kennzahlen.bauleiterModell) === 'other' ? kennzahlen.bauleiterModell : modelFamily(kennzahlen.bauleiterModell)})`
-          : ''}
-        : {comma1(kennzahlen.bauleiterProzent ?? 0)} % ·{' '}
-        {kennzahlen.bauleiterFrisch !== undefined ? usageText(kennzahlen.bauleiterFrisch, kennzahlen.bauleiterCache ?? 0) : shortTokens(kennzahlen.hauptsitzung)}
-        {d.mainCache ? ` · ${d.mainCache}` : ''}
-      </Text>
-    ) : null,
+    ...(kennzahlen && more('kosten')
+      ? costSumLines(kennzahlen, agentenProzent, d.mainCache, true).map(l => (
+          <Text key={l.key} dimColor>
+            {l.text}
+          </Text>
+        ))
+      : []),
   ]
 
   // ab 2.1.299 steht „keine“ nur in der Kurzfassung, der Inhalt entfällt (Live 0.15.3: „keine“ stand doppelt)
@@ -550,12 +576,19 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
             progress ? `${progress}${r.schritte?.note ? ` ${r.schritte.note}` : ''}` : '',
           ].filter(Boolean)
           const cache = cacheText(cacheState(r, now))
-          const stats = [
-            `Kontext ${r.kontextProzent} %`,
-            timeText(r, now),
-            cache,
-            ...(wide ? [usageText(r.frisch, r.cache), r.limitProzent !== null ? `Limit ${comma(r.limitProzent)} %` : ''] : []),
-          ].filter(Boolean)
+          // gewichtete Tokens (Hauptmaß) gleich nach dem Kontext; was nicht passt, fällt weg statt abgeschnitten zu werden:
+          // zuerst der Limit-Anteil (Konto-Näherung), dann neu/Cache, Arbeitszeit, Cache-Zeit. Zeile: 2 + Balken 12 + 2
+          const stats = fitParts(
+            [
+              { text: `Kontext ${r.kontextProzent} %`, prio: 1 },
+              { text: weightedText(r.gewichtet), prio: 1 },
+              { text: timeText(r, now), prio: 3 },
+              { text: cache, prio: 2 },
+              { text: usageText(r.frisch, r.cache), prio: 4 },
+              { text: r.limitProzent !== null ? kontoText(r.limitProzent) : '', prio: 5 },
+            ],
+            W - 16,
+          )
           return (
             <Box key={`ag-${r.id}`} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
               <Box key={`ag-${r.id}-titel`}>
@@ -570,7 +603,7 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
               <Text wrap="truncate-end">
                 {'  '}
                 {termBar(ui, (r.fortschritt ?? 0) * 100, 12, st.color)}
-                <Text dimColor>{`  ${stats.join(' · ')}`}</Text>
+                <Text dimColor>{`  ${stats}`}</Text>
               </Text>
             </Box>
           )
@@ -604,44 +637,46 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
     </Text>,
   ]
 
-  const maxK = Math.max(0, ...kosten.map(k => k.prozent))
+  // Hauptmaß gewichtete Tokens; Beispieldaten haben nur Prozent des 5-Std.-Fensters
+  const value = (k: Board['kosten'][number]) => k.gewichtet ?? k.prozent
+  const maxK = Math.max(0, ...kosten.map(value))
+  const unit = kosten.length > 0 && kosten.every(k => k.gewichtet === undefined) ? '% des 5-Std.-Fensters' : 'gewichtete Tokens'
   const kostenInfo =
     b.quelle === 'beispiel'
       ? 'Beispielwerte, % des 5-Std.-Fensters'
       : empty && b.letzte
-        ? `letzte Aufgabe ${b.letzte.aufgabe}, % des 5-Std.-Fensters`
-        : '% des 5-Std.-Fensters'
+        ? `letzte Aufgabe ${b.letzte.aufgabe}, ${unit}`
+        : unit
   const kostenBlock = [
     heading('kosten', 'Kosten pro Rolle', kostenInfo),
     ...(kosten.length === 0 ? [<Text dimColor>– noch keine Läufe gebucht</Text>] : []),
     ...kosten.map(k => (
       <Box key={`kosten-${k.rolle}`}>
         {cell(18, <Text wrap="truncate-end">{k.rolle}</Text>)}
-        {cell(12, <Text>{'━'.repeat(costBarLength(k.prozent, maxK, 12))}</Text>)}
-        {cell(6, <Text>{comma(k.prozent)}</Text>, true)}
+        {cell(12, <Text>{'━'.repeat(costBarLength(value(k), maxK, 12))}</Text>)}
+        {cell(7, <Text>{k.gewichtet !== undefined ? shortTokens(k.gewichtet) : comma(k.prozent)}</Text>, true)}
         {wide && k.tokens !== undefined ? (
-          <Text dimColor wrap="truncate-end">{`   ${usageText(k.frisch ?? k.tokens, k.cache ?? 0)} · ${k.laeufe ?? 0} Läufe`}</Text>
+          <Text dimColor wrap="truncate-end">{`   ${fitParts([{ text: usageText(k.frisch ?? k.tokens, k.cache ?? 0), prio: 2 }, { text: runsCount(k.laeufe ?? 0), prio: 1 }, { text: kontoText(k.prozent), prio: 3 }], W - 40)}`}</Text>
         ) : null}
       </Box>
     )),
     ...(kennzahlen
       ? [
           <Text dimColor wrap="truncate-end">
-            {`gesamt ${usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0)} · Treffer ${kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`} · ${kennzahlen.runden} Runden · fehlender Kontext in ${kennzahlen.fehlenderKontext} Dateien`}
+            {`gesamt ${fitParts(
+              [
+                { text: kennzahlen.gewichtet !== undefined ? weightedText(kennzahlen.gewichtet) : '', prio: 1 },
+                { text: usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0), prio: 2 },
+                { text: `Treffer ${kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`}`, prio: 3 },
+                { text: `${kennzahlen.runden} Runden`, prio: 4 },
+                { text: `fehlender Kontext in ${kennzahlen.fehlenderKontext} Dateien`, prio: 5 },
+              ],
+              W - 7,
+            )}`}
           </Text>,
-          // Summe genau der oben gezeigten Rollenwerte, eine Nachkommastelle; Bauleiter getrennt
-          <Text dimColor wrap="truncate-end">
-            {`Agenten: ${comma(agentenProzent)} % · ${usageText((kennzahlen.frisch ?? kennzahlen.tokens) - (kennzahlen.bauleiterFrisch ?? 0), (kennzahlen.cache ?? 0) - (kennzahlen.bauleiterCache ?? 0))}`}
-          </Text>,
-          <Text dimColor wrap="truncate-end">
-            {`Bauleiter${
-              kennzahlen.bauleiterModell
-                ? ` (${modelFamily(kennzahlen.bauleiterModell) === 'other' ? kennzahlen.bauleiterModell : modelFamily(kennzahlen.bauleiterModell)})`
-                : ''
-            }: ${comma(kennzahlen.bauleiterProzent ?? 0)} % · ${
-              kennzahlen.bauleiterFrisch !== undefined ? usageText(kennzahlen.bauleiterFrisch, kennzahlen.bauleiterCache ?? 0) : shortTokens(kennzahlen.hauptsitzung)
-            }${d.mainCache ? ` · ${d.mainCache}` : ''}`}
-          </Text>,
+          // Agenten = Summe der Rollen, Bauleiter und fremde Agenten getrennt; Prozent (Konto-Näherung) nur, wenn die
+          // Zeile damit noch passt (weggelassen statt abgeschnitten)
+          ...sumLinesFitting(kennzahlen, agentenProzent, d.mainCache, wide, W).map(l => <Text dimColor wrap="truncate-end">{l.text}</Text>),
         ]
       : []),
   ]
