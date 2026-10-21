@@ -18,7 +18,7 @@ Eine neue Aufgabe vom Auftrag bis zum Abschluss führen: Klären, Planen, Umsetz
 1. Lies `${CLAUDE_PLUGIN_ROOT}/skills/workflow/SKILL.md`.
 2. Ist die Beschreibung leer, frage danach (eine Frage), sonst weiter.
 3. Fehlt `.claude/codecycle.md`, folge zuerst `${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md` und kehre danach hierher zurück.
-4. Lies `${CLAUDE_PLUGIN_ROOT}/skills/workflow/steps/0-start.md` und führe Schritt 0 aus.
+4. Lies `${CLAUDE_PLUGIN_ROOT}/skills/workflow/steps/0-start.md` und führe Schritt 0 aus. Er schlägt zuerst den Weg vor (Punkt 3a); wählt der Nutzer den Solo-Weg, gilt ab dort `${CLAUDE_PLUGIN_ROOT}/skills/solo/SKILL.md` statt der folgenden Punkte.
 5. Lies danach jeweils **nur** die Anleitung des Schritts, der gerade dran ist, aus `${CLAUDE_PLUGIN_ROOT}/skills/workflow/steps/`: `1-clarify.md`, `2-plan.md`, `3-plan-review.md` (nur groß), `4-build.md`, `5-review.md`, `6-acceptance.md`, `7-finish.md`; bei Planänderungen `plan-change.md`. Lies keine Anleitung im Voraus.
 6. Halte an den Freigaben vorn an (Klären, Auftrag, Plan) und warte auf den Nutzer. **Läuft die Umsetzung, störst du ihn nicht** (Schalter `assume-and-continue`, Workflow-Skill).
 

@@ -33,7 +33,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 ### 1. Start
 1. Ist die Beschreibung leer, frage danach (eine Frage).
 2. `codecycle selftest`. Fehlt etwas, frage, ob nachinstalliert werden soll (Kopie veraltet: `/codecycle:update` anbieten). Ein fehlender Graph ist nur ein Hinweis.
-3. **Weg prüfen**, ohne Code zu lesen:
+3. **Weg prüfen**, ohne Code zu lesen (kommst du aus `/codecycle:new`, ist der Weg geklärt; weiter bei Punkt 4):
    - Ein Risikobereich aus `.claude/codecycle.md` ist kein Grund zu fragen; ihn prüft der Prüfer zusätzlich auf Sicherheit (Haltepunkt 4).
    - Fragen nur, wenn die Beschreibung etwas schwer Rückgängiges verlangt (Datenmigration, Löschen, Veröffentlichen, Zahlungen). Sonst keine Frage.
    - Die Frage steht ganz unten unter „Entscheidungen für dich“: „1a: Voller Ablauf (`/codecycle:new`)“ und „1b: Solo-Weg“, je mit Folge, dazu „Empfehlung: 1a“ oder „Empfehlung: 1b“ mit Grund. Die Empfehlung ist dein Urteil und passt zur Begründung. Vor der Antwort legst du nichts an.

@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.20.2] – 2026-10-21
+
+### Geändert
+
+- `/codecycle:new` schlägt zuerst den Weg vor: Solo-Weg für kleine und mittlere Aufgaben, voller Ablauf bei Unumkehrbarem, mehreren Risikobereichen oder sehr großen Aufgaben. Eine Frage mit Empfehlung; bei Solo geht es direkt im Solo-Weg weiter.
+- README: Abschnitt „Welcher Weg?“ (Solo-Weg für kleine und mittlere Aufgaben, voller Ablauf für große oder riskante); neue Sitzung nur, wenn die Hauptsitzung groß wird.
+
 ## [0.20.1 / Werkzeug 0.7.1] – 2026-10-21
 
 ### Geändert
