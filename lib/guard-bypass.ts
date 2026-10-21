@@ -47,8 +47,12 @@ function bypassIn(command: string, depth: number, run: boolean, agent: boolean):
 
 /** `.git/config`, `.git/config.worktree`, `.git/worktrees/<name>/config*`, `.git/hooks/…` (wie DEFAULT_CONTROL in protected.ts) */
 const REPO_INTERNAL = /(^|\/)\.git\/(config(\.worktree)?|worktrees\/[^/]+\/config(\.worktree)?|hooks(\/.*)?)$/i
-/** Git-Konfiguration des Benutzers und des Systems: dort kann `core.hooksPath` ebenso stehen. */
-const USER_CONFIG = /(^|\/)(\.gitconfig|\.config\/git\/config|git\/config)$|^\/etc\/gitconfig$/i
+/**
+ * Git-Konfiguration des Benutzers und des Systems: dort kann `core.hooksPath` ebenso stehen. Global `~/.gitconfig`,
+ * `~/.config/git/config`, `$XDG_CONFIG_HOME/git/config` (auch `${XDG_CONFIG_HOME:-…}`, PowerShell `$env:`, cmd `%…%`); System `<prefix>/etc/gitconfig` (auch Git für Windows,
+ * `…/Git/etc/gitconfig`) und unter Windows `%PROGRAMDATA%/Git/config`. Ein Projektordner `git/config` zählt nicht.
+ */
+const USER_CONFIG = /(^|\/)(\.gitconfig|\.config\/git\/config|etc\/gitconfig)$|(^|\/)(\$\{XDG_CONFIG_HOME[^}]*\}|\$XDG_CONFIG_HOME|\$env:XDG_CONFIG_HOME|%XDG_CONFIG_HOME%)\/git\/config$|(^|[/:%}])programdata%?\/git\/config$/i
 const GIT_INTERNAL = { test: (p: string): boolean => REPO_INTERNAL.test(p) || USER_CONFIG.test(p) }
 
 /** Schrägstriche vereinheitlichen, `.` und `..` auflösen (`.git/./config`, `src/../.git/config`). */

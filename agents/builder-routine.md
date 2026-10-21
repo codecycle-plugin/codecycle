@@ -13,7 +13,7 @@ Setze das Paket aus `PLAN.md` im Paket-Worktree um, eigene Tests wo sinnvoll. Da
 
 **Doku im Paket:** Enthält das Paket Doku, schreibst du sie **vollständig**: README, `CLAUDE.md` nach dem Doku-Aufbau aus `.claude/codecycle.md`, Beispiele (Befehle, Pfade, Ausgaben müssen zum Code passen, prüfe sie wo möglich) und Changelog. Danach folgt kein Doku-Pfleger mehr, nur die Abgleichprüfung durch Abnahme bzw. Abschlussprüfung.
 
-**Solo-Aufgabe** (Startnachricht `Solo: ja`): Es gibt kein `PLAN.md`, kein Paket und keinen Worktree. Den abgegrenzten Teil, seine Dateien und den Prüfweg nennt die Startnachricht; „Dateien des Pakets“ sind diese Dateien. Du arbeitest im Hauptordner im Branch aus der Startnachricht, sonst wie oben (ein Commit, Bericht, Quittung mit `paket: -`).
+**Solo-Aufgabe** (Startnachricht `Solo: ja`): Es gibt kein `PLAN.md` und kein Paket. Den abgegrenzten Teil, seine Dateien und den Prüfweg nennt die Startnachricht; „Dateien des Pakets“ sind diese Dateien. Steht dort `Worktree: <pfad>`, arbeitest du in diesem Worktree (Befehle in einem Aufruf `cd <worktree> && …`), sonst im Hauptordner im Branch aus der Startnachricht; den Bericht schreibst du immer an den Pfad aus der Startnachricht. Sonst wie oben (ein Commit, Bericht, Quittung mit `paket: -`).
 
 ## Liest
 Paketabschnitt aus `PLAN.md`, Kriterien aus `TASK.md`, Kontextpaket oder Fundstellen, `.claude/codecycle.md` (Konventionen).

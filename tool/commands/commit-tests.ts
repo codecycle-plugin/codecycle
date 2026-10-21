@@ -21,7 +21,8 @@ const PACKAGE_BRANCH = /--P\d+$/
  * `--no-verify`); die einmalige Markierung erlaubt ihm nur für genau diesen Index das Ergebnis „rot“.
  * Die Nachricht bekommt die Zeile `${TESTS_TRAILER}`; daran findet `paket pruefen` die Tests des Test-Autors.
  * Nur auf einem Paket-Branch; sonst nur mit `--ohne-paket` (Reproduktionstest des Debuggers; der Mod verweigert die
- * Option dem Test-Autor), auf dem Hauptbranch nie: rote Tests dort machen `check`, `guard` und andere Pakete rot.
+ * Option dem Test-Autor), auf dem Hauptbranch nie: dort landen rote Tests im gemeinsamen Stand und machen `check`,
+ * `guard` und alle Pakete rot. Im Aufgaben-Branch bleiben `check` und `guard` rot, bis der Fix im selben Branch folgt.
  */
 export function commitTests(args: string[], ctx: Ctx): number {
   let message: string | null = null

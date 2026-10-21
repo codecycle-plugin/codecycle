@@ -113,9 +113,17 @@ function contextLine(tokens: number | null | undefined): string {
   return `Hauptsitzung: ${tokensText(tokens)} Kontext; neue Sitzung: ${what}`
 }
 
-/** Kontext für den Bauleiter nach `codecycle paket start|fertig`: die Antwort von `codecycle_budget`, ohne eigene Abfrage. */
-export function packageBudgetNote(budget: string): string {
-  return `codecycle_budget (vom Mod nach codecycle paket start/fertig angehängt):\n${budget}`
+/**
+ * Kontext für die Hauptsitzung nach `codecycle paket start|fertig`, `solo teil start|fertig` und `solo check`: die Antwort
+ * von `codecycle_budget`, ohne eigene Abfrage.
+ */
+export function packageBudgetNote(budget: string, after = 'codecycle paket start/fertig'): string {
+  return `codecycle_budget (vom Mod nach ${after} angehängt):\n${budget}`
+}
+
+/** Kontext nach `codecycle check` der an eine Aufgabe gebundenen Hauptsitzung: nur die Zeile „Hauptsitzung“ (kurz, `check` läuft oft). */
+export function checkContextNote(tokens: number | null | undefined): string {
+  return `codecycle_budget (vom Mod nach codecycle check angehängt): ${contextLine(tokens)}`
 }
 
 /** Text für das Werkzeug `codecycle_budget`. */

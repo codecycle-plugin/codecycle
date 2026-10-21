@@ -17,7 +17,7 @@ import { type BandData, type FooterData, renderBand, renderFooter } from './band
 import { type PanelData, renderPanel } from './panel.tsx'
 import { renderFooterDesk } from './desk.tsx'
 import { supportsRichText } from './lib/desk-parts.ts'
-import { DEFAULT_THRESHOLD, budgetText, contextAdvice, packageBudgetNote, warnings } from './lib/budget.ts'
+import { DEFAULT_THRESHOLD, budgetText, checkContextNote, contextAdvice, packageBudgetNote, warnings } from './lib/budget.ts'
 import { BROWSER_CLOSE_TOOL, type BrowserUse, browserAfter, browserOpenContext, browserOpenHint, tracksBrowser } from './lib/browser-close.ts'
 import { type Hint, type HintKind, effortFromArgs, rankHints, savedChanged, savedEffortOf, savedMark, startEffortOf } from './lib/term-parts.ts'
 import {
@@ -59,7 +59,7 @@ import { bashReadTargets } from '../lib/bash-read-targets.ts'
 import { bashSearchCount } from '../lib/bash-search.ts'
 import { bashWriteTargets } from '../lib/bash-write-targets.ts'
 import { hookBypass } from '../lib/guard-bypass.ts'
-import { baselineCall, commitTestsCall, commitTestsOutsidePackageCall, packageBookkeepingCall, pythonCall } from '../lib/guard-calls.ts'
+import { baselineCall, checkCall, commitTestsCall, commitTestsOutsidePackageCall, packageBookkeepingCall, pythonCall, soloCheckCall } from '../lib/guard-calls.ts'
 import { reviewDiffArgs } from '../lib/guard-rules.ts'
 import {
   type Costs,
@@ -207,7 +207,7 @@ const COMMIT_TESTS_OUTSIDE_DENY =
 const BASELINE_DENY =
   'codecycle: Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith (codecycle guard --record, exclude, install-tool, hooks install). Melde den Bedarf im Bericht unter „Offene Punkte“.'
 const PACKAGE_DENY =
-  'codecycle: codecycle paket start und paket fertig (Worktree, guard --record, Merge, STATE.md) ruft nur der Bauleiter auf. Prüfen darfst du mit codecycle paket pruefen.'
+  'codecycle: codecycle paket start|fertig und solo teil start|fertig (Worktree, Merge, STATE.md) ruft nur die Hauptsitzung auf. Prüfen darfst du mit codecycle paket pruefen bzw. codecycle check.'
 const LOCK_HINT =
   'Das Profil lässt sich nur bis zum ersten codecycle-Agenten einer Sitzung wechseln (neue Sitzung oder /clear).'
 
@@ -2642,6 +2642,26 @@ async function denyPackageBookkeeping($: EngineInterface, e: ToolEvt, next: Tool
   return { ...result, context: [...(result.context ?? []), packageBudgetNote(budget)] }
 }
 
+// Füllstand ohne eigene Abfrage: nach `codecycle solo check` der Hauptsitzung die ganze Antwort von codecycle_budget,
+// nach `codecycle check` nur die Zeile „Hauptsitzung“ und nur, wenn die Sitzung an eine Aufgabe gebunden ist
+async function budgetAfterCheck($: EngineInterface, e: ToolEvt, next: ToolNxt) {
+  const command = (e as unknown as { command?: unknown }).command
+  if (e.agentId || typeof command !== 'string') return next(e)
+  const solo = soloCheckCall(command)
+  if (!solo && !checkCall(command)) return next(e)
+  const result = await next(e)
+  if (result.deny !== undefined) return result
+  let note: string
+  try {
+    if (solo) note = packageBudgetNote(await budgetNow($), 'codecycle solo check')
+    else if (mainTarget(claim).kind === 'dir') note = checkContextNote(await read($, context))
+    else return result
+  } catch {
+    return result
+  }
+  return { ...result, context: [...(result.context ?? []), note] }
+}
+
 // Hook-Sperre auch für PowerShell
 function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
@@ -2766,7 +2786,7 @@ async function adoptWorktreeOfCall($: EngineInterface, c: ToolCtx): Promise<void
   const { rt, input, path } = c
   if (!rt.startCommit && (!rt.cwd || sameDir(rt.cwd, await rootOf($)))) {
     try {
-      await adoptWorktree($, rt, worktreeOf(path ?? input.command ?? '') ?? undefined)
+      await adoptWorktree($, rt, (path ? worktreeOf(path, true) : worktreeOf(input.command ?? '')) ?? undefined)
     } catch (err) {
       $.ui.log(`codecycle: Worktree nicht erkannt (${String(err)})`, { to: 'debug' })
     }
@@ -3019,6 +3039,7 @@ export const register: Register = on => {
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyCommitTests)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyBaseline)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPackageBookkeeping)
+  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, budgetAfterCheck)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyHookBypass)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denySoloMerge)
   on('tool.call', onToolCall)

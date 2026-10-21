@@ -10,7 +10,7 @@ Hinweis zum Frontmatter: `user-invocable: false` blendet den Skill im `/`-Menü 
 
 **Pfade im Plugin:** `${CLAUDE_PLUGIN_ROOT}` wird laut Skills-Doku im Inhalt der Plugin-Skills ersetzt (unbestätigt). In Dateien, die du mit Read liest (diese Datei, Schritt-Anleitungen), ist die Ersetzung unbestätigt: Steht dort buchstäblich `${CLAUDE_PLUGIN_ROOT}`, nimm den Plugin-Ordner, den der aufrufende Skill unter „Voraussetzungen“ nennt. Schritte: `<Plugin>/skills/workflow/steps/<datei>`, Vorlagen: `<Plugin>/skills/workflow/templates/<datei>`, Modelle: `<Plugin>/profiles.json`.
 
-Du bist der **Bauleiter** (Hauptsitzung).
+Du bist der **Bauleiter** (Hauptsitzung). **Leitsatz:** Ziel ist das Ergebnis, das die Aufgabe am besten erfüllt, so genau wie möglich, mit so wenig Tokens wie dafür nötig; sparen heißt nicht weglassen. Jeder Agent baut eigenen Kontext auf und kostet Limit. Mehrere gleichzeitig lohnen sich, wenn sich die Arbeit aufteilen lässt (getrennte Bereiche oder ein großer Bereich in Teilen) oder deine Sitzung sonst zu voll würde: Zu voll heißt, die anstehende Arbeit brächte die Zeile „Hauptsitzung“ von `codecycle_budget` über 500 000 Tokens.
 
 ## Was du darfst
 
@@ -176,7 +176,7 @@ Jeder Zug liest den ganzen Verlauf der Sitzung; eine neue Sitzung empfiehlst du 
 - „keine“: weiterarbeiten, auch über eine Freigabe hinweg; keine Empfehlung, auch nicht am Ende der Aufgabe.
 - „an der nächsten natürlichen Pause“: nach der nächsten Freigabe (Auftrag, Plan), dem nächsten `paket fertig` oder der Merge-Antwort.
 - „jetzt“: an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Paket; nie mitten in einem Paket (laufender Agent, offene Korrektur).
-- Vor der Empfehlung: `STATE.md` vollständig und committet; „Nächster Schritt“ nennt genau, womit `/codecycle:continue` ohne Rückfrage weitermacht (Paket, Befehl, wartende Agenten mit ID).
+- Vor der Empfehlung: kein Agent läuft (Quittung abwarten), keine Frage an den Nutzer offen (Antwort im Wortlaut festhalten), Abwägungen aus dem Verlauf in `STATE.md` („Nächster Schritt“, „Offene Fragen“); `STATE.md` vollständig und committet. „Nächster Schritt“ nennt genau, womit `/codecycle:continue` ohne Rückfrage weitermacht (Paket, Befehl; Agenten, die per Nachricht weitermachen sollen, mit Agenten-ID und Auftrag). Ob ein Agent nach `/clear` per Nachricht erreichbar bleibt, ist unbestätigt: antwortet er nicht, frischer Agent mit Kontextpaket und letztem Bericht.
 - Empfehlung als eine Zeile, keine Frage, die allein genügt (Bautafel und Knopf gibt es nur am Rechner, nicht in der App über Remote Control): „Neue Sitzung: `/clear`, dann `/codecycle:continue` (am Rechner auch Knopf „Neue Sitzung“ auf der Bautafel).“
 - Ohne Mod (kein `codecycle_budget`): nach der Freigabe des Plans und nach der Abnahme empfehlen.
 - Bei `continue` liest du nur `STATE.md` und die Anleitung des aktuellen Zustands.

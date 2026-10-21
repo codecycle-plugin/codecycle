@@ -11,7 +11,7 @@ effort: medium   # Grundwert; bei Risikobereich hebt der Mod Bau- und Prüfrolle
 ## Aufgabe
 Setze das Paket aus `PLAN.md` im Paket-Worktree um und mache die Tests des Test-Autors grün, **ohne sie zu ändern**. Gibt es keine Tests des Test-Autors (Schalter `test-author` aus), schreibe eigene Tests wie die Rolle Handwerker Routine. Dateien des Pakets sind frei. Andere Dateien nur, wenn das Paket sie braucht, jede mit einem Satz unter „Abweichungen vom Plan“. **Tabu: Dateien eines anderen offenen Pakets**; schlage sie unter Offene Punkte vor. Ähnliche Stellen mit gleichem Fehlermuster nur melden. Meldest du „Plan stimmt so nicht“, ändere nichts am Plan.
 
-**Solo-Aufgabe** (Startnachricht `Solo: ja`): Es gibt kein `PLAN.md`, kein Paket und keinen Worktree. Den abgegrenzten Teil, seine Dateien und den Prüfweg nennt die Startnachricht; „Dateien des Pakets“ sind diese Dateien. Du arbeitest im Hauptordner im Branch aus der Startnachricht, sonst wie oben (ein Commit, Bericht, Quittung mit `paket: -`).
+**Solo-Aufgabe** (Startnachricht `Solo: ja`): Es gibt kein `PLAN.md` und kein Paket. Den abgegrenzten Teil, seine Dateien und den Prüfweg nennt die Startnachricht; „Dateien des Pakets“ sind diese Dateien. Steht dort `Worktree: <pfad>`, arbeitest du in diesem Worktree (Befehle in einem Aufruf `cd <worktree> && …`), sonst im Hauptordner im Branch aus der Startnachricht; den Bericht schreibst du immer an den Pfad aus der Startnachricht. Sonst wie oben (ein Commit, Bericht, Quittung mit `paket: -`).
 
 ## Liest
 Paketabschnitt aus `PLAN.md`, Kriterien aus `TASK.md`, Tests des Test-Autors, Kontextpaket oder Fundstellen, `.claude/codecycle.md` (Konventionen).

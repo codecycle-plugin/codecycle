@@ -2,15 +2,15 @@
 //   start:   Branch `<aufgabe>--P<n>` und Worktree neben dem Projekt (vorhandene weiterverwenden, dann Merge des
 //            Aufgaben-Branchs), `guard --record` im Worktree, Paketstatus `in-arbeit`, Commit von STATE.md; nennt die
 //            Zeilen für die Startnachricht. `--nur-worktree`: nur Branch und Worktree (Test-Autor im Aufgabenmodus).
-//            Hat der Hauptordner `node_modules`, bekommt der Worktree einen Verweis darauf (Lint, Typen, Tests wie dort).
+//            Hat der Hauptordner `node_modules`, bekommt der Worktree je Paket einen Verweis darauf (Lint, Typen, Tests wie dort).
 //   pruefen: `guard --base <Aufgaben-Branch>` im Worktree; die Tests des Test-Autors findet es an der Schlusszeile von
 //            `commit-tests` (oder `--test-commit`). Das Ergebnis je Stand merkt es für `fertig`.
 //   fertig:  nur nach grünem `pruefen` auf genau diesem Stand: Merge in den Aufgaben-Branch (Hauptordner), Worktree
-//            entfernen (nie `--force`; vorher den Verweis `node_modules`), Paketstatus `fertig` mit Commit, Commit von STATE.md.
-// Merge-Konflikt: Merge abbrechen, Paket `blockiert`, Exit 1. Exit 0 grün, 1 rot oder blockiert, 2 Aufruf/Werkzeug.
+//            entfernen (nie `--force`; vorher die Verweise in `node_modules`), Paketstatus `fertig` mit Commit, Commit von STATE.md.
+// Merge-Konflikt: Merge abbrechen, Paket `blockiert`, Exit 1; Uncommittetes in berührten Dateien des Hauptordners,
+// verschobener Worktree oder Merge-Fehler ohne Konflikt: rot ohne Blocker. Exit 0 grün, 1 rot oder blockiert, 2 Aufruf/Werkzeug.
 
-import { spawnSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 
 import type { TaskState } from '../../types'
@@ -19,7 +19,8 @@ import { git } from '../exec.ts'
 import { loadRecords, saveRecords } from '../guard-records.ts'
 import { pathsLib, stateFile } from '../lib-path.ts'
 import type { Ctx } from '../main.ts'
-import { findProjectRoot, gitCommonDir } from '../project.ts'
+import { findProjectRoot } from '../project.ts'
+import { dirtyForMerge, gitFull, linkNodeModules, merge, removeWorktree, worktreeMissing, worktreeOf, worktreeProblem } from '../worktree.ts'
 import { TESTS_TRAILER } from './commit-tests.ts'
 import { guard } from './guard.ts'
 
@@ -99,67 +100,6 @@ function findTask(root: string, aufgabe: string | undefined): Task {
   return task
 }
 
-/** Worktree, in dem `branch` ausgecheckt ist, oder null. */
-function worktreeOf(root: string, branch: string): string | null {
-  let path: string | null = null
-  for (const line of git(['worktree', 'list', '--porcelain'], root).out.split(/\r?\n/)) {
-    if (line.startsWith('worktree ')) path = line.slice('worktree '.length)
-    else if (line === `branch refs/heads/${branch}` && path) return resolve(path)
-  }
-  return null
-}
-
-const NODE_MODULES = 'node_modules'
-/** Eintrag in `info/exclude`: ohne Schrägstrich am Ende, denn ein Verweis ist für Git kein Ordner (`node_modules/` träfe ihn nicht). */
-const EXCLUDE_LINK = `/${NODE_MODULES}`
-
-function isLink(path: string): boolean {
-  try {
-    return lstatSync(path).isSymbolicLink()
-  } catch {
-    return false
-  }
-}
-
-/**
- * Verweis `<worktree>/node_modules` auf `node_modules` des Hauptordners (unter Windows als Junction, ohne Adminrechte),
- * damit Lint, Typprüfung und Tests im Worktree laufen. `/node_modules` kommt in `info/exclude` des gemeinsamen
- * Git-Verzeichnisses, sonst wäre der Worktree nie sauber. Nichts, wenn der Hauptordner keins hat oder der Worktree schon eins.
- */
-function linkNodeModules(root: string, wt: string): string | null {
-  const target = join(root, NODE_MODULES)
-  const link = join(wt, NODE_MODULES)
-  if (!existsSync(target) || existsSync(link) || isLink(link)) return null
-  const exclude = join(gitCommonDir(root), 'info', 'exclude')
-  const text = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
-  if (!text.split(/\r?\n/).some(l => l.trim() === EXCLUDE_LINK)) {
-    mkdirSync(dirname(exclude), { recursive: true })
-    writeFileSync(exclude, `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${EXCLUDE_LINK}\n`)
-  }
-  try {
-    symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir')
-  } catch (err) {
-    return `${NODE_MODULES}: kein Verweis möglich (${String(err)}); Lint und Typen im Worktree ohne Abhängigkeiten`
-  }
-  return `${NODE_MODULES}: Verweis auf ${target}`
-}
-
-/** Git mit Ausgabe auf stdout und stderr (für Merge und Commit, deren Meldungen gebraucht werden). */
-function gitFull(args: string[], cwd: string): { ok: boolean; text: string } {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
-  if (r.error) throw new ToolBroken(`git nicht ausführbar: ${String(r.error)}`)
-  return { ok: r.status === 0, text: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
-}
-
-/** Merge mit `--no-edit`; bei einem Konflikt abbrechen und die Dateien nennen. */
-function merge(cwd: string, from: string): { ok: true } | { ok: false; files: string[]; text: string } {
-  const r = gitFull(['merge', '--no-edit', from], cwd)
-  if (r.ok) return { ok: true }
-  const files = git([...GIT_QUIET, 'diff', '--name-only', '--diff-filter=U'], cwd).out.split(/\r?\n/).filter(Boolean)
-  gitFull(['merge', '--abort'], cwd)
-  return { ok: false, files, text: r.text }
-}
-
 /** Tagesdatum in Ortszeit (`JJJJ-MM-TT`), wie `zuletzt` und die Verlaufszeilen des Bauleiters. */
 export function localDay(at: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
@@ -184,7 +124,14 @@ function writeState(task: Task, change: (text: string) => string, message: strin
   return true
 }
 
-function blockedByMerge(task: Task, id: string, where: string, files: string[], ctx: Ctx): number {
+function blockedByMerge(task: Task, id: string, where: string, m: { files: string[]; text: string }, ctx: Ctx): number {
+  const { files } = m
+  // Merge gescheitert ohne Konflikt (Git bricht vorher ab): kein Blocker, Git-Meldung ausgeben
+  if (files.length === 0) {
+    ctx.out(`rot: Merge ${where} gescheitert (kein Konflikt), abgebrochen; ${id} bleibt, wie es ist. Git:`)
+    m.text.split(/\r?\n/).filter(Boolean).slice(-6).forEach(l => ctx.out(`  ${l}`))
+    return 1
+  }
   const list = files.length > 0 ? files.join(', ') : 'Dateien unbekannt'
   writeState(
     task,
@@ -213,6 +160,11 @@ function start(task: Task, o: Options, ctx: Ctx): number {
   const branch = `${state.branch}--${o.id}`
   let wt = worktreeOf(root, branch)
   const fresh = wt === null
+  const missing = wt ? worktreeMissing(root, wt, branch, `${o.id} bleibt ${pkg.status}`) : []
+  if (missing.length > 0) {
+    missing.forEach(l => ctx.out(l))
+    return 1
+  }
   if (!wt) {
     wt = join(dirname(root), `${basename(root)}--wt-${state.aufgabe}-${o.id}`)
     if (existsSync(wt)) throw new ToolBroken(`Ordner ${wt} gibt es schon, aber ohne Worktree von ${branch} (nachsehen, nicht löschen)`)
@@ -229,7 +181,7 @@ function start(task: Task, o: Options, ctx: Ctx): number {
   // Vorhandener Worktree (Aufgabenmodus, Wiederaufnahme): Stand des Aufgaben-Branchs mit den gemergten Paketen holen
   if (!fresh) {
     const m = merge(wt, state.branch)
-    if (!m.ok) return blockedByMerge(task, o.id, `beim Holen von ${state.branch} in den Worktree`, m.files, ctx)
+    if (!m.ok) return blockedByMerge(task, o.id, `beim Holen von ${state.branch} in den Worktree`, m, ctx)
   }
   const rec = guard(['--record'], { cwd: wt, out: ctx.out })
   if (rec === 2) {
@@ -307,35 +259,25 @@ function fertig(task: Task, o: Options, ctx: Ctx): number {
     )
     return 1
   }
-  if (wt) {
-    const dirty = git([...GIT_QUIET, 'status', '--porcelain'], wt).out
-    if (dirty !== '') {
-      ctx.out(`rot: Worktree ${wt} hat Uncommittetes; erst ansehen, nichts verwerfen`)
-      dirty.split(/\r?\n/).slice(0, 8).forEach(l => ctx.out(`  ${l}`))
-      return 1
-    }
+  const problem = wt ? worktreeProblem(root, wt, branch) : []
+  if (problem.length > 0) {
+    problem.forEach(l => ctx.out(l))
+    return 1
   }
   const current = git(['rev-parse', '--abbrev-ref', 'HEAD'], root).out
   if (current !== state.branch) throw new ToolBroken(`Hauptordner steht auf ${current}, gemergt wird in ${state.branch} (git switch ${state.branch})`)
+  const blocking = dirtyForMerge(root, branch)
+  if (blocking.length > 0) {
+    ctx.out(`rot: Hauptordner hat Uncommittetes in Dateien, die der Merge von ${o.id} ändert; nichts gemergt, ${o.id} bleibt ${pkg.status}`)
+    blocking.slice(0, 8).forEach(file => ctx.out(`  - ${file}`))
+    ctx.out('  Erst committen oder ansehen, nichts verwerfen; dann erneut fertig.')
+    return 1
+  }
   const m = merge(root, branch)
-  if (!m.ok) return blockedByMerge(task, o.id, `beim Merge in ${state.branch}`, m.files, ctx)
+  if (!m.ok) return blockedByMerge(task, o.id, `beim Merge in ${state.branch}`, m, ctx)
 
   // Worktree entfernen: nie --force; bleibt ein leerer Ordner, steht er im Verlauf
-  let leftover = ''
-  if (wt) {
-    // nur den Verweis löschen, nie seinen Inhalt (der gehört dem Hauptordner)
-    const link = join(wt, NODE_MODULES)
-    if (isLink(link)) unlinkSync(link)
-    const r = gitFull(['worktree', 'remove', wt], root)
-    if (!r.ok) {
-      gitFull(['worktree', 'prune'], root)
-      leftover = existsSync(wt)
-        ? readdirSync(wt).length === 0
-          ? `; leerer Ordner ${wt} bleibt, später löschen`
-          : `; Worktree ${wt} nicht entfernt (${r.text.split(/\r?\n/).at(-1) ?? ''}), Inhalt ansehen`
-        : ''
-    }
-  }
+  const leftover = wt ? removeWorktree(root, wt) : ''
   const commit = head.out.slice(0, 7)
   writeState(
     task,

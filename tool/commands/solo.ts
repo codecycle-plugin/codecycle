@@ -5,24 +5,31 @@
 //   funde: Haltepunkte „Prüfung“ und „Nachbesserung“. Jeder Fund aus reports/pruefung.md hat in TASK.md, Abschnitt „Funde“,
 //          `behoben` oder `verworfen: <Grund>`. Exit 0 vollständig, 1 sonst. Mit Bericht mindestens `haltepunkt: 4`;
 //          hat jeder Fund einen Status (auch `offen` als Wortlaut-Frage), `haltepunkt: 5`. Nie niedriger als vorher.
+//   teil start|fertig <aufgabenordner> <name>: gleichzeitige Abgabe an einen Handwerker. start legt Branch `<aufgabe>--<name>`
+//          und Worktree neben dem Projekt an (Verweis auf node_modules) und nennt die Zeilen für die Startnachricht; fertig
+//          merged ihn in den Aufgaben-Branch (Konflikt, Uncommittetes im Hauptordner in berührten Dateien, Worktree-Ordner
+//          verschoben: abbrechen, Exit 1) und entfernt Worktree (nie `--force`) und Branch.
 // Start ist der Abzweig vom Hauptbranch (`git merge-base <hauptbranch> HEAD`).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 import { ToolBroken } from '../errors.ts'
 import { git } from '../exec.ts'
 import { mainBranch } from '../git-hints.ts'
 import { pathsLib, riskPathsLib, soloFindingsLib, stateFile } from '../lib-path.ts'
 import type { Ctx } from '../main.ts'
-import { findWorkTree, tryLoadConfig } from '../project.ts'
+import { findProjectRoot, findWorkTree, tryLoadConfig } from '../project.ts'
+import { dirtyForMerge, gitFull, linkNodeModules, merge, removeWorktree, worktreeMissing, worktreeOf, worktreeProblem } from '../worktree.ts'
 import { check } from './check.ts'
 
 const { GIT_QUIET } = pathsLib
 const { SOLO_REPORT, checkFindings, findingStatuses } = soloFindingsLib
 
 const CODECYCLE_MD = '.claude/codecycle.md'
-const USAGE = 'Aufruf: codecycle solo check <aufgabenordner> | codecycle solo funde <aufgabenordner>'
+const USAGE = 'Aufruf: codecycle solo check <aufgabenordner> | codecycle solo funde <aufgabenordner> | codecycle solo teil start|fertig <aufgabenordner> <name>'
+/** Name eines Teils: wird Teil von Branch und Ordner */
+const PART_NAME = /^[a-z0-9][a-z0-9-]{0,30}$/
 
 type Folder = { work: string; rel: string; abs: string }
 
@@ -130,7 +137,88 @@ function raiseStop(f: Folder, stop: number): number {
   return stop
 }
 
+/** Teil-Worktree anlegen (oder vorhandenen nennen) und die Zeilen für die Startnachricht ausgeben. */
+function partStart(f: Folder, name: string, ctx: Ctx): number {
+  const { root, state, branch } = partOf(f, name, ctx)
+  let wt = worktreeOf(root, branch)
+  const missing = wt ? worktreeMissing(root, wt, branch, 'nichts gestartet') : []
+  if (missing.length > 0) {
+    missing.forEach(l => ctx.out(l))
+    return 1
+  }
+  if (wt) ctx.out(`grün: Teil ${name} hat schon den Worktree ${wt}`)
+  else {
+    wt = join(dirname(root), `${basename(root)}--wt-${state.aufgabe}-${name}`)
+    if (existsSync(wt)) throw new ToolBroken(`Ordner ${wt} gibt es schon, aber ohne Worktree von ${branch} (nachsehen, nicht löschen)`)
+    const exists = git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], root).ok
+    const r = gitFull(exists ? ['worktree', 'add', wt, branch] : ['worktree', 'add', '-b', branch, wt, state.branch], root)
+    if (!r.ok) throw new ToolBroken(`git worktree add fehlgeschlagen: ${r.text}`)
+    ctx.out(`grün: Teil ${name}, Worktree ${wt} (Branch ${branch} ab ${state.branch})`)
+  }
+  const linked = linkNodeModules(root, wt)
+  if (linked) ctx.out(linked)
+  ctx.out('Für die Startnachricht:')
+  ctx.out(`  Aufgabenordner: ${join(root, f.rel)}`)
+  ctx.out('  Solo: ja')
+  ctx.out(`  Worktree: ${wt}`)
+  ctx.out(`  Branch: ${branch}`)
+  return 0
+}
+
+/** Teil übernehmen: sauberer Worktree, Merge in den Aufgaben-Branch (Hauptordner), dann Worktree und Branch weg. */
+function partDone(f: Folder, name: string, ctx: Ctx): number {
+  const { root, state, branch } = partOf(f, name, ctx)
+  if (!git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], root).ok) throw new ToolBroken(`Branch ${branch} fehlt (erst codecycle solo teil start)`)
+  const wt = worktreeOf(root, branch)
+  const problem = wt ? worktreeProblem(root, wt, branch) : []
+  if (problem.length > 0) {
+    problem.forEach(l => ctx.out(l))
+    return 1
+  }
+  const current = git(['rev-parse', '--abbrev-ref', 'HEAD'], root).out
+  if (current !== state.branch) throw new ToolBroken(`Hauptordner steht auf ${current}, übernommen wird in ${state.branch} (git switch ${state.branch})`)
+  const blocking = dirtyForMerge(root, branch)
+  if (blocking.length > 0) {
+    ctx.out(`rot: Hauptordner hat Uncommittetes in Dateien, die das Übernehmen von ${name} ändert; nichts übernommen`)
+    blocking.slice(0, 8).forEach(file => ctx.out(`  - ${file}`))
+    ctx.out('  Erst committen oder ansehen, nichts verwerfen; dann erneut fertig.')
+    return 1
+  }
+  const commits = Number(git(['rev-list', '--count', `${state.branch}..${branch}`], root).out) || 0
+  const m = merge(root, branch)
+  if (!m.ok && m.files.length === 0) {
+    ctx.out(`rot: Merge beim Übernehmen von ${name} gescheitert (kein Konflikt), abgebrochen; Teil und Worktree bleiben. Git:`)
+    lines(m.text).slice(-6).forEach(l => ctx.out(`  ${l}`))
+    return 1
+  }
+  if (!m.ok) {
+    ctx.out(`rot: Merge-Konflikt beim Übernehmen von ${name}, abgebrochen; Teil und Worktree bleiben`)
+    m.files.forEach(file => ctx.out(`  - ${file}`))
+    ctx.out('  Konflikt selbst lösen oder den Handwerker per Nachricht auf den neuen Stand bringen lassen, dann erneut fertig.')
+    return 1
+  }
+  const leftover = wt ? removeWorktree(root, wt) : ''
+  const del = gitFull(['branch', '-d', branch], root)
+  ctx.out(`grün: Teil ${name} übernommen (${commits} Commit${commits === 1 ? '' : 's'}) in ${state.branch}${leftover}${del.ok ? '' : `; Branch ${branch} bleibt (${del.text.split(/\r?\n/).at(-1) ?? ''})`}`)
+  return 0
+}
+
+function partOf(f: Folder, name: string, ctx: Ctx) {
+  if (!PART_NAME.test(name)) throw new ToolBroken(`Name „${name}“: nur Kleinbuchstaben, Ziffern und „-“, höchstens 31 Zeichen`)
+  const root = findProjectRoot(ctx.cwd)
+  if (resolve(f.work) !== resolve(root)) throw new ToolBroken(`im Hauptordner ${root} aufrufen, nicht im Worktree`)
+  const state = stateFile.parseState(readFileSync(join(f.abs, 'STATE.md'), 'utf8'), `${f.rel}/STATE.md`)
+  if (!state.branch) throw new ToolBroken(`${f.rel}/STATE.md ohne branch`)
+  return { root, state, branch: `${state.branch}--${name}` }
+}
+
 export function solo(args: string[], ctx: Ctx): number {
+  if (args[0] === 'teil') {
+    const [, action, folder, name, ...extra] = args
+    if (!folder || !name || extra.length > 0 || (action !== 'start' && action !== 'fertig')) throw new ToolBroken(USAGE)
+    const f = soloFolder(folder, ctx)
+    return action === 'start' ? partStart(f, name, ctx) : partDone(f, name, ctx)
+  }
   const [sub, ...rest] = args
   const folder = rest.find(a => !a.startsWith('--'))
   const options = rest.filter(a => a.startsWith('--'))

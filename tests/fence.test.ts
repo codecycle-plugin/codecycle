@@ -289,11 +289,6 @@ describe('Zaun und Sperren', () => {
     const cmds = ['codecycle guard --record', 'codecycle exclude', 'codecycle install-tool', 'codecycle hooks install']
     for (const cmd of cmds) {
       expect((await run('Bash', cmd)).deny).toBeUndefined() // Hauptsitzung
-    // außerhalb eines Paket-Branchs: Debugger und Hauptsitzung ja, Test-Autor nie
-    const ohne = 'codecycle commit-tests -m "Reproduktion" --ohne-paket'
-    expect((await run('Bash', ohne, ids['codecycle:test-author'])).deny).toMatch(/nur im Paket-Worktree/)
-    expect((await run('Bash', ohne, ids['codecycle:debugger'])).deny).toBeUndefined()
-    expect((await run('Bash', ohne)).deny).toBeUndefined()
       expect((await run('Bash', cmd, ids['codecycle:toolsmith'])).deny).toBeUndefined()
       for (const id of [ids['codecycle:builder-logic'], ids['codecycle:test-author'], 'unbekannt']) {
         expect((await run('Bash', cmd, id)).deny).toMatch(/Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith/)
@@ -305,10 +300,10 @@ describe('Zaun und Sperren', () => {
     // prüfen ohne --record bleibt erlaubt
     expect((await run('Bash', 'codecycle guard --base main', builder)).deny).toBeUndefined()
     // paket start und fertig nur der Bauleiter, auch nicht toolsmith; paket pruefen frei
-    for (const cmd of ['codecycle paket start P1', 'codecycle paket fertig P1']) {
+    for (const cmd of ['codecycle paket start P1', 'codecycle paket fertig P1', 'codecycle solo teil start docs/codecycle/x eins', 'codecycle solo teil fertig docs/codecycle/x eins']) {
       expect((await run('Bash', cmd)).deny).toBeUndefined()
       for (const id of [ids['codecycle:toolsmith'], builder, 'unbekannt']) {
-        expect((await run('Bash', cmd, id)).deny).toMatch(/ruft nur der Bauleiter auf/)
+        expect((await run('Bash', cmd, id)).deny).toMatch(/ruft nur die Hauptsitzung auf/)
       }
     }
     expect((await run('Bash', 'codecycle paket pruefen P1', builder)).deny).toBeUndefined()

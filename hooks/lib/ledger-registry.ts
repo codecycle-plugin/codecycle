@@ -124,9 +124,21 @@ export function toRepoRelative(
 
 /**
  * Worktree-Ordner (`…--wt-<name>`) aus einem Text (Pfad eines Werkzeugaufrufs, Befehl, Startnachricht);
- * null, wenn keiner vorkommt. Der Mod nutzt es, wenn `agent.spawn` keinen Arbeitsordner meldet.
+ * null, wenn keiner vorkommt. Der Mod nutzt es, wenn `agent.spawn` keinen Arbeitsordner meldet. Vorrang hat eine Zeile
+ * `Worktree: <pfad>` der Startnachricht, gelesen bis zum Zeilenende (Pfade mit Leerzeichen), ohne Markdown (`**`, `_`,
+ * Backticks); gilt nur, wenn der Wert auf den Ordner mit `--wt-` endet. `wholePath`: der Text ist ein einzelner Pfad
+ * (Leerzeichen gehören dazu), geschnitten nach dem Ordner mit `--wt-`. Sonst endet ein Pfad am Leerzeichen.
  */
-export function worktreeOf(text: string): string | null {
+export function worktreeOf(text: string, wholePath = false): string | null {
+  const raw = text.match(/^[ \t>*_-]*Worktree:(.*)$/m)?.[1]?.replace(/^[\s*_]+|[\s*_]+$/g, '')
+  if (raw) {
+    const line = raw.match(/^`([^`]+)`/)?.[1] ?? raw.replace(/^["']|["']$/g, '')
+    if (/--wt-[^\s\\/]+$/.test(line)) return line
+  }
+  if (wholePath) {
+    const m = text.match(/^.*?--wt-[^\\/]+/)
+    return m ? m[0] : null
+  }
   const m = text.match(/(?:[A-Za-z]:[\\/]|\/)?[^\s"'`<>|;&()]*--wt-[^\s"'`<>|;&()\\/]+/)
   return m ? m[0] : null
 }

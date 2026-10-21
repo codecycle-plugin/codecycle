@@ -2,6 +2,29 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.20.5 / Werkzeug 0.7.5] – 2026-10-21
+
+### Neu
+
+- Solo-Weg: Die Sitzung darf Teile auch gleichzeitig an Handwerker abgeben, je in einem eigenen Worktree (`codecycle solo teil start <ordner> <name>`), und übernimmt sie nach kurzer Sichtung per Merge (`codecycle solo teil fertig <ordner> <name>`). Bei einem Merge-Konflikt bricht der Befehl ab, der Teil bleibt erhalten.
+
+### Geändert
+
+- Bauleiter und Solo-Sitzung arbeiten nach einem Leitsatz: das Ergebnis, das die Aufgabe am besten erfüllt, mit so wenig Tokens wie dafür nötig; sparen heißt nicht weglassen. Ob Agenten gleichzeitig arbeiten, entscheiden sie danach; als zu voll gilt die Sitzung, wenn die anstehende Arbeit sie über 500 000 Tokens brächte. Den Füllstand hängt der Mod an: nach `codecycle solo check` die Antwort von `codecycle_budget`, nach `codecycle check` in einer Sitzung mit Aufgabe die Zeile „Hauptsitzung“; eine eigene Abfrage ist nicht nötig.
+- Neue Sitzung im Solo-Weg nur an einem Haltepunkt, nie mit laufendem Agenten oder offener Frage; im vollen Ablauf ebenso keine laufenden Agenten beim Wechsel.
+- Entschiedene Randfälle bekommen den passenden Prüfweg (Oberfläche: Browser); Randfälle mit Bezug zum Wortlaut werden einzeln gefragt.
+
+### Behoben
+
+- `npm ci` oder `npm install` in einem Paket- oder Teil-Worktree konnte `node_modules` des Hauptordners leeren. Der Worktree bekommt jetzt einen eigenen Ordner `node_modules` mit einem Verweis je Paket und einem eigenen Ordner `.bin`; npm im Worktree (auch `npm uninstall`) löscht nur dort, Pakete und Programme des Hauptordners bleiben.
+- Workspace-Pakete im Monorepo: Im Worktree zeigt der Verweis auf die Fassung im Worktree, nicht auf die im Hauptordner; Tests und Typen prüfen so den geänderten Stand.
+- Hat npm im Worktree schon echt installiert, ergänzt ein erneuter Start fehlende Verweise und lässt Vorhandenes unverändert.
+- `paket start` und `solo teil start` melden einen verschobenen oder gelöschten Worktree rot, statt grün zu melden oder mit einer irreführenden Git-Meldung abzubrechen; der Hinweis nennt `git worktree repair` bzw. `git worktree prune`.
+- Die Zeile `Worktree:` der Startnachricht wird auch mit Markdown (`**Worktree:**`, Backticks) oder Text hinter dem Pfad richtig zugeordnet.
+- `paket fertig` und `solo teil fertig` nennen uncommittete Dateien im Hauptordner, die der Merge ändern würde, statt einen Merge-Konflikt ohne Datei zu melden; ein Paket wird dabei nicht mehr auf „blockiert“ gesetzt. Ein verschobener Worktree-Ordner wird gemeldet statt übergangen.
+- Pfade mit Leerzeichen in der Zeile `Worktree:` werden dem Agenten richtig zugeordnet.
+- Die Hook-Sperre hält eine Projektdatei `git/config` nicht mehr für Git-Konfiguration und erkennt die Systemkonfiguration von Git für Windows und `XDG_CONFIG_HOME` auch in PowerShell- und cmd-Schreibweise; `git ls-files | xargs codecycle check` gilt nicht mehr als gesperrter Aufruf.
+
 ## [0.20.4 / Werkzeug 0.7.4] – 2026-10-21
 
 ### Geändert

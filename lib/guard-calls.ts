@@ -61,7 +61,12 @@ export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash
 /** Programme, die einen anderen Befehl starten: `codecycle` dahinter ist ein Werkzeug-Aufruf. */
 const LAUNCHERS = new Set(['npx', 'bunx', 'pnpx', 'pnpm', 'yarn', 'bun', 'deno', 'xargs', 'npm', 'exec', 'command', 'nohup', 'time', 'timeout', 'nice'])
 
-function toolCall(command: string, match: (args: readonly string[]) => boolean): boolean {
+/**
+ * `subcommands`: Unterbefehle, zu denen ein Treffer gehören kann. Hinter `xargs` kommen weitere Argumente erst zur Laufzeit
+ * aus der Eingabe; ein Treffer ist es dann ohne Unterbefehl, mit einem Platzhalter (`{}`) oder einem passenden Unterbefehl
+ * (`xargs codecycle guard` kann `--record` bekommen), nicht mit einem anderen (`xargs codecycle check`).
+ */
+function toolCall(command: string, match: (args: readonly string[]) => boolean, subcommands: readonly string[]): boolean {
   // Der Zerleger kennt Bash: ein Backslash ist dort Fluchtzeichen und würde Windows-Pfade zerstören; deshalb
   // zusätzlich eine Fassung mit Schrägstrichen prüfen (PowerShell kennt keinen Backslash-Fluchtzeichen).
   return [command, command.replace(/\\/g, '/')].some(text => {
@@ -81,8 +86,10 @@ function toolCall(command: string, match: (args: readonly string[]) => boolean):
       }
       if (LAUNCHERS.has(name)) {
         const cc = args.findIndex(a => /^codecycle(\.(cmd|exe))?$/i.test(a.split(/[\\/]/).at(-1)!))
-        // `xargs`: die Argumente kommen zur Laufzeit aus der Eingabe, also zählt jeder Aufruf
-        hit = cc >= 0 && (name === 'xargs' || match(args.slice(cc + 1)))
+        if (cc < 0) return
+        const rest = args.slice(cc + 1)
+        const sub = rest.find(a => !a.startsWith('-'))
+        hit = match(rest) || (name === 'xargs' && (sub === undefined || !/^[a-z][a-z-]*$/.test(sub) || subcommands.includes(sub)))
       }
     })
     return hit
@@ -91,24 +98,40 @@ function toolCall(command: string, match: (args: readonly string[]) => boolean):
 
 /** `codecycle commit-tests` (roter Test-Commit nur für Test-Autor und Fehlersucher). */
 export function commitTestsCall(command: string): boolean {
-  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests')
+  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests', ['commit-tests'])
 }
 
 /** `codecycle commit-tests … --ohne-paket` (roter Commit außerhalb eines Paket-Branchs; nicht für den Test-Autor). */
 export function commitTestsOutsidePackageCall(command: string): boolean {
-  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests' && args.includes('--ohne-paket'))
+  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests' && args.includes('--ohne-paket'), ['commit-tests'])
 }
 
 /**
  * `codecycle paket start` und `paket fertig`: Worktree, `guard --record`, Merge in den Aufgaben-Branch und
- * `STATE.md`. Nur der Bauleiter (Hauptsitzung); `paket pruefen` prüft nur und bleibt frei.
+ * `STATE.md`; ebenso `solo teil start|fertig` (Teil-Worktree, Merge). Nur der Bauleiter bzw. die Solo-Sitzung
+ * (Hauptsitzung); `paket pruefen` prüft nur und bleibt frei.
  */
 export function packageBookkeepingCall(command: string): boolean {
   return toolCall(command, args => {
     // Werte von Optionen (`--aufgabe <ordner>`, `--runden <n>`, `--test-commit <hash>`) sind keine Wörter des Befehls
     const pos = args.filter((a, i) => !a.startsWith('-') && !/^--(aufgabe|runden|test-commit)$/.test(args[i - 1] ?? ''))
-    return pos[0] === 'paket' && (pos[1] === 'start' || pos[1] === 'fertig')
-  })
+    if (pos[0] === 'paket') return pos[1] === 'start' || pos[1] === 'fertig'
+    // Solo-Weg: Teil-Worktree anlegen und übernehmen (Merge in den Aufgaben-Branch) wie paket start|fertig
+    return pos[0] === 'solo' && pos[1] === 'teil' && (pos[2] === 'start' || pos[2] === 'fertig')
+  }, ['paket', 'solo'])
+}
+
+/** `codecycle solo check` (Haltepunkt „Eigene Kontrolle“; der Mod hängt danach den Füllstand an). */
+export function soloCheckCall(command: string): boolean {
+  return toolCall(command, args => {
+    const pos = args.filter(a => !a.startsWith('-'))
+    return pos[0] === 'solo' && pos[1] === 'check'
+  }, ['solo'])
+}
+
+/** `codecycle check` (der Mod hängt danach in der Hauptsitzung die Zeile „Hauptsitzung“ an). */
+export function checkCall(command: string): boolean {
+  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'check', ['check'])
 }
 
 /**
@@ -122,5 +145,5 @@ export function baselineCall(command: string): boolean {
     if (pos[0] === 'exclude' || pos[0] === 'install-tool' || pos[0] === 'update') return true
     if (pos[0] === 'hooks') return pos[1] === 'install'
     return pos[0] === 'guard' && args.includes('--record')
-  })
+  }, ['exclude', 'install-tool', 'update', 'hooks', 'guard'])
 }

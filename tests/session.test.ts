@@ -39,6 +39,30 @@ describe('Sitzungsstart und Profil', () => {
     }
   })
 
+  test('solo check der Hauptsitzung: ganze Antwort von codecycle_budget; check: nur die Zeile Hauptsitzung, nur mit Aufgabe', async ($, on) => {
+    mock.store(on)
+    fakeWorld(on, FILES)
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
+    on('tool.call', () => ({ result: 'grün' }))
+    const ctxOf = async (command: string, agentId?: string) =>
+      ((await $.tool.call({ tool: 'Bash', command, ...(agentId ? { agentId } : {}) } as never)).context ?? []).join('\n')
+    const solo = await ctxOf(`codecycle solo check ${DIR}`)
+    expect(solo).toMatch(/codecycle_budget \(vom Mod nach codecycle solo check angehängt\)/)
+    expect(solo).toMatch(/5-Stunden-Fenster: 42 %/)
+    expect(solo).toMatch(/Hauptsitzung: /)
+    // check ohne Aufgabe der Sitzung: nichts
+    expect(await ctxOf('codecycle check')).toBe('')
+    // Sitzung an die Aufgabe gebunden (Agentenstart mit Aufgabenordner): eine Zeile
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    const check = await ctxOf('cd ../wt && codecycle check --affected')
+    expect(check).toMatch(/^codecycle_budget \(vom Mod nach codecycle check angehängt\): Hauptsitzung: /)
+    expect(check).not.toMatch(/5-Stunden-Fenster|\n/)
+    // Agenten und andere Befehle: nichts
+    expect(await ctxOf(`codecycle solo check ${DIR}`, 'ag1')).toBe('')
+    expect(await ctxOf('codecycle check', 'ag1')).toBe('')
+    expect(await ctxOf('git status')).toBe('')
+  })
+
   test('register-forwarding aus: kein codecycle_owner', async ($, on) => {
     mock.store(on)
     fakeWorld(on, FILES)

@@ -9,6 +9,8 @@ disable-model-invocation: true
 ## Zweck
 Eine Aufgabe auf dem Solo-Weg: **Du baust selbst** (Code, Tests, Doku, Commits). Am Ende prüft ein frischer Prüfer (`codecycle:solo-reviewer`) gegen den Wortlaut des Nutzers, du besserst einmal nach, dann folgt die Merge-Frage.
 
+**Leitsatz:** Ziel ist das Ergebnis, das die Aufgabe am besten erfüllt, so genau wie möglich, mit so wenig Tokens wie dafür nötig; sparen heißt nicht weglassen. Jeder Agent baut eigenen Kontext auf und kostet Limit. Mehrere gleichzeitig lohnen sich, wenn sich die Arbeit aufteilen lässt (getrennte Bereiche oder ein großer Bereich in Teilen) oder deine Sitzung sonst zu voll würde: Zu voll heißt, die anstehende Arbeit brächte die Zeile „Hauptsitzung“ von `codecycle_budget` über 500 000 Tokens.
+
 Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod: ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfbericht und ohne Status je Fund kein Merge.
 
 **Haltepunkte:** Jeder Haltepunkt steht als `haltepunkt: <n>` in `STATE.md`; `STATE.md` ist danach vollständig (Sitzung wegwerfbar).
@@ -55,14 +57,12 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 ### Bauen (frei)
 - Reihenfolge, Tests zuerst oder danach, Zahl der Commits: frei. Nie `git commit --no-verify`; die Git-Hooks sind die Prüfung.
 - **Hilfsagenten nur lesend:** Recherche und Erkunden mit Agenten ist frei (Zahl und Modell nach deinem Urteil); jeder Lauf erscheint mit Modell in den Kosten. Schreiben dürfen in einer Solo-Aufgabe nur du, `codecycle:builder-logic` und `codecycle:builder-routine`; den Rest sperrt der Mod.
-- **Abgabe an Handwerker:** Einen abgegrenzten Teil (Logik mit Tests: `builder-logic`; gleichförmige Änderungen: `builder-routine`) darfst du abgeben, wenn er deinen Kontext stark füllen würde. Nacheinander, nie zwei gleichzeitig, im selben Branch, ohne Worktree. Startnachricht:
-  ```
-  Aufgabenordner: <ordner>
-  Solo: ja
-  Branch: codecycle/<thema> (Hauptordner, kein Worktree)
-  Teil: <was genau, Dateien, Prüfweg>
-  ```
-  Danach siehst du das Ergebnis selbst an. Jede Abgabe kommt mit Rolle und Grund in den Verlauf von `STATE.md`.
+- **Abgabe an Handwerker:** Teile (Logik mit Tests: `builder-logic`; gleichförmige Änderungen: `builder-routine`) darfst du abgeben, nach dem Leitsatz oben; ob, wie viele und ob gleichzeitig, entscheidest du.
+  - **Eine Abgabe allein:** im Aufgaben-Branch im Hauptordner. Startnachricht: `Aufgabenordner: <ordner>`, `Solo: ja`, `Branch: codecycle/<thema> (Hauptordner, kein Worktree)`, `Teil: <was genau, Dateien, Prüfweg>`.
+  - **Gleichzeitig:** je Teil `codecycle solo teil start <ordner> <name>` (Name aus Kleinbuchstaben, Ziffern, `-`); die Ausgabe nennt die Zeilen für die Startnachricht (mit `Worktree:`), dazu `Teil: <was genau, Dateien, Prüfweg>`. Teile, die dieselben Dateien ändern, führen eher zu Merge-Konflikten.
+  - **Übernehmen, schlank:** Quittung und Kurzbericht lesen, `git -C <worktree> diff --stat <aufgaben-branch>`, `cd <worktree> && codecycle check`; Code nur gezielt, wenn etwas auffällt (die gründliche Prüfung macht der Solo-Prüfer). Dann `codecycle solo teil fertig <ordner> <name>`: Merge in den Aufgaben-Branch, Worktree und Branch weg. Bei Konflikt bricht es ab und der Teil bleibt; lösen oder den Handwerker per Nachricht nachziehen lassen, dann erneut.
+  - **Füllstand:** Der Mod hängt ihn selbst an: nach `codecycle check` die Zeile „Hauptsitzung“, nach `codecycle solo check` und `solo teil start|fertig` die ganze Antwort von `codecycle_budget`. Danach richtest du Abgaben (Leitsatz oben); eigene Abfrage nur, wenn noch keine Angabe vorliegt. Ohne Mod nach eigenem Urteil.
+  - Jede Abgabe kommt mit Rolle, Grund und gleichzeitig ja/nein in den Verlauf von `STATE.md`.
 
 ### 3. Eigene Kontrolle
 1. Berührt die Aufgabe eine Oberfläche: selbst im Browser ansehen, Desktop und Handybreite 375 px, danach Browser schließen.
@@ -118,6 +118,13 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
    - Ganz unten **„Entscheidungen für dich“**, nummeriert, je Frage Erklärung, Antworten, Folge, Empfehlung: zuerst offene Wortlaut-Fragen, dann die Merge-Frage „Aufgabe X ist geprüft und noch nicht in <Hauptbranch>: jetzt mergen und die Branches löschen?“ mit „Ja, mergen und Branches löschen“ (Standard; bei offenen Wortlaut-Fragen „Später“), „Nur mergen, Branches behalten“, „Später“. <!-- doku-ok -->
 5. **Antwort auf eine Wortlaut-Frage:** ändern → beheben, Commit, Status `behoben`; so lassen → `verworfen: Nutzer: „<Antwort>“`. Dann `codecycle solo funde <ordner>` erneut.
 6. **Merge nur auf ausdrückliches Ja**, Ablauf wie `${CLAUDE_PLUGIN_ROOT}/skills/workflow/steps/7-finish.md` Punkt 5 („Ja“, Unterpunkte 1–4 und 6): `zustand: fertig`, Abschluss-Commit im Aufgaben-Branch, auf den Hauptbranch wechseln, `git merge codecycle/<thema>`, bei „Ja, mergen und Branches löschen“ `git branch -d codecycle/<thema>`. Verweigert der Mod den Merge, nennt die Meldung, was fehlt.
+
+### Neue Sitzung (an jedem Haltepunkt)
+Empfiehlt die Zeile „Hauptsitzung“ eine neue Sitzung, wechselst du nur an einem Haltepunkt (1–6), mit `STATE.md` vollständig und committet:
+- Nie, während ein Agent läuft: erst seine Quittung.
+- Nie mit offener Frage an den Nutzer: erst die Antwort, im Wortlaut festgehalten.
+- Abwägungen, die nur im Verlauf stehen, vorher in `TASK.md` („Annahmen“) oder `STATE.md` („Nächster Schritt“, „Offene Fragen“).
+- Dann eine Zeile: „Neue Sitzung: `/clear`, dann `/codecycle:continue`.“
 
 ## Ergebnis
 Aufgabenordner mit `TASK.md` (Wortlaut, Ziel, Kurzplan, Annahmen, Funde), `STATE.md` (`weg: solo`), `reports/pruefung.md`; Branch `codecycle/<thema>`; nach dem Ja im Hauptbranch gemergt, `zustand: fertig`.
