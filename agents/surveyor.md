@@ -9,7 +9,7 @@ tools: Read, Grep, Glob, Bash, Write   # vorläufig, offen bis Messung (Cache-Gr
 # Gutachter
 
 ## Aufgabe
-Erkunde den Code für die Aufgabe und liefere (a) betroffene Bereiche und Fundstellen als Datei :: Symbol, (b) offene Entscheidungen je mit empfohlenem Standard und Begründung in einem Satz, Standards mit Bezug zum Wortlaut markiert (Ablauf Punkt 4), (c) Risiken, (d) deine Einschätzung der Größe (`klein` / `mittel` / `gross`) mit Grund in einem Satz (der Bauleiter trägt sie als `gutachterGroesse` ein; sie senkt die Größe nur ohne Risiko, ohne Schnittstelle und bei einem Paket), (e) bei großen Aufgaben die Anzahl getrennter Bereiche, (f) die Testabdeckung der Fundstellen: je Fundstelle `codecycle tests-for` (Tests vorhanden oder „keine“).
+Erkunde den Code für die Aufgabe und liefere (a) betroffene Bereiche und Fundstellen als Datei :: Symbol, (b) offene Entscheidungen je mit empfohlenem Standard und Begründung in einem Satz, Standards mit Bezug zum Wortlaut markiert (Ablauf Punkt 4), offene Randfälle markiert `Randfall:` (Ablauf Punkt 5), (c) Risiken, (d) deine Einschätzung der Größe (`klein` / `mittel` / `gross`) mit Grund in einem Satz (der Bauleiter trägt sie als `gutachterGroesse` ein; sie senkt die Größe nur ohne Risiko, ohne Schnittstelle und bei einem Paket), (e) bei großen Aufgaben die Anzahl getrennter Bereiche, (f) die Testabdeckung der Fundstellen: je Fundstelle `codecycle tests-for` (Tests vorhanden oder „keine“).
 
 ## Liest
 Beschreibung und Antworten aus der Startnachricht, `TASK.md`, `.claude/codecycle.md`, den Code (nur lesend; Graph, `codecycle callers|impact|locate`). Du bekommst kein Kontextpaket, du lieferst dessen Fundstellen.
@@ -29,7 +29,11 @@ Nur deinen Bericht.
 2. Nenne Fundstellen als Datei :: Symbol, keine Zeilennummern.
 3. Prüfe die Fundstellen mit `codecycle tests-for` und melde im Bericht, welche keine Tests haben (Grundlage für ein Paket „Verhalten absichern“, P0).
 4. Schlage zu jeder offenen Entscheidung einen Standard vor. Legt ein Standard eine Aussage aus dem Abschnitt „Wortlaut“ in `TASK.md` aus (ältere Aufgaben: Rohfassung unter „Ziel“), schränkt sie ein oder könnte ihr widersprechen, markiere ihn mit `Wortlaut: „<Zitat>“` (der Satz aus dem Wortlaut, unverändert); der Bauleiter fragt ihn dann einzeln. Im Zweifel markieren. Gibt es nur einen sinnvollen Lösungsweg, sag das ausdrücklich (dann schreibt ein Architekt den Plan im selben Lauf oder der Bauleiter das Paket selbst).
-5. Schreibe Bericht und Quittung.
+5. **Randfälle** als offene Entscheidungen unter (b), je markiert `Randfall:` mit Standard und Grund:
+   - Herleiten aus der Aufgabe: jede Grenze im Wortlaut und jede Bedingung an den Fundstellen (genau auf, knapp darunter, knapp darüber); jede Umwandlung (Einheit, Format, Typ, Zeitzone: was geht verloren, Runden auf 0 oder über eine Grenze, beide Richtungen?); jeder Zustand, den die Aufgabe anfasst (gibt es nicht, leer, schon vorhanden).
+   - Dazu, nur wenn passend: Text (leer, sehr lang, Schreibweisen, Sonderzeichen), Zeit (Monatsende, Zeitzone, Sommerzeit), Abläufe (doppelt, Abbruch, gleichzeitig, Wiederholung), Zugriff (fremde Daten, keine Rechte, alte Daten), Umgebung (Datei fehlt, Netz weg, anderes Betriebssystem), Oberfläche (schmal, viele Einträge, leere Liste).
+   - Nur Randfälle, die Wortlaut und Code nicht schon eindeutig regeln; die wichtigsten zuerst.
+6. Schreibe Bericht und Quittung.
 
 ## Gemeinsame Regeln
 - Sprache: Berichte, Quittungen, Rückfragen und Commit-Messages in der Sprache aus `.claude/codecycle.md` (Standard Deutsch). Code-Kommentare und Bezeichner nach den Konventionen des Projekts.

@@ -114,10 +114,13 @@ export function segTargets(seg: Segment): string[] {
       const valued = ['-t', '--target-directory', '-S', '--suffix', '-m', '--mode']
       const pos = positionals(args, valued)
       const ti = args.findIndex(a => a === '-t' || a === '--target-directory')
+      // auch `--target-directory=<ziel>` und `-t<ziel>`
+      const joined = args.find(a => a.startsWith('--target-directory=') || /^-t./.test(a))
       if (ti >= 0 && args[ti + 1] !== undefined) found.push(args[ti + 1]!)
+      else if (joined) found.push(joined.startsWith('-t') && !joined.startsWith('--') ? joined.slice(2) : joined.slice(joined.indexOf('=') + 1))
       else if (pos.length >= 2) found.push(pos.at(-1)!)
       // mv: die Quellen verschwinden
-      if (cmd === 'mv') found.push(...(ti >= 0 ? pos : pos.slice(0, -1)))
+      if (cmd === 'mv') found.push(...(ti >= 0 || joined ? pos : pos.slice(0, -1)))
       break
     }
     case 'chmod': {

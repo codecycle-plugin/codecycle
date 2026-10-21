@@ -2,6 +2,17 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.20.4 / Werkzeug 0.7.4] – 2026-10-21
+
+### Geändert
+
+- Randfälle werden am Anfang geklärt: Gutachter, Bauleiter und Solo-Sitzung leiten Sonderfälle aus Aufgabe und Code her (Grenzen, Umwandlungen, leere oder fehlende Zustände) und ergänzen sie aus einer Liste nach Bereichen. Im vollen Ablauf höchstens eine gebündelte Frage; entschiedene Randfälle werden Abnahmekriterien mit Test.
+- Token-Buch: Die erste Antwort eines Agenten wird bei ihm gebucht, nicht mehr unter „fremd“.
+- `codecycle effort --record` nennt die Rollen und ihre Läufe aus dem Token-Buch; die Zusammenfassung im Abschluss übernimmt nur diese.
+- `codecycle commit-tests` committet rote Tests nur auf Paket-Branches; außerhalb davon nur mit `--ohne-paket` (nicht für den Test-Autor), auf dem Hauptbranch nie.
+- Sperren gegen das Umgehen der Git-Hooks erkennen mehr Schreibweisen: unbekannte Git-Optionen vor `commit`, Schlüssel mit Anführungszeichen getarnt, Pfade mit `./` und `../`, `>|`, `--target-directory=`, die Git-Konfiguration von Benutzer und System. Agenten dürfen `git commit-tree` und `git update-ref` nicht aufrufen. Werkzeug-Befehle werden hinter jedem Starter erkannt (`npx`, `bun`, `deno`, `pnpm exec`, `xargs`).
+- Paket-Worktrees bekommen einen Verweis auf `node_modules` des Hauptordners, damit Lint, Typprüfung und Tests dort wie im Hauptordner laufen. `codecycle paket fertig` entfernt nur den Verweis, nie den Inhalt.
+
 ## [0.20.3] – 2026-10-21
 
 ### Geändert

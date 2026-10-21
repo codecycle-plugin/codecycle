@@ -54,9 +54,13 @@ export function pythonCall(command: string, shell: 'bash' | 'powershell' = 'bash
 /**
  * Ruft der Befehl einen Werkzeug-Befehl auf, auf dessen Argumente (nach `codecycle` bzw. nach `…/cli.ts`) `match`
  * passt? Erkannt: `codecycle …`, auch mit Pfad (`./bin/codecycle`, `…\codecycle.cmd`, `& codecycle …`), der Rückfall
- * `node <Pfad>/cli.ts …` und beides in Verpackungen (`bash -c`, `pwsh -Command`, `eval`, Befehlsersetzung, Heredocs,
+ * `<beliebiger Starter> <Pfad>/cli.ts …` (`node`, `npx tsx`, `bun`, `deno run` …), `codecycle` hinter einem Paket-Starter
+ * (`npx`, `bunx`, `pnpm exec`, `xargs` …) und alles in Verpackungen (`bash -c`, `pwsh -Command`, `eval`, Befehlsersetzung, Heredocs,
  * die laufen). Text in Anführungszeichen als Argument (Commit-Nachricht) zählt nicht.
  */
+/** Programme, die einen anderen Befehl starten: `codecycle` dahinter ist ein Werkzeug-Aufruf. */
+const LAUNCHERS = new Set(['npx', 'bunx', 'pnpx', 'pnpm', 'yarn', 'bun', 'deno', 'xargs', 'npm', 'exec', 'command', 'nohup', 'time', 'timeout', 'nice'])
+
 function toolCall(command: string, match: (args: readonly string[]) => boolean): boolean {
   // Der Zerleger kennt Bash: ein Backslash ist dort Fluchtzeichen und würde Windows-Pfade zerstören; deshalb
   // zusätzlich eine Fassung mit Schrägstrichen prüfen (PowerShell kennt keinen Backslash-Fluchtzeichen).
@@ -65,10 +69,20 @@ function toolCall(command: string, match: (args: readonly string[]) => boolean):
     walkSegments(text, seg => {
       if (hit) return
       const { name, args } = commandName(seg)
-      if (name === 'codecycle') hit = match(args)
-      else if (name === 'node' || name === 'nodejs' || name === 'tsx') {
-        const cli = args.findIndex(a => /(^|[\\/])cli\.(ts|js|mjs)$/i.test(a))
-        hit = cli >= 0 && match(args.slice(cli + 1))
+      if (name === 'codecycle') {
+        hit = match(args)
+        return
+      }
+      // Starter egal: das erste Wort auf `cli.(ts|js|mjs)` ist das Werkzeug (lieber ein Fehlalarm als eine Lücke)
+      const cli = args.findIndex(a => /(^|[\\/])cli\.(ts|js|mjs)$/i.test(a))
+      if (cli >= 0) {
+        hit = match(args.slice(cli + 1))
+        return
+      }
+      if (LAUNCHERS.has(name)) {
+        const cc = args.findIndex(a => /^codecycle(\.(cmd|exe))?$/i.test(a.split(/[\\/]/).at(-1)!))
+        // `xargs`: die Argumente kommen zur Laufzeit aus der Eingabe, also zählt jeder Aufruf
+        hit = cc >= 0 && (name === 'xargs' || match(args.slice(cc + 1)))
       }
     })
     return hit
@@ -78,6 +92,11 @@ function toolCall(command: string, match: (args: readonly string[]) => boolean):
 /** `codecycle commit-tests` (roter Test-Commit nur für Test-Autor und Fehlersucher). */
 export function commitTestsCall(command: string): boolean {
   return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests')
+}
+
+/** `codecycle commit-tests … --ohne-paket` (roter Commit außerhalb eines Paket-Branchs; nicht für den Test-Autor). */
+export function commitTestsOutsidePackageCall(command: string): boolean {
+  return toolCall(command, args => args.find(a => !a.startsWith('-')) === 'commit-tests' && args.includes('--ohne-paket'))
 }
 
 /**

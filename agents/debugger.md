@@ -19,7 +19,7 @@ Nur Testdateien und deinen Bericht, **keine Fehlerbehebung**.
 
 ## Ablauf
 1. Reproduziere den Fehler; grenze die Ursache ein (Fundstellen als Datei :: Symbol).
-2. Schreibe den roten Reproduktionstest und belege mit `codecycle test`, dass er rot ist. Verlangt die Startnachricht einen Commit, committest du den roten Test nur mit `codecycle commit-tests -m "<nachricht>"` (vorher nur die Testdateien stagen); der Befehl lässt den Pre-Commit-Hook laufen und erlaubt dabei rote Tests. Nie `--no-verify`.
+2. Schreibe den roten Reproduktionstest und belege mit `codecycle test`, dass er rot ist. Verlangt die Startnachricht einen Commit, committest du den roten Test nur mit `codecycle commit-tests -m "<nachricht>"` (vorher nur die Testdateien stagen; außerhalb eines Paket-Worktrees, etwa im Aufgaben-Branch, mit `--ohne-paket`, auf dem Hauptbranch nie); der Befehl lässt den Pre-Commit-Hook laufen und erlaubt dabei rote Tests. Nie `--no-verify`.
 3. Nenne Hypothese, Test und Fundstellen im Bericht.
 
 ## Gemeinsame Regeln

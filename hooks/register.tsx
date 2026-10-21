@@ -59,7 +59,7 @@ import { bashReadTargets } from '../lib/bash-read-targets.ts'
 import { bashSearchCount } from '../lib/bash-search.ts'
 import { bashWriteTargets } from '../lib/bash-write-targets.ts'
 import { hookBypass } from '../lib/guard-bypass.ts'
-import { baselineCall, commitTestsCall, packageBookkeepingCall, pythonCall } from '../lib/guard-calls.ts'
+import { baselineCall, commitTestsCall, commitTestsOutsidePackageCall, packageBookkeepingCall, pythonCall } from '../lib/guard-calls.ts'
 import { reviewDiffArgs } from '../lib/guard-rules.ts'
 import {
   type Costs,
@@ -202,6 +202,8 @@ const STORE_LOCKED = 'lockedSessions'
 const STORE_CLAIMS = 'mainClaims'
 const COMMIT_TESTS_DENY =
   'codecycle: rote Tests committet nur der Test-Autor bzw. Debugger (codecycle commit-tests). Melde den Stand im Bericht unter „Offene Punkte“; der Bauleiter entscheidet.'
+const COMMIT_TESTS_OUTSIDE_DENY =
+  'codecycle: Der Test-Autor committet rote Tests nur im Paket-Worktree (ohne --ohne-paket). Fehlt der Worktree, melde es im Bericht unter „Offene Punkte“; der Bauleiter legt ihn mit codecycle paket start P<n> --nur-worktree an.'
 const BASELINE_DENY =
   'codecycle: Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith (codecycle guard --record, exclude, install-tool, hooks install). Melde den Bedarf im Bericht unter „Offene Punkte“.'
 const PACKAGE_DENY =
@@ -2573,9 +2575,12 @@ async function* onTurnStep($: EngineInterface, e: Evt<'turn.step'>, next: Nxt<'t
   await noteStepBaseline($, rt, e)
   const stepAt = await noteStepTime($, e)
   const result = yield* next(ev)
+  // Erste Anfrage eines Agenten: sie kann vor seinem Eintrag im Register (agent.spawn → onSpawned) beginnen;
+  // deshalb nach der Anfrage noch einmal nachschlagen, sonst stünde sie als „fremd“ im Buch
+  const booked = rt ?? (e.agentId ? agents.get(e.agentId) : undefined)
   try {
-    const rundenNow = await bookStep($, rt, result, stepAt, rt ? undefined : e.agentId)
-    if (rt) await crewAfterStep($, rt, ev, result, stepAt, rundenNow)
+    const rundenNow = await bookStep($, booked, result, stepAt, booked ? undefined : e.agentId)
+    if (booked) await crewAfterStep($, booked, ev, result, stepAt, rundenNow)
   } catch (err) {
     $.ui.log(`codecycle: Token-Buch: ${String(err)}`, { to: 'debug' })
   }
@@ -2598,12 +2603,14 @@ async function denyPython($: EngineInterface, e: ToolEvt, next: ToolNxt) {
 }
 
 // Roter Test-Commit (`codecycle commit-tests`) nur für Test-Autor und Fehlersucher; die Hauptsitzung (kein agentId)
-// darf (Notfall, P0). Auch Agenten, die der Mod nicht kennt, werden verweigert.
+// darf (Notfall, P0). Auch Agenten, die der Mod nicht kennt, werden verweigert. `--ohne-paket` (außerhalb eines
+// Paket-Branchs) nicht für den Test-Autor.
 function denyCommitTests(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
   if (e.agentId && typeof command === 'string' && commitTestsCall(command)) {
     const role = agents.get(e.agentId)?.rolle
     if (role !== 'test-author' && role !== 'debugger') return { deny: COMMIT_TESTS_DENY }
+    if (role === 'test-author' && commitTestsOutsidePackageCall(command)) return { deny: COMMIT_TESTS_OUTSIDE_DENY }
   }
   return next(e)
 }
@@ -2638,7 +2645,8 @@ async function denyPackageBookkeeping($: EngineInterface, e: ToolEvt, next: Tool
 // Hook-Sperre auch für PowerShell
 function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
-  const hit = typeof command === 'string' ? hookBypass(command, (e.tool as string) === 'PowerShell' ? 'powershell' : 'bash') : null
+  // Agenten zusätzlich ohne `commit-tree`/`update-ref`; die Hauptsitzung darf sie (Notfall)
+  const hit = typeof command === 'string' ? hookBypass(command, (e.tool as string) === 'PowerShell' ? 'powershell' : 'bash', !!e.agentId) : null
   return hit ? { deny: `codecycle: ${hit} ist verboten (Git-Hooks sind die Prüfung, nicht umgehen). Fehler beheben statt überspringen.` } : next(e)
 }
 

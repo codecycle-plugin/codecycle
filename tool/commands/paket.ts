@@ -2,14 +2,15 @@
 //   start:   Branch `<aufgabe>--P<n>` und Worktree neben dem Projekt (vorhandene weiterverwenden, dann Merge des
 //            Aufgaben-Branchs), `guard --record` im Worktree, Paketstatus `in-arbeit`, Commit von STATE.md; nennt die
 //            Zeilen für die Startnachricht. `--nur-worktree`: nur Branch und Worktree (Test-Autor im Aufgabenmodus).
+//            Hat der Hauptordner `node_modules`, bekommt der Worktree einen Verweis darauf (Lint, Typen, Tests wie dort).
 //   pruefen: `guard --base <Aufgaben-Branch>` im Worktree; die Tests des Test-Autors findet es an der Schlusszeile von
 //            `commit-tests` (oder `--test-commit`). Das Ergebnis je Stand merkt es für `fertig`.
 //   fertig:  nur nach grünem `pruefen` auf genau diesem Stand: Merge in den Aufgaben-Branch (Hauptordner), Worktree
-//            entfernen (nie `--force`), Paketstatus `fertig` mit Commit, Commit von STATE.md.
+//            entfernen (nie `--force`; vorher den Verweis `node_modules`), Paketstatus `fertig` mit Commit, Commit von STATE.md.
 // Merge-Konflikt: Merge abbrechen, Paket `blockiert`, Exit 1. Exit 0 grün, 1 rot oder blockiert, 2 Aufruf/Werkzeug.
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 
 import type { TaskState } from '../../types'
@@ -18,7 +19,7 @@ import { git } from '../exec.ts'
 import { loadRecords, saveRecords } from '../guard-records.ts'
 import { pathsLib, stateFile } from '../lib-path.ts'
 import type { Ctx } from '../main.ts'
-import { findProjectRoot } from '../project.ts'
+import { findProjectRoot, gitCommonDir } from '../project.ts'
 import { TESTS_TRAILER } from './commit-tests.ts'
 import { guard } from './guard.ts'
 
@@ -108,6 +109,41 @@ function worktreeOf(root: string, branch: string): string | null {
   return null
 }
 
+const NODE_MODULES = 'node_modules'
+/** Eintrag in `info/exclude`: ohne Schrägstrich am Ende, denn ein Verweis ist für Git kein Ordner (`node_modules/` träfe ihn nicht). */
+const EXCLUDE_LINK = `/${NODE_MODULES}`
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Verweis `<worktree>/node_modules` auf `node_modules` des Hauptordners (unter Windows als Junction, ohne Adminrechte),
+ * damit Lint, Typprüfung und Tests im Worktree laufen. `/node_modules` kommt in `info/exclude` des gemeinsamen
+ * Git-Verzeichnisses, sonst wäre der Worktree nie sauber. Nichts, wenn der Hauptordner keins hat oder der Worktree schon eins.
+ */
+function linkNodeModules(root: string, wt: string): string | null {
+  const target = join(root, NODE_MODULES)
+  const link = join(wt, NODE_MODULES)
+  if (!existsSync(target) || existsSync(link) || isLink(link)) return null
+  const exclude = join(gitCommonDir(root), 'info', 'exclude')
+  const text = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
+  if (!text.split(/\r?\n/).some(l => l.trim() === EXCLUDE_LINK)) {
+    mkdirSync(dirname(exclude), { recursive: true })
+    writeFileSync(exclude, `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${EXCLUDE_LINK}\n`)
+  }
+  try {
+    symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir')
+  } catch (err) {
+    return `${NODE_MODULES}: kein Verweis möglich (${String(err)}); Lint und Typen im Worktree ohne Abhängigkeiten`
+  }
+  return `${NODE_MODULES}: Verweis auf ${target}`
+}
+
 /** Git mit Ausgabe auf stdout und stderr (für Merge und Commit, deren Meldungen gebraucht werden). */
 function gitFull(args: string[], cwd: string): { ok: boolean; text: string } {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
@@ -184,6 +220,8 @@ function start(task: Task, o: Options, ctx: Ctx): number {
     const r = gitFull(exists ? ['worktree', 'add', wt, branch] : ['worktree', 'add', '-b', branch, wt, state.branch], root)
     if (!r.ok) throw new ToolBroken(`git worktree add fehlgeschlagen: ${r.text}`)
   }
+  const linked = linkNodeModules(root, wt)
+  if (linked) ctx.out(linked)
   if (o.nurWorktree) {
     ctx.out(`grün: Worktree ${wt} (Branch ${branch}); Paketstatus unverändert`)
     return 0
@@ -285,6 +323,9 @@ function fertig(task: Task, o: Options, ctx: Ctx): number {
   // Worktree entfernen: nie --force; bleibt ein leerer Ordner, steht er im Verlauf
   let leftover = ''
   if (wt) {
+    // nur den Verweis löschen, nie seinen Inhalt (der gehört dem Hauptordner)
+    const link = join(wt, NODE_MODULES)
+    if (isLink(link)) unlinkSync(link)
     const r = gitFull(['worktree', 'remove', wt], root)
     if (!r.ok) {
       gitFull(['worktree', 'prune'], root)

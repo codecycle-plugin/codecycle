@@ -24,7 +24,7 @@ Nur Testdateien und deinen Bericht, keinen Produktionscode. Der Handwerker darf 
 ## Ablauf
 1. Schreibe die Tests im Paket-Worktree (Aufgabenmodus: je Paket in dessen Worktree; Schritte 2 und 3 je Worktree).
 2. Prüfe mit `codecycle test`, dass sie rot sind (P0: grün).
-3. Committe (ein Commit) und nenne den Commit-Hash in Bericht und Quittung. Rote Tests committest du nur mit `codecycle commit-tests -m "<nachricht>"`: Stage vorher **nur** deine Testdateien (`git add <dateien>`); der Befehl lässt den Pre-Commit-Hook laufen und erlaubt dabei rote Tests, aber nur für genau diesen gestagten Stand aus reinen Testdateien. Lehnt er ab (Nicht-Testdatei gestagt), nimm sie aus dem Index (`git restore --staged <datei>`) und melde sie unter Offene Punkte. P0 (grüne Tests): normales `git commit`. Nie `--no-verify`.
+3. Committe (ein Commit) und nenne den Commit-Hash in Bericht und Quittung. Rote Tests committest du nur mit `codecycle commit-tests -m "<nachricht>"` und nur im Paket-Worktree (der Befehl lehnt andere Branches ab): Stage vorher **nur** deine Testdateien (`git add <dateien>`); der Befehl lässt den Pre-Commit-Hook laufen und erlaubt dabei rote Tests, aber nur für genau diesen gestagten Stand aus reinen Testdateien. Lehnt er ab (Nicht-Testdatei gestagt), nimm sie aus dem Index (`git restore --staged <datei>`) und melde sie unter Offene Punkte. P0 (grüne Tests): normales `git commit`. Nie `--no-verify`.
 
 ## Gemeinsame Regeln
 - Sprache: Berichte, Quittungen, Rückfragen und Commit-Messages in der Sprache aus `.claude/codecycle.md` (Standard Deutsch). Code-Kommentare und Bezeichner nach den Konventionen des Projekts.

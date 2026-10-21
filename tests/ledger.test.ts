@@ -38,6 +38,41 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect(costs.rollen['builder-logic'].input).toBe(10)
   })
 
+  test('Erste Anfrage eines Agenten vor seinem Eintrag im Register: beim Agenten gebucht, nicht „fremd“', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, FILES)
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
+    let release = (): void => undefined
+    const gate = new Promise<void>(r => {
+      release = r
+    })
+    on('turn.step', async function* (_$, e) {
+      if (e.agentId === 'ag1') await gate
+      return {
+        turnId: e.turnId,
+        index: e.index,
+        answer: '',
+        toolUses: [],
+        stopReason: 'end_turn' as const,
+        usage: { model: 'sonnet', input_tokens: 2, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 900 },
+      }
+    })
+    on('turn.complete', (_$, e) => ({ text: e.answer }))
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    // die Anfrage läuft schon, bevor agent.spawn den Agenten einträgt
+    const step = (async () => {
+      for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, agentId: 'ag1' })) void chunk
+    })()
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    release()
+    await step
+    await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't', agentId: 'ag1', reason: 'answer' })
+    const costs = JSON.parse(written[`${DIR}/costs.json`]!)
+    expect(costs.agenten.ag1.runden).toBe(1)
+    expect(costs.agenten.ag1.cacheWrite).toBe(900)
+    expect(costs.fremd).toBeUndefined()
+  })
+
   test('Agent ohne codecycle-Rolle: eigene Zeile „fremd“ im Token-Buch, nicht beim Bauleiter', async ($, on) => {
     mock.store(on)
     const written = fakeWorld(on, FILES)

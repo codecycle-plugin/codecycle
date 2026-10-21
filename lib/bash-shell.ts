@@ -173,7 +173,8 @@ export function splitShell(command: string): Segment[] {
         cur = ''
         has = false
       } else endWord()
-      if (command[i + 1] === '>') i++
+      // `>>` anhängen, `>|` überschreiben trotz noclobber: beides schreibt in die Datei danach
+      if (command[i + 1] === '>' || command[i + 1] === '|') i++
       if (command[i + 1] === '&') {
         // `>&2`, `2>&1`: Kanal, keine Datei
         i++

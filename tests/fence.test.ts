@@ -252,6 +252,11 @@ describe('Zaun und Sperren', () => {
     expect((await run('Bash', cmd, ids['codecycle:test-author'])).deny).toBeUndefined()
     expect((await run('Bash', cmd, ids['codecycle:debugger'])).deny).toBeUndefined()
     expect((await run('Bash', cmd)).deny).toBeUndefined() // Hauptsitzung
+    // außerhalb eines Paket-Branchs: Debugger und Hauptsitzung ja, Test-Autor nie
+    const ohne = 'codecycle commit-tests -m "Reproduktion" --ohne-paket'
+    expect((await run('Bash', ohne, ids['codecycle:test-author'])).deny).toMatch(/nur im Paket-Worktree/)
+    expect((await run('Bash', ohne, ids['codecycle:debugger'])).deny).toBeUndefined()
+    expect((await run('Bash', ohne)).deny).toBeUndefined()
     for (const role of ['codecycle:builder-logic', 'codecycle:reviewer']) {
       expect((await run('Bash', cmd, ids[role])).deny).toMatch(/rote Tests committet nur der Test-Autor bzw\. Debugger/)
     }
@@ -284,6 +289,11 @@ describe('Zaun und Sperren', () => {
     const cmds = ['codecycle guard --record', 'codecycle exclude', 'codecycle install-tool', 'codecycle hooks install']
     for (const cmd of cmds) {
       expect((await run('Bash', cmd)).deny).toBeUndefined() // Hauptsitzung
+    // außerhalb eines Paket-Branchs: Debugger und Hauptsitzung ja, Test-Autor nie
+    const ohne = 'codecycle commit-tests -m "Reproduktion" --ohne-paket'
+    expect((await run('Bash', ohne, ids['codecycle:test-author'])).deny).toMatch(/nur im Paket-Worktree/)
+    expect((await run('Bash', ohne, ids['codecycle:debugger'])).deny).toBeUndefined()
+    expect((await run('Bash', ohne)).deny).toBeUndefined()
       expect((await run('Bash', cmd, ids['codecycle:toolsmith'])).deny).toBeUndefined()
       for (const id of [ids['codecycle:builder-logic'], ids['codecycle:test-author'], 'unbekannt']) {
         expect((await run('Bash', cmd, id)).deny).toMatch(/Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith/)

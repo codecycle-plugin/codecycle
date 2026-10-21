@@ -61,8 +61,25 @@ export function recordMeasure(ctx: Ctx, root: string, rel: string, name: string,
         : '  Hauptsitzungen erfasst: unbekannt (Buch ohne Startstände)',
     )
     ctx.out(`  nicht erfasst: ${NOT_RECORDED.join(' · ')}`)
+    const runs = roleRuns(costsPath)
+    ctx.out(`  Rollen laut Token-Buch: ${runs.length > 0 ? runs.map(([rolle, n]) => `${rolle} ${n}`).join(' · ') : 'keine'}`)
   }
   return 0
+}
+
+/** Gelaufene Rollen mit Zahl der Läufe aus `costs.json` (`rollen[].laeufe`), nach Name; ohne Lauf oder unlesbar: leer. */
+export function roleRuns(file: string): [string, number][] {
+  let c: { rollen?: Record<string, { laeufe?: unknown }> }
+  try {
+    c = JSON.parse(readFileSync(file, 'utf8')) as typeof c
+  } catch {
+    return []
+  }
+  const rollen = c && typeof c.rollen === 'object' && c.rollen ? c.rollen : {}
+  return Object.entries(rollen)
+    .map(([rolle, r]): [string, number] => [rolle, typeof r?.laeufe === 'number' ? r.laeufe : 0])
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
 }
 
 /** Was die Messung nie enthält: Grenzen des Token-Buchs (Schreibtakt, fertige Aufgabe, Bindung der Hauptsitzung). */
