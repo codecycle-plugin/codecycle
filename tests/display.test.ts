@@ -2,7 +2,7 @@
 // Agenten-Leiste, Fortschritt, Bautafel, Statuszeile und Seitenleiste. Attrappen und Hilfen: ./helpers.
 
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { BAND, DIR, PLAN, STATE, FILES, spawn, LOGS, TOOLS, fakeWorld, type Engine, type Ops } from './helpers'
+import { BAND, CLOCK, DIR, PLAN, STATE, FILES, spawn, LOGS, TOOLS, fakeWorld, type Engine, type Ops } from './helpers'
 
 describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
   const STEP_USAGE = { model: 'claude-sonnet-5-5', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 248_500, cache_creation_input_tokens: 0 }
@@ -136,20 +136,45 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     mock.store(on)
     fakeWorld(on, FILES)
     await $.session.measure({
-      context: { window: 200000, percent: 70 },
+      context: { window: 1000000, tokens: 450000, percent: 45 },
       rateLimits: [{ kind: 'five_hour', percentUsed: 85 }],
       changed: ['context', 'rateLimits'],
     })
     const ui = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', ...BAND })
     expect(await ui.find({ type: 'Text', text: /Limit 5 Std\. bei 85 %/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /Hauptsitzung groß \(70 %/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Hauptsitzung groß \(450k Tokens/ })).toBeDefined()
     await ui.unmount()
     // Terminal: kein Limit-Hinweis (das Limit steht in der Fußzeile), ▲ statt ⚠
     const term = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
     expect(await term.find({ type: 'Text', text: /Limit 5 Std\. bei/ })).toBeUndefined()
-    expect(await term.find({ type: 'Text', text: /^▲ Hauptsitzung groß \(70 %/ })).toBeDefined()
+    expect(await term.find({ type: 'Text', text: /^▲ Hauptsitzung groß \(450k Tokens/ })).toBeDefined()
     expect(await term.find({ type: 'Text', text: /⚠/ })).toBeUndefined()
     await term.unmount()
+  })
+
+  test('Knopf „Neue Sitzung“ erst ab 400k Tokens; Druck: /clear, dann /codecycle:continue', async ($, on) => {
+    mock.store(on)
+    fakeWorld(on, FILES)
+    const runs: string[] = []
+    const fills: string[] = []
+    on('command.run', { command: 'clear' }, (_$, e) => (runs.push(e.command), {}))
+    on('command.run', { command: 'codecycle:continue' }, (_$, e) => (runs.push(e.command), {}))
+    on('prompt.fill', (_$, e) => (fills.push(e.text), { isFilled: true }) as never)
+    const measure = (tokens: number) => $.session.measure({ context: { window: 1000000, tokens, percent: tokens / 10000 }, rateLimits: [], changed: ['context'] })
+    await measure(399_000)
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui = await $.ui.mount({ plugin: 'codecycle', surface, ...BAND })
+      expect(await ui.find({ key: 'new-session' })).toBeUndefined()
+      await ui.unmount()
+    }
+    await measure(450_000)
+    const ui = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', ...BAND })
+    expect(await ui.find({ key: 'new-session' })).toBeDefined()
+    await ui.press({ key: 'new-session' })
+    await CLOCK.current!.advance(10)
+    expect(runs).toEqual(['clear', 'codecycle:continue'])
+    expect(fills).toEqual([])
+    await ui.unmount()
   })
 
   test('ohne offene Aufgabe leere Ansicht mit der letzten Aufgabe, Agenten behalten ihre Tokens; Beispieldaten nur mit demo-data', async ($, on) => {

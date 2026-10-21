@@ -6,7 +6,7 @@ Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl n
 
 ## Voraussetzungen
 
-- Claude Code (Terminal oder Desktop-App; gebaut und getestet mit 2.1.299), **Git**, **Node.js ab Version 24** (das Projekt-Werkzeug ist TypeScript und läuft direkt mit Node; Claude Code bringt kein Node mit; kein `npm install` nötig).
+- Claude Code (Terminal oder Desktop-App; die Seitenleiste der Desktop-App zeigt ihr volles Aussehen ab 2.1.299, ältere Fassungen eine schlichtere), **Git**, **Node.js ab Version 24** (das Projekt-Werkzeug ist TypeScript und läuft direkt mit Node; Claude Code bringt kein Node mit; kein `npm install` nötig).
 - Python ist **nicht** nötig.
 - Optional: ctags (Universal Ctags) für die Outline der Dateien; ohne ctags ist die Outline leer.
 - Optional: ein Code-Graph, **entweder** code-review-graph (über uv: `uv tool install code-review-graph`) **oder** CodeGraph (`@colbymchenry/codegraph` über npm). Installiert wird nur nach Rückfrage. Ohne Graph gilt der Rückfall Outline und Suche. Der Anbieter steht in `.codecycle/tool.config.json` (`graph.provider`: `auto`, `code-review-graph`, `codegraph`, `none`; `auto` nimmt den Anbieter, dessen Index im Projekt liegt).

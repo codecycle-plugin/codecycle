@@ -16,6 +16,7 @@ import { rework } from './commands/rework.ts'
 import { effort } from './commands/effort.ts'
 import { selftest } from './commands/selftest.ts'
 import { server } from './commands/server.ts'
+import { paket } from './commands/paket.ts'
 import { solo } from './commands/solo.ts'
 import { tasks } from './commands/tasks.ts'
 import { update } from './commands/update.ts'
@@ -53,6 +54,7 @@ COMMANDS['package-info'] = packageInfo
 COMMANDS['plan-html'] = planHtml
 COMMANDS.update = (args, ctx) => update(args, ctx)
 COMMANDS.notiz = notiz
+COMMANDS.paket = paket
 COMMANDS.solo = solo
 
 const HELP = [
@@ -76,6 +78,9 @@ const HELP = [
   '  exclude [--share] [--gitignore] [--gitattributes]   .claude/, .codecycle/, .githooks/ lokal halten (--share: nur .claude/settings.local.json); optional auch .gitignore bzw. .gitattributes ergänzen',
   '  guard [--base <ref>]        Kontrolldateien, Abhängigkeitsdateien, Test-Autor-Tests, Testzahl (--record vorher)',
   '  rework <aufgabenordner>     Commits nach fertig auf denselben Dateien (Nacharbeit)',
+  '  paket start P<n>            voller Ablauf: Branch und Worktree, guard --record, Paket in-arbeit (--nur-worktree: nur anlegen)',
+  '  paket pruefen P<n>          guard gegen den Aufgaben-Branch, Tests des Test-Autors aus commit-tests',
+  '  paket fertig P<n>           nach grünem pruefen: Merge in den Aufgaben-Branch, Worktree weg, Paket fertig (--runden <n>)',
   '  solo check <ordner>         Solo-Weg vor dem Prüfer: check grün, alles committet; nennt berührte Risikobereiche für den Prüfauftrag',
   '  solo funde <ordner>         Solo-Weg vor dem Merge: jeder Fund aus reports/pruefung.md mit Status in TASK.md',
   '  effort <ordner> [--set k=v] [--drop rolle] [--keep rolle] [--record]   Rollen-Set und Läufe aus Merkmalen (aufwand.json)',

@@ -26,4 +26,4 @@ Eine neue Aufgabe vom Auftrag bis zum Abschluss führen: Klären, Planen, Umsetz
 Ordner `docs/codecycle/<JJJJ-MM-TT>-<thema>/` mit `TASK.md`, `PLAN.md`, `STATE.md`, `reports/`; Aufgaben-Branch `codecycle/<thema>`; am Ende `zustand: geprueft`; der Merge in den Hauptbranch mit `zustand: fertig` kommt auf ausdrückliches Ja (die Frage steht am Ende von Schritt 7, sonst bei `/codecycle:continue`).
 
 ## Nächster Schritt
-Nach jeder Freigabe eine neue Sitzung empfehlen und mit `/codecycle:continue` fortsetzen. Ist die Aufgabe abgenommen: `/codecycle:continue` (fragt nach dem Merge).
+Eine neue Sitzung empfiehlst du nach dem Füllstand der Hauptsitzung (Workflow-Skill, „Hauptsitzung klein halten“); fortgesetzt wird mit `/codecycle:continue`. Ist die Aufgabe abgenommen: `/codecycle:continue` (fragt nach dem Merge).

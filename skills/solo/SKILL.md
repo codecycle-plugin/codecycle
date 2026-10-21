@@ -46,7 +46,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 ### 2. Kurzplan
 1. `haltepunkt: 2`, `zustand: in-arbeit`.
 2. In `TASK.md` unter „Kurzplan“ 3–10 Zeilen: Dateien, Vorgehen, wie du es prüfst. Keine Freigabe abwarten.
-3. Unter „Eingabeformate“ je Eingabe die Schreibweisen, die Nutzer dieser Aufgabe realistisch tippen oder einfügen: Komma oder Punkt, Tausendertrenner, wo der Wortlaut sie nicht ausschließt, Brüche (`½`, `1/2`), Abkürzungen mit und ohne Punkt, Einheit mit und ohne Leerzeichen, groß/klein, Umlaute. Nur was zu dieser Aufgabe passt; ohne Eingaben „keine“.
+3. Unter „Eingabeformate“ je Eingabe die Schreibweisen, die Nutzer dieser Aufgabe realistisch tippen oder einfügen: Komma oder Punkt, Tausendertrenner mit Leerzeichen (`1 000`), Punkt oder Komma als Tausendertrenner nur, wo der Wortlaut sie nicht als Dezimalzeichen erlaubt, Brüche (`½`, `1/2`), Abkürzungen mit und ohne Punkt, Einheit mit und ohne Leerzeichen, groß/klein, Umlaute. Nur was zu dieser Aufgabe passt; ohne Eingaben „keine“.
    - Nur Schreibweisen, keine Deutung: Was eine Schreibweise bedeutet, steht unter „Annahmen“, denn der Prüfer bekommt diesen Abschnitt.
    - Die Deutung folgt dem Wortlaut. Erlaubt er eine Schreibweise schon (z. B. „Dezimalzahlen mit Punkt“), bekommt sie keine zweite Bedeutung (`1.250` bleibt 1,25). Lässt er sie offen und hängt viel daran, ist das eine Lücke im Wortlaut (Punkt 4).
 4. Offene Punkte entscheidest du still und schreibst jeden als eine Zeile unter „Annahmen“: `- <Annahme> (Grund)`. Fragen nur bei einem Widerspruch oder einer Lücke im Wortlaut, die sich nicht still festlegen lässt; dann eine gebündelte Frage.

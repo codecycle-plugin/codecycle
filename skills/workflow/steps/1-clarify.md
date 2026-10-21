@@ -41,4 +41,4 @@ Keine Schritte 1b/1c. 0–2 Fragen, dann (gilt Risikobereich: Negativ-Kriterium 
 `TASK.md` vollständig und freigegeben, `STATE.md` auf `geklaert` (klein und ohne Architekt: `geplant`, mit Paket in `PLAN.md`); Bericht von Gutachter und Architekt in `reports/`.
 
 ## Nächster Schritt
-Neue Sitzung empfehlen (`/codecycle:continue`). Danach `steps/2-plan.md` (mit Architekt) bzw. `steps/4-build.md` (klein oder ohne Architekt).
+Neue Sitzung nur nach „Hauptsitzung klein halten“ (Workflow-Skill). Danach `steps/2-plan.md` (mit Architekt) bzw. `steps/4-build.md` (klein oder ohne Architekt).

@@ -2,6 +2,40 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.20.1 / Werkzeug 0.7.1] – 2026-10-21
+
+### Geändert
+
+- Nach `codecycle paket start` und `paket fertig` hängt der Mod den Stand von `codecycle_budget` (Limit und Größe der Hauptsitzung) an die Ausgabe; der Bauleiter fragt das Budget zusätzlich vor jedem Agentenstart und nach jeder Freigabe.
+- Eine neue Sitzung empfiehlt der Bauleiter nur, wenn `codecycle_budget` es sagt, auch am Ende einer Aufgabe. Die Empfehlung nennt zuerst `/clear` und `/codecycle:continue`, den Knopf auf der Bautafel nur als Zusatz, damit sie auch ohne Bautafel (z. B. über Remote Control) genügt.
+- Der Bauleiter wiederholt nicht mehr, was `codecycle paket` in `STATE.md` schreibt.
+- README: keine „getestet mit“-Version mehr; 2.1.299 nur als Grenze für das volle Aussehen der Seitenleiste.
+
+### Behoben
+
+- Ein Agent bekam als Schreibziel den ersten Berichtspfad seiner Startnachricht, auch wenn dieser nur ein Lesehinweis auf einen fremden Bericht war; sein eigener Bericht wurde dann verweigert.
+- `codecycle paket` schrieb das Datum in UTC; zwischen Mitternacht und dem Ende der Zeitverschiebung stand der Vortag.
+
+## [0.20.0 / Werkzeug 0.7.0] – 2026-10-20
+
+### Neu
+
+- `codecycle paket start|pruefen|fertig P<n>`: Worktree, Testzahl, Prüfung gegen den Aufgaben-Branch, Merge und `STATE.md` eines Pakets in je einem Aufruf. `paket fertig` mergt nur nach einer grünen Prüfung auf genau diesem Stand; bei einem Merge-Konflikt steht das Paket auf „blockiert“.
+- Knopf „Neue Sitzung“ auf der Bautafel, sobald die Hauptsitzung groß ist: `/clear`, danach `/codecycle:continue`.
+
+### Geändert
+
+- Eine neue Sitzung empfiehlt der Bauleiter nach dem Füllstand der Hauptsitzung (ab 400 000 Tokens an der nächsten Pause, ab 600 000 an der nächsten möglichen Stelle), nicht mehr nach jeder Phase. `codecycle_budget` nennt den Füllstand; die Bautafel warnt in denselben Stufen.
+- `/codecycle:continue` setzt eine einzelne offene Aufgabe ohne Rückfrage fort; Einstellungsfragen wie die nach den Git-Hooks kommen je Aufgabe nur einmal; Fragen zum Ergebnis stehen vor Fragen zum Ablauf.
+- Der Paketleiter prüft mit `codecycle paket pruefen`, bevor er den Prüfer startet. `paket start` und `paket fertig` ruft nur der Bauleiter auf.
+- `codecycle commit-tests` versieht den Commit mit der Zeile `Codecycle-Tests: rot`.
+
+## [0.19.2 / Werkzeug 0.6.6] – 2026-10-20
+
+### Geändert
+
+- Solo-Weg: Die Liste der Eingabeformate nennt Tausendertrenner mit Leerzeichen (`1 000`) immer; Punkt oder Komma als Tausendertrenner nur, wo die Aufgabe sie nicht als Dezimalzeichen erlaubt.
+
 ## [0.19.1 / Werkzeug 0.6.6] – 2026-10-20
 
 ### Geändert

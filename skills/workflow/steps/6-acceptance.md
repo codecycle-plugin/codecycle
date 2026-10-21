@@ -6,6 +6,7 @@ Den Gesamtstand gegen alle Kriterien prüfen: volle Suite, Browser-Prüfer, Abna
 ## Voraussetzungen
 - Alle Pakete `fertig`, alles im Aufgaben-Branch.
 - Schalter: `half-blind` (Punkt 3), `reuse-agents` (Punkt 4), `graph` (vergessene Aufrufer).
+- **`codecycle_budget` fragen** vor dem Start von Abschlussprüfung bzw. Abnahme und vor dem Browser-Prüfer; bei `anhalten` nichts starten (`4-build.md`, Zusatz „Budget zu Ende“).
 - Für den Browser-Prüfer laut `.claude/codecycle.md`: Oberfläche, Start (`codecycle server`), Test-Zugang; dazu Playwright-Plugin mit Google Chrome (meldet `codecycle selftest` als „Browser-Prüfung: bereit“, Punkt 2). Server und Wegwerf-Datei: Der Browser-Prüfer startet und beendet den Server selbst über `codecycle server --temp`; das setzt `serverTemp` in `.codecycle/tool.config.json` voraus (Umgebungsvariable der Datendatei des Projekts, oder `{ "ohneDaten": true }`, wenn der Server nichts speichert) und einen Serverbefehl (`commands.server`). **Rückfall A:** fehlt `serverTemp` oder der Serverbefehl, startest du (Bauleiter) den Server vor dem Lauf selbst mit einer Wegwerf-Datei, nennst Adresse und Datei in der Startnachricht des Browser-Prüfers und beendest den Server danach; Schritte „Server aus/an“ macht er dann auf Zuruf.
 
 ## Schritte
@@ -20,4 +21,4 @@ Den Gesamtstand gegen alle Kriterien prüfen: volle Suite, Browser-Prüfer, Abna
 Alle Kriterien belegt; `STATE.md` auf `geprueft`.
 
 ## Nächster Schritt
-Neue Sitzung empfehlen (`/codecycle:continue`), danach `steps/7-finish.md`.
+`steps/7-finish.md`; eine neue Sitzung nur, wenn die Zeile „Hauptsitzung“ der letzten Antwort von `codecycle_budget` sie verlangt (Workflow-Skill, „Hauptsitzung klein halten“).

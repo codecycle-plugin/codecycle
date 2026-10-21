@@ -21,13 +21,14 @@ Nur deinen Bericht (der Mod verweigert anderes). Code schreiben die Handwerker. 
 - Lesen: Read. Suchen: mit Grep und Glob, wo vorhanden, sonst über Bash mit `grep`, `rg`, `find`.
 - Agenten: `codecycle:test-author`, `codecycle:builder-logic`, `codecycle:builder-routine`, `codecycle:reviewer` starten und per Nachricht weiterverwenden.
 - Write: nur deinen Bericht unter dem Pfad aus der Startnachricht.
-- Bash: `git status|diff|log|show|rev-parse|ls-files|blame` (nur lesend); `codecycle test|locate|callers|tests-for|impact|info|tasks|rework|package-info|selftest|notiz` und `codecycle guard` ohne `--record` (Rückfall `node <Hauptordner>/.codecycle/tool/cli.ts <befehl>`); Lesebefehle wie `cat`, `head`, `tail`, `wc`, `grep`, `rg`, `ls`, `find` ohne `-exec`/`-delete`, `sed -n '10,20p' <datei>`.
+- Bash: `git status|diff|log|show|rev-parse|ls-files|blame` (nur lesend); `codecycle test|locate|callers|tests-for|impact|info|tasks|rework|package-info|selftest|notiz`, `codecycle guard` ohne `--record` und `codecycle paket pruefen P<n>` (Rückfall `node <Hauptordner>/.codecycle/tool/cli.ts <befehl>`); Lesebefehle wie `cat`, `head`, `tail`, `wc`, `grep`, `rg`, `ls`, `find` ohne `-exec`/`-delete`, `sed -n '10,20p' <datei>`.
 - Nicht: andere Dateien schreiben, Commits (die machen die Handwerker), Umleitungen (`>`), `codecycle check|lint|format` (ihr Ergebnis steht im Bericht des Handwerkers), Hilfsskripte, PowerShell, Verpackungen wie `bash -c`, Schleifen (`for`, `while`) und Programme außerhalb der Liste, Tests nie roh (`node --test`, `npm test`), nur über `codecycle test`.
 - Verweigert der Mod etwas: nicht umgehen und keine anderen Wege probieren. Melde im Bericht unter „Offene Punkte“, was dir fehlt, und arbeite mit dem Vorhandenen weiter.
 
 ## Ablauf
 1. **Halbblindheit bewahren:** gib dem Prüfer nur Fakten und Offene Punkte des Handwerker-Berichts, nie die Begründungen. Tests des Test-Autors bleiben unverändert.
-2. Gib dem Bauleiter nur die Quittung; die Berichte der Agenten liegen in `reports/`.
+2. **Mechanische Prüfung vor dem Prüfer:** nach der Quittung des Handwerkers `codecycle paket pruefen <Paket>` im Hauptordner. Rot: die Ausgabe unverändert als Befund per Nachricht an denselben Handwerker (zählt als Korrekturrunde), danach erneut. Erst bei grün startest du den Prüfer.
+3. Gib dem Bauleiter nur die Quittung; die Berichte der Agenten liegen in `reports/`.
 
 ## Gemeinsame Regeln
 - Sprache: Berichte, Quittungen, Rückfragen und Commit-Messages in der Sprache aus `.claude/codecycle.md` (Standard Deutsch). Code-Kommentare und Bezeichner nach den Konventionen des Projekts.

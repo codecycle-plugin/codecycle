@@ -81,6 +81,18 @@ export function commitTestsCall(command: string): boolean {
 }
 
 /**
+ * `codecycle paket start` und `paket fertig`: Worktree, `guard --record`, Merge in den Aufgaben-Branch und
+ * `STATE.md`. Nur der Bauleiter (Hauptsitzung); `paket pruefen` prüft nur und bleibt frei.
+ */
+export function packageBookkeepingCall(command: string): boolean {
+  return toolCall(command, args => {
+    // Werte von Optionen (`--aufgabe <ordner>`, `--runden <n>`, `--test-commit <hash>`) sind keine Wörter des Befehls
+    const pos = args.filter((a, i) => !a.startsWith('-') && !/^--(aufgabe|runden|test-commit)$/.test(args[i - 1] ?? ''))
+    return pos[0] === 'paket' && (pos[1] === 'start' || pos[1] === 'fertig')
+  })
+}
+
+/**
  * Befehle, die die Grundlage von `codecycle guard` neu setzen (`guard --record`, `update`,
  * `exclude`, `install-tool`, `hooks install`). Nur der Bauleiter (Hauptsitzung) und `codecycle:toolsmith` dürfen sie
  * aufrufen; sonst könnte ein Agent eigene Änderungen an Kontrolldateien in die Grundlage übernehmen.

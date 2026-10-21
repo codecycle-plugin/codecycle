@@ -294,6 +294,14 @@ describe('Zaun und Sperren', () => {
     expect((await run('Bash', `bash -c 'codecycle exclude'`, builder)).deny).toBeDefined()
     // prüfen ohne --record bleibt erlaubt
     expect((await run('Bash', 'codecycle guard --base main', builder)).deny).toBeUndefined()
+    // paket start und fertig nur der Bauleiter, auch nicht toolsmith; paket pruefen frei
+    for (const cmd of ['codecycle paket start P1', 'codecycle paket fertig P1']) {
+      expect((await run('Bash', cmd)).deny).toBeUndefined()
+      for (const id of [ids['codecycle:toolsmith'], builder, 'unbekannt']) {
+        expect((await run('Bash', cmd, id)).deny).toMatch(/ruft nur der Bauleiter auf/)
+      }
+    }
+    expect((await run('Bash', 'codecycle paket pruefen P1', builder)).deny).toBeUndefined()
     expect((await run('Bash', 'codecycle hooks status', builder)).deny).toBeUndefined()
   })
 })

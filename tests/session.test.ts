@@ -20,6 +20,25 @@ describe('Sitzungsstart und Profil', () => {
     expect(text).toMatch(/auto-resume: aus/)
   })
 
+  test('paket start/fertig der Hauptsitzung: Antwort von codecycle_budget als Kontext', async ($, on) => {
+    mock.store(on)
+    fakeWorld(on, FILES)
+    on('tool.call', () => ({ result: 'grün: P1 fertig' }))
+    for (const command of ['codecycle paket start P1', 'codecycle paket fertig P1 --runden 0']) {
+      const r = await $.tool.call({ tool: 'Bash', command } as never)
+      expect(r.deny).toBeUndefined()
+      expect(r.result).toBe('grün: P1 fertig')
+      const ctx = (r.context ?? []).join('\n')
+      expect(ctx).toMatch(/codecycle_budget \(vom Mod nach codecycle paket start\/fertig angehängt\)/)
+      expect(ctx).toMatch(/Hauptsitzung: /)
+      expect(ctx).toMatch(/5-Stunden-Fenster: 42 %/)
+    }
+    // paket pruefen und andere Befehle: kein Anhang
+    for (const command of ['codecycle paket pruefen P1', 'git status']) {
+      expect((await $.tool.call({ tool: 'Bash', command } as never)).context ?? []).toEqual([])
+    }
+  })
+
   test('register-forwarding aus: kein codecycle_owner', async ($, on) => {
     mock.store(on)
     fakeWorld(on, FILES)

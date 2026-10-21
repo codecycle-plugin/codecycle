@@ -32,4 +32,4 @@ Den Plan gegen die Prüfliste prüfen lassen (nur groß), dann die Freigabe einh
 Geprüfter und freigegebener Plan; `STATE.md` auf `geplant`.
 
 ## Nächster Schritt
-Neue Sitzung empfehlen (`/codecycle:continue`), danach `steps/4-build.md`.
+Neue Sitzung nur nach „Hauptsitzung klein halten“ (Workflow-Skill), danach `steps/4-build.md`.

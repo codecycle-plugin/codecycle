@@ -187,6 +187,91 @@ export function withHeadField(text: string, key: string, value: string): string 
   return lines.join(nl)
 }
 
+/**
+ * Setzt ein Feld eines Pakets in der Liste `pakete:` (Blockstil der Vorlage oder `- { id: P1, … }`): ersetzt den Wert
+ * und behält einen Kommentar dahinter, sonst kommt das Feld als letzte Zeile des Pakets dazu. Wirft, wenn das Paket fehlt.
+ */
+export function withPackageField(text: string, id: string, key: string, value: string): string {
+  const nl = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  if (lines[0]?.trim() !== '---') throw new Error('STATE.md ohne YAML-Kopf')
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
+  if (end < 0) throw new Error('STATE.md: YAML-Kopf nicht geschlossen')
+  const list = lines.findIndex((l, i) => i > 0 && i < end && /^pakete:\s*$/.test(stripComment(l)))
+  if (list < 0) throw new Error('STATE.md: keine Liste `pakete:`')
+  const idOf = (l: string): string | null => {
+    const flow = stripComment(l).match(/^\s+-\s+\{(.*)\}\s*$/)
+    if (flow) return str(flowMap(`{${flow[1]}}`).id) || null
+    const block = stripComment(l).match(/^\s+-\s+id:\s*(.*)$/)
+    return block ? str(scalar(block[1]!)) : null
+  }
+  let i = list + 1
+  for (; i < end; i++) {
+    if (!/^\s/.test(lines[i]!) && lines[i]!.trim() !== '') break
+    if (idOf(lines[i]!) === id) break
+  }
+  if (i >= end || idOf(lines[i]!) !== id) throw new Error(`STATE.md: Paket ${id} fehlt`)
+  const flow = lines[i]!.match(/^(\s+-\s+)\{(.*)\}(\s*(?:#.*)?)$/)
+  if (flow) {
+    const parts = splitTopLevel(flow[2]!).map(x => x.trim()).filter(Boolean)
+    const at = parts.findIndex(x => x.slice(0, x.indexOf(':')).trim() === key)
+    if (at >= 0) parts[at] = `${key}: ${value}`
+    else parts.push(`${key}: ${value}`)
+    lines[i] = `${flow[1]}{ ${parts.join(', ')} }${flow[3]}`
+    return lines.join(nl)
+  }
+  // Blockstil: Felder bis zum nächsten Listenpunkt bzw. bis zum Ende der Liste
+  let last = i
+  let indent = ''
+  for (let j = i + 1; j < end; j++) {
+    const l = lines[j]!
+    if (l.trim() === '') continue
+    if (!/^\s/.test(l) || /^\s+-\s/.test(l)) break
+    last = j
+    indent = l.match(/^(\s+)/)![1]!
+    const m = l.match(/^(\s+)([A-Za-z_][\w-]*):(\s*)(.*)$/)
+    if (m && m[2] === key) {
+      const comment = stripComment(m[4]!).length < m[4]!.length ? m[4]!.slice(stripComment(m[4]!).trimEnd().length) : ''
+      lines[j] = `${m[1]}${key}: ${value}${comment}`
+      return lines.join(nl)
+    }
+  }
+  if (indent === '') indent = `${lines[i]!.match(/^(\s+)-/)![1]}  `
+  lines.splice(last + 1, 0, `${indent}${key}: ${value}`)
+  return lines.join(nl)
+}
+
+/**
+ * Hängt eine Zeile an einen Abschnitt `## <name>` an (legt ihn am Ende an, wenn er fehlt); ein Platzhalter
+ * `- keine` im Abschnitt fällt dabei weg.
+ */
+export function withSectionLine(text: string, name: string, line: string): string {
+  const nl = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const h = lines.findIndex(l => l.match(/^##\s+(.*?)\s*$/)?.[1] === name)
+  if (h < 0) {
+    while (lines.length > 0 && lines.at(-1)!.trim() === '') lines.pop()
+    lines.push('', `## ${name}`, line, '')
+    return lines.join(nl)
+  }
+  let next = lines.findIndex((l, i) => i > h && /^##\s/.test(l))
+  if (next < 0) next = lines.length
+  const empty = lines.findIndex((l, i) => i > h && i < next && /^[-*]\s+(keine|keiner)\s*$/i.test(l.trim()))
+  if (empty >= 0) {
+    lines.splice(empty, 1)
+    next--
+  }
+  let at = next
+  while (at > h + 1 && lines[at - 1]!.trim() === '') at--
+  lines.splice(at, 0, line)
+  return lines.join(nl)
+}
+
+/** Hängt eine Zeile an den Abschnitt „Verlauf“ an. */
+export function withHistoryLine(text: string, line: string): string {
+  return withSectionLine(text, 'Verlauf', line)
+}
+
 /** Wählt die aktive Aufgabe: nicht fertig/verworfen, zuletzt geändert zuerst. */
 export function pickActive<T extends TaskState>(states: T[]): T | undefined {
   return states

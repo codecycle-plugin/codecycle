@@ -17,7 +17,7 @@ import { type BandData, type FooterData, renderBand, renderFooter } from './band
 import { type PanelData, renderPanel } from './panel.tsx'
 import { renderFooterDesk } from './desk.tsx'
 import { supportsRichText } from './lib/desk-parts.ts'
-import { DEFAULT_THRESHOLD, budgetText, warnings } from './lib/budget.ts'
+import { DEFAULT_THRESHOLD, budgetText, contextAdvice, packageBudgetNote, warnings } from './lib/budget.ts'
 import { BROWSER_CLOSE_TOOL, type BrowserUse, browserAfter, browserOpenContext, browserOpenHint, tracksBrowser } from './lib/browser-close.ts'
 import { type Hint, type HintKind, effortFromArgs, rankHints, savedChanged, savedEffortOf, savedMark, startEffortOf } from './lib/term-parts.ts'
 import {
@@ -59,7 +59,7 @@ import { bashReadTargets } from '../lib/bash-read-targets.ts'
 import { bashSearchCount } from '../lib/bash-search.ts'
 import { bashWriteTargets } from '../lib/bash-write-targets.ts'
 import { hookBypass } from '../lib/guard-bypass.ts'
-import { baselineCall, commitTestsCall, pythonCall } from '../lib/guard-calls.ts'
+import { baselineCall, commitTestsCall, packageBookkeepingCall, pythonCall } from '../lib/guard-calls.ts'
 import { reviewDiffArgs } from '../lib/guard-rules.ts'
 import {
   type Costs,
@@ -204,6 +204,8 @@ const COMMIT_TESTS_DENY =
   'codecycle: rote Tests committet nur der Test-Autor bzw. Debugger (codecycle commit-tests). Melde den Stand im Bericht unter „Offene Punkte“; der Bauleiter entscheidet.'
 const BASELINE_DENY =
   'codecycle: Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith (codecycle guard --record, exclude, install-tool, hooks install). Melde den Bedarf im Bericht unter „Offene Punkte“.'
+const PACKAGE_DENY =
+  'codecycle: codecycle paket start und paket fertig (Worktree, guard --record, Merge, STATE.md) ruft nur der Bauleiter auf. Prüfen darfst du mit codecycle paket pruefen.'
 const LOCK_HINT =
   'Das Profil lässt sich nur bis zum ersten codecycle-Agenten einer Sitzung wechseln (neue Sitzung oder /clear).'
 
@@ -417,6 +419,7 @@ const STEP_TOOL = 'codecycle_step'
 const RELOAD_TOOL = 'codecycle_reload'
 /** Vorschlag im leeren Eingabefeld (Tab, Enter), solange die Werkzeug-Kopie veraltet ist oder fehlt */
 const UPDATE_COMMAND = '/codecycle:update'
+const CONTINUE_COMMAND = '/codecycle:continue'
 /** ebenso, solange das Projekt nicht eingerichtet ist (dann gibt es keine Bautafel mit dem Hinweis) */
 const SETUP_COMMAND = '/codecycle:setup'
 /** `codecycle update` lässt über guard die Tests einmal laufen; höchstens zehn Minuten (Grenze von $.process.run) */
@@ -1545,8 +1548,8 @@ async function start($: EngineInterface): Promise<void> {
 // Hauptsitzung: Füllstand und Modell (Warnung „Hauptsitzung groß“, Hinweis Sonnet)
 async function measure($: EngineInterface, e: Pick<SessionMeasureInput, 'changed' | 'context'>): Promise<void> {
   if (e.changed.includes('context')) {
-    const p = e.context.percent
-    await update($, context, () => (p === undefined ? null : p))
+    const t = e.context.tokens
+    await update($, context, () => (t === undefined ? null : t))
   }
 }
 
@@ -1663,6 +1666,22 @@ function runReload($: EngineInterface): void {
       $.ui.log(`codecycle: /reload-plugins per command.run: ${String(err)}`, { to: 'debug' })
       void fillCommand($, 'reload-plugins')
     })
+  })
+}
+
+/**
+ * Knopf „Neue Sitzung“: /clear, danach /codecycle:continue. `session.start` feuert bei /clear nicht, der Mod bleibt
+ * geladen. Lehnt die Engine einen der Befehle ab, steht `/codecycle:continue` im Eingabefeld (Enter genügt).
+ */
+function newSession($: EngineInterface): void {
+  $.clock.after(1, () => {
+    $.command
+      .run({ command: 'clear' })
+      .then(() => $.command.run({ command: CONTINUE_COMMAND.slice(1) }))
+      .catch(err => {
+        $.ui.log(`codecycle: Neue Sitzung per command.run: ${String(err)}`, { to: 'debug' })
+        void fillCommand($, CONTINUE_COMMAND.slice(1))
+      })
   })
 }
 
@@ -1901,7 +1920,7 @@ async function currentWarnings($: EngineInterface, surface: string): Promise<Hin
       woche: terminal ? null : lim.woche,
       profile: await shownProfile($),
       mainModel: await read($, mainModel),
-      contextPercent: await read($, context),
+      contextTokens: await read($, context),
     }).map(t => hint('sonstig', t)),
   ]
   return terminal ? rankHints(list) : list
@@ -2170,6 +2189,7 @@ async function bandData($: EngineInterface, surface: string, bodyColumns: number
     notes: await currentWarnings($, surface),
     running: (await read($, crew)).filter(a => a.status === 'laeuft').length,
     maxRows,
+    newSession: contextAdvice(await read($, context)) !== 'keine',
   }
 }
 
@@ -2193,6 +2213,7 @@ async function onRenderBand($: EngineInterface, e: MEvt<MatchedHook<'ui.render',
     // Fokus nach dem Klick nicht versetzen
     onSetProfile: p => void setProfile($, p),
     onSetCollapsed: value => void setCollapsed($, value),
+    onNewSession: () => newSession($),
   })
 }
 
@@ -2597,6 +2618,23 @@ function denyBaseline(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   return next(e)
 }
 
+// paket start und paket fertig nur für die Hauptsitzung (Bauleiter), auch nicht für toolsmith oder unbekannte Agenten
+// Bauleiter: an das Ergebnis die Antwort von codecycle_budget als Kontext, damit jede Pause den Füllstand zeigt
+async function denyPackageBookkeeping($: EngineInterface, e: ToolEvt, next: ToolNxt) {
+  const command = (e as unknown as { command?: unknown }).command
+  if (typeof command !== 'string' || !packageBookkeepingCall(command)) return next(e)
+  if (e.agentId) return { deny: PACKAGE_DENY }
+  const result = await next(e)
+  if (result.deny !== undefined) return result
+  let budget: string
+  try {
+    budget = await budgetNow($)
+  } catch {
+    return result
+  }
+  return { ...result, context: [...(result.context ?? []), packageBudgetNote(budget)] }
+}
+
 // Hook-Sperre auch für PowerShell
 function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
@@ -2882,23 +2920,28 @@ async function onToolCall($: EngineInterface, e: Evt<'tool.call'>, next: Nxt<'to
 }
 
 async function toolBudget($: EngineInterface, e: ToolEvt) {
+  const input = e as unknown as { role?: unknown }
+  const role = typeof input.role === 'string' && input.role !== '' ? input.role : undefined
+  return toolText(await budgetNow($, role))
+}
+
+/** Antworttext von `codecycle_budget` (Limit-Empfehlung, Zeile „Hauptsitzung“). */
+async function budgetNow($: EngineInterface, role?: string): Promise<string> {
   await reloadConfig($)
   const usage = await $.session.usage()
   const lim = limitsOf(usage)
-  const input = e as unknown as { role?: unknown }
-  const role = typeof input.role === 'string' && input.role !== '' ? input.role : undefined
-  const text = budgetText(
+  return budgetText(
     {
       ...lim,
       ...(role ? { role } : {}),
       avg: roleAvg,
       threshold: DEFAULT_THRESHOLD,
+      contextTokens: await read($, context),
       autoResume: isOn(switches, 'auto-resume'),
       profile: await shownProfile($),
     },
     iso => resetText(iso),
   )
-  return toolText(text)
 }
 
 // Fortschritt je Agent (Schalter agent-progress): nur Anzeige, ändert nichts am Ablauf
@@ -2967,6 +3010,7 @@ export const register: Register = on => {
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPython)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyCommitTests)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyBaseline)
+  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPackageBookkeeping)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyHookBypass)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denySoloMerge)
   on('tool.call', onToolCall)

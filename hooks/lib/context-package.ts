@@ -23,13 +23,27 @@ export function packageKind(role: string): PackageKind {
  */
 const TASK_WIDE_ROLES: readonly string[] = ['acceptance', 'architect', 'area-architect', 'plan-reviewer', 'surveyor', 'doc-keeper', 'browser-reviewer']
 
+/**
+ * Schreibziel aus der Startnachricht (Name ohne `.md`): ein einziger `reports/*.md` gilt; bei mehreren der Pfad
+ * nach „Bericht:“, sonst der Name `<nr|P<n>>-<rolle>` bzw. `<rolle>`, sonst keiner (Standardpfad aus `reportPath`).
+ * Ein Lesehinweis auf einen fremden Bericht verschiebt so das Schreibrecht nicht.
+ */
+function pickReport(prompt: string, role?: string): string | undefined {
+  const names = [...prompt.matchAll(/reports[\\/]([\w.-]+?)\.md/g)].map(m => m[1]!)
+  if (new Set(names).size <= 1) return names[0]
+  const labelled = prompt.match(/\bBericht(?:spfad)?\s*:\s*[`"']?[^\s`"']*?reports[\\/]([\w.-]+?)\.md/i)
+  if (labelled) return labelled[1]
+  if (!role) return undefined
+  return names.find(n => n === role || new RegExp(`^(?:P\\d+|\\d+)-${role}$`, 'i').test(n))
+}
+
 /** Aufgabenordner, Paket und Berichtspfad aus der Startnachricht des Bauleiters; `role` (ohne Präfix) schränkt die Paket-Ableitung für Aufgaben-Rollen ein. */
 export function parseSpawnPrompt(prompt: string, role?: string): { aufgabeDir?: string; paket?: string; bericht?: string } {
   const out: { aufgabeDir?: string; paket?: string; bericht?: string } = {}
   const dir = prompt.match(/(?:^|[\s"'`(])((?:[\w./\\:-]*?)docs[\\/]codecycle[\\/][^\s"'`)\\/]+)/)
   if (dir) out.aufgabeDir = dir[1]!.replace(/\\/g, '/').replace(/^.*?(docs\/codecycle\/)/, '$1')
-  const report = prompt.match(/reports[\\/]([\w.-]+?)\.md/)
-  if (report) out.bericht = report[0].replace(/\\/g, '/')
+  const report = pickReport(prompt, role)
+  if (report) out.bericht = `reports/${report}.md`
   // Aufgabenmodus: Paket „alle“ geht vor jeder P-Nummer im Text
   const all = prompt.match(/\bPaket(?:-ID)?\s*[:=]?\s*`?alle\b/i)
   if (all) {
@@ -41,7 +55,7 @@ export function parseSpawnPrompt(prompt: string, role?: string): { aufgabeDir?: 
     if (labelled?.[1]) out.paket = labelled[1].toUpperCase()
     return out
   }
-  const fromReport = report?.[1]?.match(/^(P\d+)-/)
+  const fromReport = report?.match(/^(P\d+)-/)
   const any = prompt.match(/\b(P\d+)\b/)
   const id = labelled?.[1] ?? fromReport?.[1] ?? any?.[1]
   if (id) out.paket = id.toUpperCase()

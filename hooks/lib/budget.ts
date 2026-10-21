@@ -5,6 +5,20 @@
 
 export const DEFAULT_THRESHOLD = 92
 export const WARN_PERCENT = 80
+/** Kontext der Hauptsitzung in Tokens: ab hier neue Sitzung an der nächsten natürlichen Pause (vorläufig bis Messung) */
+export const CONTEXT_PAUSE = 400_000
+/** ab hier an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Paket (vorläufig bis Messung) */
+export const CONTEXT_STOP = 600_000
+
+export type ContextAdvice = 'keine' | 'pause' | 'jetzt'
+
+/** Wann eine neue Sitzung dran ist, nach dem Kontext der Hauptsitzung in Tokens. */
+export function contextAdvice(tokens: number | null | undefined): ContextAdvice {
+  if (tokens === null || tokens === undefined) return 'keine'
+  return tokens >= CONTEXT_STOP ? 'jetzt' : tokens >= CONTEXT_PAUSE ? 'pause' : 'keine'
+}
+
+const tokensText = (n: number): string => `${Math.round(n / 1000)}k Tokens`
 
 export type RoleAverage = { laeufe: number; prozent: number }
 export type Recommendation = 'starten' | 'nur klein' | 'anhalten'
@@ -22,6 +36,8 @@ export type BudgetInput = {
    */
   avg: Record<string, RoleAverage>
   threshold?: number
+  /** Kontext der Hauptsitzung in Tokens, falls bekannt */
+  contextTokens?: number | null
 }
 
 export type BudgetAdvice = { empfehlung: Recommendation; grund: string; durchschnitt?: number; frei: number | null }
@@ -59,9 +75,8 @@ export type WarningInput = {
   profile: string
   /** Modell der Hauptsitzung (Text von `$.session.model()`) */
   mainModel?: string
-  /** Füllstand der Hauptsitzung in %, falls bekannt */
-  contextPercent?: number | null
-  contextThreshold?: number
+  /** Kontext der Hauptsitzung in Tokens, falls bekannt */
+  contextTokens?: number | null
 }
 
 /** Hinweise für die Bautafel, kürzester zuerst. */
@@ -79,11 +94,28 @@ export function warnings(i: WarningInput): string[] {
   if (i.profile === 'sparsam' && i.mainModel && /opus/i.test(i.mainModel)) {
     out.push('Profil sparsam, aber die Hauptsitzung läuft auf Opus: Sonnet reicht dafür (/model sonnet).')
   }
-  const ct = i.contextThreshold ?? 60
-  if (i.contextPercent !== null && i.contextPercent !== undefined && i.contextPercent >= ct) {
-    out.push(`Hauptsitzung groß (${Math.round(i.contextPercent)} % des Kontexts): an einer natürlichen Pause /clear und /codecycle:continue.`)
-  }
+  const c = contextAdvice(i.contextTokens)
+  if (c === 'jetzt') out.push(`Hauptsitzung sehr groß (${tokensText(i.contextTokens!)}): an der nächsten möglichen Stelle neue Sitzung (/clear, dann /codecycle:continue).`)
+  else if (c === 'pause') out.push(`Hauptsitzung groß (${tokensText(i.contextTokens!)}): an der nächsten natürlichen Pause neue Sitzung (/clear, dann /codecycle:continue).`)
   return out
+}
+
+/** Zeile „Hauptsitzung“ für `codecycle_budget`: Kontext und ob eine neue Sitzung dran ist. */
+function contextLine(tokens: number | null | undefined): string {
+  if (tokens === null || tokens === undefined) return 'Hauptsitzung: Kontext ohne Messwert; neue Sitzung: keine'
+  const c = contextAdvice(tokens)
+  const what =
+    c === 'jetzt'
+      ? `jetzt (ab ${tokensText(CONTEXT_STOP)}): an der nächsten möglichen Stelle anhalten, auch nach einem Paket`
+      : c === 'pause'
+        ? `an der nächsten natürlichen Pause (ab ${tokensText(CONTEXT_PAUSE)}: nach Freigabe, paket fertig oder Merge)`
+        : `keine (unter ${tokensText(CONTEXT_PAUSE)})`
+  return `Hauptsitzung: ${tokensText(tokens)} Kontext; neue Sitzung: ${what}`
+}
+
+/** Kontext für den Bauleiter nach `codecycle paket start|fertig`: die Antwort von `codecycle_budget`, ohne eigene Abfrage. */
+export function packageBudgetNote(budget: string): string {
+  return `codecycle_budget (vom Mod nach codecycle paket start/fertig angehängt):\n${budget}`
 }
 
 /** Text für das Werkzeug `codecycle_budget`. */
@@ -100,6 +132,7 @@ export function budgetText(
     `Wochenfenster: ${pct(i.woche)}${i.resetWoche ? `, Reset ${fmt(i.resetWoche)}` : ''}`,
     `Schwelle: ${i.threshold ?? DEFAULT_THRESHOLD} %`,
     `Profil: ${i.profile}`,
+    contextLine(i.contextTokens),
   ]
   const roles = Object.entries(i.avg)
     .map(([r, e]) => [r, averageOf(e)] as const)

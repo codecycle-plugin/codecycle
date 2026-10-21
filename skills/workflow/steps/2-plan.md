@@ -29,4 +29,4 @@
 `PLAN.md` mit Paketen und Budget; `STATE.md` mit allen Paketen auf `offen` (nicht groß: Zustand `geplant` nach Freigabe).
 
 ## Nächster Schritt
-Groß: `steps/3-plan-review.md`. Sonst: neue Sitzung empfehlen (`/codecycle:continue`), danach `steps/4-build.md`.
+Groß: `steps/3-plan-review.md`. Sonst: neue Sitzung nur nach „Hauptsitzung klein halten“ (Workflow-Skill), danach `steps/4-build.md`.

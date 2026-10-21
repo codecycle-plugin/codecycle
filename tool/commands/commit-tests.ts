@@ -6,10 +6,14 @@ import { findWorkTree } from '../project.ts'
 import { clearRedMark, indexTree, stagedFiles, writeRedMark } from '../red-tests.ts'
 import { isTestPath } from '../graph/util.ts'
 
+/** Schlusszeile jedes Commits von `commit-tests` */
+export const TESTS_TRAILER = 'Codecycle-Tests: rot'
+
 /**
  * `commit-tests -m <nachricht>`: committet gestagte Testdateien auch dann, wenn die Tests rot sind
  * (roter Test-Autor-Commit). Nur Testdateien erlaubt. Der Pre-Commit-Hook läuft normal (kein
  * `--no-verify`); die einmalige Markierung erlaubt ihm nur für genau diesen Index das Ergebnis „rot“.
+ * Die Nachricht bekommt die Zeile `${TESTS_TRAILER}`; daran findet `paket pruefen` die Tests des Test-Autors.
  */
 export function commitTests(args: string[], ctx: Ctx): number {
   let message: string | null = null
@@ -38,7 +42,7 @@ export function commitTests(args: string[], ctx: Ctx): number {
   if (tree === null) throw new ToolBroken('git write-tree fehlgeschlagen (ungelöste Konflikte im Index?)')
   try {
     writeRedMark(work, tree)
-    const r = spawnSync('git', ['commit', '-m', message], { cwd: work, encoding: 'utf8', windowsHide: true })
+    const r = spawnSync('git', ['commit', '-m', message, '-m', TESTS_TRAILER], { cwd: work, encoding: 'utf8', windowsHide: true })
     if (r.error) throw new ToolBroken(`git commit nicht ausführbar: ${String(r.error)}`)
     const text = `${r.stdout ?? ''}${r.stderr ?? ''}`.trimEnd()
     if (text !== '') text.split(/\r?\n/).forEach(l => ctx.out(l))

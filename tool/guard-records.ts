@@ -20,7 +20,12 @@ export const CONTROL_DIRS = ['.codecycle', '.githooks', '.husky']
 
 export type CountRecord = { branch: string; head: string; work: string; total: number; skipped: number; recordedAt: string }
 /** `control`: je Arbeitsordner (Schlüssel `workKey`) Prüfsummen der ignorierten Kontrolldateien */
-export type Records = { counts: CountRecord[]; control: Record<string, { recordedAt: string; files: Record<string, string> }> }
+/** `pruefungen`: je Paket-Branch das letzte Ergebnis von `paket pruefen` (Stand, grün), für `paket fertig` */
+export type Records = {
+  counts: CountRecord[]
+  control: Record<string, { recordedAt: string; files: Record<string, string> }>
+  pruefungen?: Record<string, { head: string; ok: boolean; at: string }>
+}
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)
@@ -50,7 +55,16 @@ export function loadRecords(root: string): Records {
       : []
     const raw = j.control
     const control = raw === undefined ? {} : isPlainObject(raw) && Object.values(raw).every(validControlEntry) ? (raw as Records['control']) : {}
-    return { counts, control }
+    const p = j.pruefungen
+    const pruefungen = isPlainObject(p)
+      ? Object.fromEntries(
+          Object.entries(p).filter(
+            (e): e is [string, { head: string; ok: boolean; at: string }] =>
+              isPlainObject(e[1]) && typeof e[1].head === 'string' && typeof e[1].ok === 'boolean' && typeof e[1].at === 'string',
+          ),
+        )
+      : {}
+    return { counts, control, pruefungen }
   } catch {
     return empty()
   }

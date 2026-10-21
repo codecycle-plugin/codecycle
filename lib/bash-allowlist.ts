@@ -289,9 +289,9 @@ function readerGitProblem(args: readonly string[]): string | null {
 /**
  * codecycle-Befehle für Lese-Rollen; `server` nur mit `server: true` (Browser-Prüfer). Ohne `effort`: es schreibt
  * `aufwand.json` auch ohne Optionen neu; der Plan-Prüfer liest `aufwand.json` direkt. `notiz` hängt nur eine Zeile an
- * `notizen.md` an, und nur mit Schalter `notizen` an.
+ * `notizen.md` an, und nur mit Schalter `notizen` an. `paket` nur als `paket pruefen` (prüft, ändert nichts im Projekt).
  */
-export const READER_TOOL_COMMANDS = ['test', 'locate', 'callers', 'tests-for', 'impact', 'info', 'tasks', 'rework', 'package-info', 'selftest', 'guard', 'notiz'] as const
+export const READER_TOOL_COMMANDS = ['test', 'locate', 'callers', 'tests-for', 'impact', 'info', 'tasks', 'rework', 'package-info', 'selftest', 'guard', 'paket', 'notiz'] as const
 
 /** Browser-Prüfer: `server` nur in den festen Formen, keine freien Eingaben. */
 function serverProblem(rest: readonly string[]): string | null {
@@ -309,12 +309,16 @@ function readerToolProblem(args: readonly string[], server: boolean): string | n
   }
   if (!(READER_TOOL_COMMANDS as readonly string[]).includes(sub)) return `codecycle ${sub} ist für Lese-Rollen nicht erlaubt`
   if (sub === 'guard' && args.includes('--record')) return 'codecycle guard --record ist für Lese-Rollen nicht erlaubt (setzt die Grundlage für guard)'
+  if (sub === 'paket') {
+    const pos = args.slice(1).filter((a, i, all) => !a.startsWith('-') && !/^--(aufgabe|test-commit)$/.test(all[i - 1] ?? ''))
+    if (pos[0] !== 'pruefen') return `codecycle paket ${pos[0] ?? ''} ist für Lese-Rollen nicht erlaubt (nur paket pruefen; start und fertig ruft der Bauleiter auf)`
+  }
   return null
 }
 
 /** Was eine Lese-Rolle per Bash darf, vollständig, für Verweigerungsmeldungen (gleiche Liste in agents/*.md). */
 export function readerBashAllowedText(server: boolean): string {
-  const tool: string[] = READER_TOOL_COMMANDS.map(c => (c === 'guard' ? 'guard (ohne --record)' : c))
+  const tool: string[] = READER_TOOL_COMMANDS.map(c => (c === 'guard' ? 'guard (ohne --record)' : c === 'paket' ? 'paket pruefen' : c))
   if (server) tool.push('server (nur ohne Argument, --stop, --temp, --temp --same)')
   return `git ${[...GIT_READ].join('/')} (nur lesend); codecycle ${tool.join(', ')} (Rückfall: node <Hauptordner>/.codecycle/tool/cli.ts <befehl>); Lesebefehle wie cat, head, tail, wc, grep, rg, ls, find (ohne -exec/-delete), sed -n '10,20p' <datei>`
 }

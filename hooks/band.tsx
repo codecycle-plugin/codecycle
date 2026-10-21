@@ -52,6 +52,8 @@ export type BandData = {
   maxRows: number
   /** Engine kennt `weight`, `size`, `tabular`, Abstandsstufen (ab 2.1.299) */
   rich: boolean
+  /** Hauptsitzung groß (ab 400k Tokens): Knopf „Neue Sitzung“ zeigen */
+  newSession?: boolean
 }
 
 /** Rückrufe, die der Handler mit `$` bereitstellt */
@@ -59,7 +61,12 @@ export type BandActions = {
   onTogglePanel: () => void
   onSetProfile: (profile: Profile) => void
   onSetCollapsed: (collapsed: boolean) => void
+  /** /clear, danach /codecycle:continue */
+  onNewSession?: () => void
 }
+
+/** Beschriftung des Knopfs, der eine neue Sitzung beginnt und die Aufgabe fortsetzt */
+export const NEW_SESSION_LABEL = 'Neue Sitzung'
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Terminal: Bautafel im selbst gezeichneten Rahmen, Fußzeile rechts. Werte kommen aus den Quellen des Plugins (Board, Hinweise, Limits, Modell).
@@ -96,6 +103,7 @@ function renderBandTerminal(ui: ElementTable, d: BandData, act: BandActions) {
   // Bedienknöpfe rechtsbündig in der ersten Zeile im Rahmen, nur per Klick: keine Tasten-Kürzel im Terminal
   const controls = (
     <Box key="controls" flexGrow={1} flexShrink={0} justifyContent="flex-end" columnGap={2}>
+      {d.newSession && act.onNewSession ? <Button key="new-session" label={NEW_SESSION_LABEL} plain onPress={() => act.onNewSession!()} /> : null}
       <Button key="panel" label="Details" plain onPress={() => act.onTogglePanel()} />
       {isCollapsed ? (
         <Button key="expand" label={EXPAND_LABEL} plain onPress={() => act.onSetCollapsed(false)} />
@@ -343,6 +351,7 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
         )}
         {notes.length > 0 && deskChip(ui, 'hinweise', notes.length === 1 ? '1 Hinweis' : `${notes.length} Hinweise`, 'warning')}
         <Box key="controls" flexGrow={1} justifyContent="flex-end" columnGap={2}>
+          {d.newSession && act.onNewSession ? <Button key="new-session" label={NEW_SESSION_LABEL} variant="primary" onPress={() => act.onNewSession!()} /> : null}
           {panelButton}
           <Button key="expand" label="▾ ausklappen" plain dimColor onPress={() => act.onSetCollapsed(false)} />
         </Box>
@@ -379,6 +388,7 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
           </Box>
         )}
         <Box key="controls" flexGrow={1} justifyContent="flex-end" columnGap={2}>
+          {d.newSession && act.onNewSession ? <Button key="new-session" label={NEW_SESSION_LABEL} variant="primary" onPress={() => act.onNewSession!()} /> : null}
           {panelButton}
           <Button key="collapse" label="▴ einklappen" plain dimColor onPress={() => act.onSetCollapsed(true)} />
         </Box>

@@ -27,13 +27,15 @@ Du bist der **Bauleiter** (Hauptsitzung).
 - **Merge in `main` nur auf ausdrückliches Ja, nie automatisch**. „Nicht im Lauf“ gilt nur für die Zeit **vor** dem Abschluss. Schritt 7 endet mit der sichtbaren Frage „jetzt mergen und die Branches löschen?“ (siehe `steps/7-finish.md`; Standard Ja; nur `git branch -d`, nie `-D`); ohne Antwort wiederholt sie sich bei `continue` und `status`.
 - **Fragen an den Nutzer** stehen immer ganz unten in der letzten Nachricht als Block „Entscheidungen für dich“, nummeriert, je Frage Erklärung in Alltagssprache, Antworten, Folge jeder Antwort, Empfehlung als Standard; nie in der Mitte einer Zusammenfassung. Vorlage für jede Frage:
   - Anrede „du“.
+  - Reihenfolge: zuerst Fragen, deren Antwort das Ergebnis ändert (Verhalten, Wortlaut, Freigabe, Merge), danach Fragen zum Ablauf (Zaun, Hooks, Rollen).
+  - Fragen, deren Antwort das Werkzeug kennt, stellst du nicht. Eine Einstellungsfrage (Hooks, Zaun) stellst du je Aufgabe einmal; steht die Antwort im Verlauf von `STATE.md`, gilt sie weiter.
   - Optionen je Frage nummeriert (1a, 1b, 2a …).
   - Empfehlung mit Grund direkt bei der Frage.
   - Neue Standards und Annahmen einzeln aufzählen, je mit eigener Antwort, nie in einem Ja gebündelt.
   - Keine Werkzeugbegriffe, internen Nummern oder Optionen (kein „--drop“, „Toolsmith“, „10a“); sag, was passiert.
   - Tabellen höchstens etwa 100 Zeichen breit.
 - **Annahme „der Nutzer stimmt zu“** gilt nur für Dinge, die später ohne Aufwand umkehrbar sind; sonst gehört die Frage vor die Plan-Freigabe.
-- **Sitzung wegwerfbar:** `STATE.md` ist nach **jedem** Schritt vollständig (Zustand, Pakete, Nächster Schritt, Offene Fragen, Verlauf); `/clear` plus `/codecycle:continue` verliert nichts. `/clear` nur an natürlichen Pausen empfehlen.
+- **Sitzung wegwerfbar:** `STATE.md` ist nach **jedem** Schritt vollständig (Zustand, Pakete, Nächster Schritt, Offene Fragen, Verlauf); `/clear` plus `/codecycle:continue` verliert nichts. Wann du eine neue Sitzung empfiehlst: Abschnitt „Hauptsitzung klein halten“.
 
 ## Werkzeug
 
@@ -97,6 +99,7 @@ Ungeplante Läufe (frischer Agent statt Nachricht, Eskalation, Widerleger) erhö
 - Dateinamen und Befehle englisch, **Inhalte in der Projektsprache** (`.claude/codecycle.md`, Standard Deutsch).
 - Aufgabenordner: `docs/codecycle/<JJJJ-MM-TT>-<thema>/` mit `TASK.md`, `PLAN.md`, `STATE.md`, `reports/`. Immer im **Hauptordner** des Projekts suchen (auch aus Worktrees; `git rev-parse --git-common-dir`). Ablage teilen oder lokal laut `.claude/codecycle.md`.
 - Vorlagen aus `templates/` kopieren und Platzhalter `<…>` füllen. `STATE.md` im **Blockstil** der Vorlage halten; `zuletzt` bei jeder Änderung aktualisieren.
+- **Was `codecycle paket` schreibt, schreibst du nicht noch einmal:** Paketstatus, `commit`, `runden`, `zuletzt`, die Verlaufszeile je Befehl und den Commit von `STATE.md`. Keine eigene Zeile „gestartet“ oder „fertig“, kein eigener Buchhaltungs-Commit. Selbst schreibst du Agenten-ID, `budget.verbraucht` (je neuem Agentenlauf) und Freitext (Annahmen, Offene Fragen, Nächster Schritt).
 - `STATE.md` ist ein Hinweis, **Git ist die Wahrheit**. `zustand: fertig` nur im selben Commit wie der Merge in den Hauptbranch.
 - **Branch-Namen:** Aufgaben-Branch `codecycle/<thema>`, Paket-Branch und Worktree `codecycle/<thema>--P<n>` (Git erlaubt einen Branch mit Schrägstrich vor dem P nicht neben `codecycle/<thema>`).
 - Commits: knapp, Projektsprache, **keine Urheberzeilen** (sachliche Erwähnungen wie „Claude Code“ sind erlaubt), nie `--no-verify`.
@@ -114,7 +117,7 @@ Ungeplante Läufe (frischer Agent statt Nachricht, Eskalation, Widerleger) erhö
 - **Korrekturen per Nachricht an denselben Agenten** (Agenten-ID in `STATE.md`), möglichst sofort (Cache 5 min). Nachrichtenaufbau: (1) warum an dich, (2) Datei und Stelle, (3) was falsch ist, (4) was erwartet wird (Kriterium), (5) **aktuellen Stand der Datei neu lesen, bevor du änderst**, (6) was danach zu tun ist (Tests, Commit, Quittung). Höchstens 2 Korrekturrunden. Nicht erreichbar oder lange gewartet: frischer Agent mit Kontextpaket und letztem Bericht.
 - Parallele Agenten derselben Rolle versetzt starten (einen zuerst). Stammhandwerker höchstens 3 Pakete im selben Bereich, danach frischer Agent mit letztem Bericht. Höchstens 2–3 Pakete parallel, nur mit Vermerk „Parallel möglich“.
 - Prüfer halbblind: bekommt nur `TASK.md`, Paketabschnitt, Diff, **Fakten** und **Offene Punkte** (nie die Begründungen), Schalter `half-blind`.
-- Vor jedem neuen Lauf mit Mod: `codecycle_budget` fragen. Ohne Mod keine Limit-Prüfung; bei Anzeichen knappen Limits (Vorschlag) den Nutzer fragen.
+- **`codecycle_budget` fragen:** vor jedem neuen Agentenlauf und nach jeder Freigabe. Nach `codecycle paket start` und `paket fertig` hängt der Mod die Antwort an die Ausgabe; dann keine eigene Abfrage. Die Antwort gilt für das Limit und für die Größe der Hauptsitzung. Ohne Mod keine Limit-Prüfung; bei Anzeichen knappen Limits (Vorschlag) den Nutzer fragen.
 
 ## Berichte, die der Bauleiter liest
 
@@ -169,7 +172,14 @@ Nur über diese Anleitung wirksam (Mod und Werkzeug kennen ihn nicht): `assume-a
 
 ## Hauptsitzung klein halten
 
-Nach jeder Freigabe (Auftrag, Plan) und nach der Abnahme (nach der Merge-Antwort) empfehlen: neue Sitzung, `/codecycle:continue`. Es geht nichts verloren: `STATE.md` ist nach jedem Schritt vollständig, alles Weitere steht in den Dateien. Lies bei `continue` nur `STATE.md` und die Anleitung des aktuellen Zustands. Empfiehl `/clear` nur an natürlichen Pausen (nach einer Freigabe, nach einem Merge), nie mitten in einem Paket.
+Jeder Zug liest den ganzen Verlauf der Sitzung; eine neue Sitzung empfiehlst du nach dem Füllstand, nicht nach jeder Phase. `codecycle_budget` nennt ihn in der Zeile „Hauptsitzung“, und nur sie entscheidet:
+- „keine“: weiterarbeiten, auch über eine Freigabe hinweg; keine Empfehlung, auch nicht am Ende der Aufgabe.
+- „an der nächsten natürlichen Pause“: nach der nächsten Freigabe (Auftrag, Plan), dem nächsten `paket fertig` oder der Merge-Antwort.
+- „jetzt“: an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Paket; nie mitten in einem Paket (laufender Agent, offene Korrektur).
+- Vor der Empfehlung: `STATE.md` vollständig und committet; „Nächster Schritt“ nennt genau, womit `/codecycle:continue` ohne Rückfrage weitermacht (Paket, Befehl, wartende Agenten mit ID).
+- Empfehlung als eine Zeile, keine Frage, die allein genügt (Bautafel und Knopf gibt es nur am Rechner, nicht in der App über Remote Control): „Neue Sitzung: `/clear`, dann `/codecycle:continue` (am Rechner auch Knopf „Neue Sitzung“ auf der Bautafel).“
+- Ohne Mod (kein `codecycle_budget`): nach der Freigabe des Plans und nach der Abnahme empfehlen.
+- Bei `continue` liest du nur `STATE.md` und die Anleitung des aktuellen Zustands.
 
 ## Schritte (nur laden, was dran ist)
 
