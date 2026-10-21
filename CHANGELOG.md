@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.20.3] – 2026-10-21
+
+### Geändert
+
+- `/codecycle:setup` fragt, was als Kennzeichnung durch Claude in Commits und PRs stehen soll: Urheberzeile und Sitzungslink (Standard von Claude Code), nur der Sitzungslink, oder nichts. Bisher schaltete Setup die Urheberzeilen ohne Frage ab.
+
 ## [0.20.2] – 2026-10-21
 
 ### Geändert
