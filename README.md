@@ -41,12 +41,14 @@ In einer Sitzung im Zielprojekt:
 
 **Welcher Weg?**
 
-- **Solo-Weg** (`/codecycle:solo`) für kleine und mittlere Aufgaben: Die Sitzung baut selbst, ein frischer Prüfer prüft das Ergebnis gegen den Wortlaut der Aufgabe und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage. Verlangt die Aufgabe etwas schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen), fragt der Solo-Weg vorher, ob der volle Ablauf besser passt.
+- **Solo-Weg** (`/codecycle:solo`) für kleine und mittlere Aufgaben: Die Sitzung baut selbst, ein frischer Prüfer prüft das Ergebnis gegen den Wortlaut der Aufgabe und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage. Verlangt die Aufgabe etwas schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen), fragt der Solo-Weg vorher, ob der volle Ablauf besser passt. <!-- doku-ok -->
 - **Voller Ablauf** (`/codecycle:new`) für große oder riskante Aufgaben: Ein Bauleiter verteilt Erkunden, Planen, Tests, Bauen und Prüfen auf eigene Agenten, je Paket in einem eigenen Worktree. Gründlicher, aber ein Vielfaches an Verbrauch.
 - `/codecycle:new` schlägt den passenden Weg zuerst vor (eine Frage mit Empfehlung) und wechselt auf Wunsch in den Solo-Weg.
 - Beide Wege legen einen Aufgabenordner mit Auftrag und Stand an; nach `/clear` setzt `/codecycle:continue` fort.
 
-`/codecycle:setup` legt `.claude/codecycle.md` an, ruft `codecycle install-tool` (Werkzeug-Kopie `.codecycle/tool/`) und `codecycle hooks install` (`.githooks/`) auf und fragt nach Sprache, Ablage, Profil und Schaltern. Danach führt `/codecycle:new` durch den Ablauf. Eine neue Sitzung empfiehlt der Bauleiter erst, wenn die Hauptsitzung groß wird; dann setzt `/codecycle:continue` nach `/clear` fort. **Gefragt wird nur vorn (Klären, Auftrag, Plan) und beim Wiedereinstieg;** läuft die Umsetzung, wird der Nutzer nicht gestört. Der Merge in `main` kommt nie automatisch, sondern als Frage beim nächsten `/codecycle:continue` oder `/codecycle:status` („jetzt mergen und die Branches löschen?“, Standard Ja; gelöscht wird nur mit `git branch -d`). Setup fragt außerdem nach dem Hauptbranch (Vorgabe `main`, `master` nur auf Frage umbenennen), nach `.gitignore`-Einträgen (bei Ablage „teilen“ wird `.claude/codecycle.md` committet) und nach einer `.gitattributes` gegen CRLF-Warnungen.
+`/codecycle:setup` legt `.claude/codecycle.md` an, ruft `codecycle install-tool` (Werkzeug-Kopie `.codecycle/tool/`) und `codecycle hooks install` (`.githooks/`) auf und fragt nach Sprache, Ablage, Profil und Schaltern. Danach führt `/codecycle:new` durch den Ablauf. Eine neue Sitzung empfiehlt der Bauleiter erst, wenn die Hauptsitzung groß wird; dann setzt `/codecycle:continue` nach `/clear` fort.
+**Gefragt wird nur vorn (Klären, Auftrag, Plan) und beim Wiedereinstieg;** läuft die Umsetzung, wird der Nutzer nicht gestört.
+Der Merge in `main` kommt nie automatisch, sondern als Frage beim nächsten `/codecycle:continue` oder `/codecycle:status` („jetzt mergen und die Branches löschen?“, Standard Ja; gelöscht wird nur mit `git branch -d`). Setup fragt außerdem nach dem Hauptbranch (Vorgabe `main`, `master` nur auf Frage umbenennen), nach `.gitignore`-Einträgen (bei Ablage „teilen“ wird `.claude/codecycle.md` committet) und nach einer `.gitattributes` gegen CRLF-Warnungen. <!-- doku-ok -->
 
 **Kennzeichnung durch Claude in Commits:** Setup fragt einmal, was in Commits und Pull Requests stehen soll: Urheberzeile und Sitzungslink (Standard von Claude Code; der Link `Claude-Session: …` kommt nur in Cloud- und Remote-Control-Sitzungen und öffnet sich nur für das eigene Konto), nur der Sitzungslink, oder nichts. Die Antwort steht als `attribution` mit `commit`, `pr` und `sessionUrl` in `.claude/settings.json` des Projekts und lässt sich dort jederzeit ändern.
 
@@ -114,6 +116,20 @@ Zusatzteile sind einzeln schaltbar, im Abschnitt „Schalter“ von `.claude/cod
 ## Mod (optional)
 
 Bautafel über dem Eingabefeld (nur in eingerichteten Projekten), Seitenleiste (`/codecycle-panel`), `/profile`. Ohne Mod läuft der Ablauf gleich, nur ohne Bautafel, Limit-Prüfung, Token-Buch und technischen Zaun.
+
+### Was „gew.“ bedeutet
+
+Bautafel, Seitenleiste und Token-Buch (`costs.json` im Aufgabenordner) zeigen den Aufwand in **gewichteten Tokens**: jede Token-Art mal ihrem Faktor, im Verhältnis der API-Listenpreise. So zählt, was ein Lauf kostet, nicht nur wie viel Text er bewegt.
+
+| Token-Art | Faktor |
+|---|---|
+| Eingabe (neuer Text) | 1 |
+| Cache schreiben, Laufzeit 5 Minuten (Agenten) | 1,25 |
+| Cache schreiben, Laufzeit 1 Stunde (Hauptsitzung im Abo, Agenten mit `cacheTtl: 1h`) | 2 |
+| Cache lesen (bisheriger Verlauf, bei jedem Schritt erneut) | 0,05 bei Sonnet 5.5 und Opus 5.5, sonst 0,1 |
+| Ausgabe (was das Modell schreibt) | 5 |
+
+Beispiel: 4,4 Mio Tokens aus dem Cache gelesen, 190 000 geschrieben (davon 110 000 mit 1 Stunde), 76 000 ausgegeben ergeben rund 0,9 Mio gewichtet. Bei Sonnet 5.5 entspricht 1 Mio gewichtet etwa 2 $ Listenpreis. Wie stark ein Abo-Limit die Token-Arten anrechnet, ist nicht dokumentiert; deshalb steht der Anteil am 5-Stunden-Fenster nur als Näherung („Konto ≈“) daneben.
 
 ## Aktualisieren
 

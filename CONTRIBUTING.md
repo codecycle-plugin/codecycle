@@ -11,7 +11,7 @@ Rückmeldungen und Pull Requests sind willkommen.
   claude plugin test .
   ```
 
-  `validate` prüft, ob das Plugin formal gültig ist (Manifest, Agenten, Skills, Mod). `test` führt die Mod-Tests in `tests/` aus; sie liegen im Plugin, weil `claude plugin test` nur dort sucht, und laufen bei Nutzern nie mit. Zum Ausprobieren das Plugin direkt aus dem Ordner laden: `claude --plugin-dir .` (eine installierte Fassung vorher mit `claude plugin disable codecycle@codecycle` abschalten).
+  `validate` prüft, ob das Plugin formal gültig ist (Manifest, Agenten, Skills, Mod). `test` führt die Mod-Tests in `tests/` aus; sie liegen im Plugin, weil `claude plugin test` nur dort sucht, und laufen bei Nutzern nie mit. Zum Ausprobieren das Plugin direkt aus dem Ordner laden: `claude --plugin-dir .` (eine installierte Fassung vorher mit `claude plugin disable codecycle@codecycle` abschalten). <!-- doku-ok -->
 
 - Die Texte (Skills, Agenten, README, Changelog) sind auf Deutsch.
 - Mit einem Beitrag stimmst du zu, dass er unter der [MIT-Lizenz](LICENSE) des Projekts steht.

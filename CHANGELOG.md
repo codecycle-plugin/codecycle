@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.21.0 / Werkzeug 0.7.6] – 2026-10-22
+
+### Geändert
+
+- Gewichtete Tokens folgen den API-Preisen: Cache-Lesen zählt bei Sonnet 5.5 und Opus 5.5 0,05 statt 0,1, Cache-Schreiben mit 1 Stunde Laufzeit 2 statt 1,25. Die Laufzeit kommt je Agent aus seiner Agenten-Datei (Standard 5 Minuten) und für die Hauptsitzung aus der Meldung von Claude Code (ohne Meldung 1 Stunde, wie im Abo). Rollen rechnen aus ihren Agenten, je mit eigenem Modell. Ältere `costs.json` bleiben lesbar.
+- README: Abschnitt „Was ‚gew.‘ bedeutet“ erklärt die gewichteten Tokens mit Faktoren und Beispiel.
+
 ## [0.20.5 / Werkzeug 0.7.5] – 2026-10-21
 
 ### Neu

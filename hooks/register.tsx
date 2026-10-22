@@ -2505,7 +2505,7 @@ async function bookStep($: EngineInterface, rt: Runtime | undefined, result: Ste
   if (rt) {
     // Agenten ohne Aufgabe buchen in SETUP_DIR
     const b = await bookOf($, rt.book)
-    const who = { agentId: rt.id, rolle: rt.rolle, paket: rt.paket, modell: model }
+    const who = { agentId: rt.id, rolle: rt.rolle, paket: rt.paket, modell: model, cacheTtl: (await cacheTtlOf($, rt.rolle)) === CACHE_TTL_LONG_MS ? '1h' as const : '5m' as const }
     // Folgenachricht an einen fertigen Agenten: neuer Lauf ab dieser Anfrage (beim ersten Lauf schon offen seit dem Start)
     openRun(b.costs, who, iso(stepAt))
     addStep(b.costs, who, result.usage ?? null)

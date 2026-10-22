@@ -10,7 +10,7 @@ import type { Ctx } from './main.ts'
 import { tryLoadConfig } from './project.ts'
 
 const { GIT_QUIET, TASKS_DIR } = pathsLib
-const { shortTokens, weightedTokens } = tokensLib
+const { shortTokens, weightedMain, weightedRole, weightedTokens } = tokensLib
 
 /** `--record`: Läufe und Nachläufe aus STATE.md, Diff-Zeilen ohne `docs/codecycle/`. */
 export function recordMeasure(ctx: Ctx, root: string, rel: string, name: string, statePath: string, path: string, data: Aufwand): number {
@@ -148,14 +148,15 @@ type Counts = Partial<Record<'input' | 'output' | 'cacheRead' | 'cacheWrite' | '
 
 /**
  * Aufwand aus `costs.json` (Aufbau `hooks/lib/ledger-costs.ts :: Costs`). Hauptmaß: gewichtete Tokens
- * (`lib/tokens.ts :: weightedTokens`, aus den gespeicherten Feldern berechnet): Agenten = Summe der Rollen, Bauleiter =
+ * (`lib/tokens.ts :: weightedTokens`, aus den gespeicherten Feldern berechnet, je Agent mit Modell und Cache-Laufzeit):
+ * Agenten = Summe der Rollen (`weightedRole`), Bauleiter (`weightedMain`, ohne gemeldete Laufzeit 1 h) =
  * `hauptsitzung` mit Modell und Anteil an allem (Agenten, Bauleiter, fremd) in %, fremd = Agenten ohne codecycle-Rolle.
  * Daneben die Prozentpunkte des 5-Stunden-Fensters als Konto-Näherung: Agenten = Summe `limitProzent` der Rollen,
  * Bauleiter = `hauptsitzung.limitProzent`. Fehlt die Datei oder ein Wert, fehlt das Feld.
  */
 export function costShares(file: string): CostShares {
   if (!existsSync(file)) return {}
-  let c: { rollen?: unknown; hauptsitzung?: Counts & { modell?: unknown }; fremd?: Counts }
+  let c: { rollen?: unknown; agenten?: unknown; hauptsitzung?: Counts & { modell?: unknown; cacheTtl?: unknown }; fremd?: Counts & { modell?: unknown } }
   try {
     c = JSON.parse(readFileSync(file, 'utf8')) as typeof c
   } catch {
@@ -163,11 +164,13 @@ export function costShares(file: string): CostShares {
   }
   if (!c || typeof c !== 'object') return {}
   const out: CostShares = {}
-  const roles = c.rollen && typeof c.rollen === 'object' ? Object.values(c.rollen as Record<string, Counts | null>) : null
-  if (roles) out.agentenGewichtet = roles.reduce((n, r) => n + weightedTokens(r), 0)
+  const roleMap = c.rollen && typeof c.rollen === 'object' ? (c.rollen as Record<string, Counts | null>) : null
+  const roles = roleMap ? Object.values(roleMap) : null
+  const agents = c.agenten && typeof c.agenten === 'object' ? (c.agenten as Record<string, (Counts & { rolle?: unknown; modell?: unknown; cacheTtl?: unknown }) | null>) : null
+  if (roleMap) out.agentenGewichtet = Object.entries(roleMap).reduce((n, [rolle, r]) => n + weightedRole(rolle, r, agents), 0)
   const h = c.hauptsitzung && typeof c.hauptsitzung === 'object' ? c.hauptsitzung : null
   if (h) {
-    out.bauleiterGewichtet = weightedTokens(h)
+    out.bauleiterGewichtet = weightedMain(h)
     if (typeof h.modell === 'string' && h.modell !== '') out.bauleiterModell = shortModel(h.modell)
   }
   if (c.fremd && typeof c.fremd === 'object') out.fremdGewichtet = weightedTokens(c.fremd)

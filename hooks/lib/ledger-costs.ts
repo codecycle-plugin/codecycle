@@ -2,15 +2,16 @@
 // Rein, ohne Node und ohne Mod-API: der Mod hält die Strukturen im Speicher und schreibt sie als JSON.
 // Das Agenten-Register (agents.json) steht in `ledger-registry.ts`.
 //
-// Nicht erfasst: Cache-Schreiben getrennt nach 5 min / 1 h. Die Typen von `turn.step`
-// (TurnUsage/ModelUsage) liefern nur `cache_creation_input_tokens` als Summe.
+// Cache-Schreiben steht als Summe im Buch: Die Typen von `turn.step` (TurnUsage/ModelUsage) liefern nur
+// `cache_creation_input_tokens`. Die Laufzeit (5 min / 1 h) steht je Agent (`cacheTtl` aus der Agenten-Datei) und für
+// die Hauptsitzung (`hauptsitzung.cacheTtl`, sonst Annahme 1 h) daneben; die Gewichtung richtet sich danach.
 
 import type { Metrics, RoleCost } from '../../types'
-import { weightedTokens } from '../../lib/tokens.ts'
+import { weightedMain, weightedRole, weightedTokens } from '../../lib/tokens.ts'
 import type { Registry } from './ledger-registry.ts'
 
 // Gewichtete Tokens (Hauptmaß, Entscheidung 2a) und Kurzform stehen im Kern, weil auch das Werkzeug sie braucht.
-export { TOKEN_WEIGHTS, shortTokens, weightedTokens } from '../../lib/tokens.ts'
+export { TOKEN_WEIGHTS, shortTokens, weightedMain, weightedRole, weightedTokens } from '../../lib/tokens.ts'
 
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number }
 
@@ -44,6 +45,8 @@ export type AgentCost = CostEntry & {
   limitProzent?: number
   /** Läufe (Start bzw. Folgenachricht bis Ende) mit eigenen Tokens; fehlt in älteren costs.json */
   laeufe?: Run[]
+  /** Cache-Laufzeit des Agenten (aus der Agenten-Datei, Standard der Sub-Agenten 5 min); fehlt in älteren costs.json */
+  cacheTtl?: '5m' | '1h'
 }
 
 /**
@@ -70,7 +73,7 @@ export type Costs = {
   aktualisiert: string
   hauptsitzung: MainEntry
   /** Agenten ohne codecycle-Rolle (z. B. ein Hilfsagent der Hauptsitzung): eigene Zeile, nicht in Rollen und nicht beim Bauleiter */
-  fremd?: CostEntry
+  fremd?: CostEntry & { modell?: string }
   rollen: Record<string, RoleEntry>
   agenten: Record<string, AgentCost>
   /** Datei → wie oft sie zusätzlich gelesen wurde (Kennzahl „fehlender Kontext“, 9a) */
@@ -104,13 +107,15 @@ function add(e: CostEntry, u: ModelUsageLike | null): void {
   e.cacheWrite += u.cache_creation_input_tokens ?? 0
 }
 
-export type Who = { agentId?: string; rolle?: string; paket?: string | null; modell?: string }
+export type Who = { agentId?: string; rolle?: string; paket?: string | null; modell?: string; cacheTtl?: '5m' | '1h' }
 
 /** Eine Modell-Anfrage (ein `turn.step`) verbuchen; ohne `agentId` zählt sie zur Hauptsitzung. */
 export function addStep(costs: Costs, who: Who, usage: ModelUsageLike | null): void {
   if (who.agentId && !who.rolle) {
     // Agent ohne codecycle-Rolle, eigene Zeile „fremd“
-    add((costs.fremd ??= { ...zero(), runden: 0 }), usage)
+    const fremd = (costs.fremd ??= { ...zero(), runden: 0 })
+    if (who.modell) fremd.modell = who.modell
+    add(fremd, usage)
     return
   }
   if (!who.agentId || !who.rolle) {
@@ -120,6 +125,7 @@ export function addStep(costs: Costs, who: Who, usage: ModelUsageLike | null): v
   }
   const agent = agentCost(costs, { ...who, agentId: who.agentId, rolle: who.rolle })
   if (who.modell) agent.modell = who.modell
+  if (who.cacheTtl) agent.cacheTtl = who.cacheTtl
   add(agent, usage)
   // offener Lauf: dieselbe Anfrage auch dort
   const run = agent.laeufe?.at(-1)
@@ -261,6 +267,11 @@ export function freshTokens(u: Usage): number {
   return u.input + u.output + u.cacheWrite
 }
 
+/** Gewichtete Tokens aller Rollen, je Rolle aus ihren Agenten (`lib/tokens.ts :: weightedRole`). */
+function agentsWeighted(costs: Costs): number {
+  return Object.entries(costs.rollen).reduce((n, [rolle, r]) => n + weightedRole(rolle, r, costs.agenten), 0)
+}
+
 /** Kennzahlen einer Aufgabe aus ihrem Token-Buch (Bautafel, Seitenleiste). */
 export function metricsOf(costs: Costs): Metrics {
   const sum = sumUsage(costs)
@@ -268,10 +279,11 @@ export function metricsOf(costs: Costs): Metrics {
     tokens: totalTokens(sum),
     frisch: freshTokens(sum),
     cache: sum.cacheRead,
-    // Hauptmaß (Entscheidung 2a): gewichtete Tokens; Agenten = Summe der Rollen wie bei den Prozentwerten
-    gewichtet: weightedTokens(sum),
-    agentenGewichtet: Object.values(costs.rollen).reduce((n, r) => n + weightedTokens(r), 0),
-    bauleiterGewichtet: weightedTokens(costs.hauptsitzung),
+    // Hauptmaß (Entscheidung 2a): gewichtete Tokens je Teil (Modell und Cache-Laufzeit je Agent bzw. Hauptsitzung);
+    // Agenten = Summe der Rollen wie bei den Prozentwerten
+    gewichtet: agentsWeighted(costs) + weightedMain(costs.hauptsitzung) + weightedTokens(costs.fremd),
+    agentenGewichtet: agentsWeighted(costs),
+    bauleiterGewichtet: weightedMain(costs.hauptsitzung),
     ...(costs.fremd
       ? { fremd: { gewichtet: weightedTokens(costs.fremd), frisch: freshTokens(costs.fremd), cache: costs.fremd.cacheRead } }
       : {}),
@@ -299,7 +311,7 @@ export function roleCosts(costs: Costs): RoleCost[] {
     .map(([rolle, r]) => ({
       rolle,
       prozent: r.limitProzent ?? 0,
-      gewichtet: weightedTokens(r),
+      gewichtet: weightedRole(rolle, r, costs.agenten),
       tokens: totalTokens(r),
       laeufe: r.laeufe,
       frisch: freshTokens(r),

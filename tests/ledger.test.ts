@@ -154,9 +154,9 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
       requestId: 'codecycle-panel',
       props: { title: 'codecycle', isFocused: true, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 120 }, view: {} },
     })
-    // Entscheidung 2a: gewichtete Tokens zuerst (je Anfrage 10 + 5·5 + 80·0,1 = 43), Prozent zuletzt als Konto-Näherung
-    expect(await pane.find({ type: 'Text', text: /^Agenten: 43 gew\. · neu 15 · Cache 80 · Konto ≈ 1,0 %$/ })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: /^Bauleiter \(opus\): 43 gew\. · neu 15 · Cache 80 · Cache warm .* · Konto ≈ 1,0 %$/ })).toBeDefined()
+    // Entscheidung 2a: gewichtete Tokens zuerst (je Anfrage 10 + 5·5 + 80·0,05 = 39 bei Sonnet 5.5 und Opus 5.5), Prozent zuletzt als Konto-Näherung
+    expect(await pane.find({ type: 'Text', text: /^Agenten: 39 gew\. · neu 15 · Cache 80 · Konto ≈ 1,0 %$/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /^Bauleiter \(opus\): 39 gew\. · neu 15 · Cache 80 · Cache warm .* · Konto ≈ 1,0 %$/ })).toBeDefined()
     // Rollenzeile: gewichtete Tokens als Zahl, Prozent nachrangig
     expect(await pane.find({ type: 'Text', text: /gewichtete Tokens/ })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /neu 15 · Cache 80 · 1 Lauf · Konto ≈ 1,0 %/ })).toBeDefined()
@@ -170,10 +170,10 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
       requestId: 'codecycle-panel',
       props: { title: 'codecycle', isFocused: true, bodyColumns: 40, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} },
     })
-    expect(await narrow.find({ type: 'Text', text: /^Agenten: 43 gew\. · neu 15 · Cache 80$/ })).toBeDefined()
+    expect(await narrow.find({ type: 'Text', text: /^Agenten: 39 gew\. · neu 15 · Cache 80$/ })).toBeDefined()
     expect(await narrow.find({ type: 'Text', text: /Konto/ })).toBeUndefined()
     await narrow.unmount()
-    // Desktop-App: Kurzfassung „Agenten 43 gew.“, Summenzeilen hinter „+3 weitere“ mit Konto-Näherung
+    // Desktop-App: Kurzfassung „Agenten 39 gew.“, Summenzeilen hinter „+3 weitere“ mit Konto-Näherung
     const desk = await $.ui.mount({
       plugin: 'codecycle',
       surface: 'desktop',
@@ -181,7 +181,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
       requestId: 'codecycle-panel',
       props: { title: 'codecycle', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 80 }, view: {} },
     })
-    expect(await desk.find({ type: 'Text', text: /^Agenten 43 gew\.$/ })).toBeDefined()
+    expect(await desk.find({ type: 'Text', text: /^Agenten 39 gew\.$/ })).toBeDefined()
     await desk.unmount()
     // Terminal: Budget in der Zeile der Aufgabe (ohne Beschriftung „Budget“), Desktop-App wie bisher
     for (const [surface, text] of [['terminal', /1\/5 Läufe · Nachlauf 1/], ['desktop', /Budget 1\/5 Läufe · Nachlauf 1/]] as const) {
@@ -550,10 +550,10 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     // Fenster 11 % in der Fußzeile, nicht die Summe der Agenten (3 Punkte); im Kopf steht nur der Anteil der Aufgabe
     expect(head).not.toMatch(/Limit 5 Std\./)
     expect(await deskFooter()).toBe('5h 11 %')
-    expect(head).toMatch(/Aufgabe: Agenten 68 gew\. · Bauleiter 0 gew\. · Konto ≈ 3,0 % \/ 0,0 %/)
+    expect(head).toMatch(/Aufgabe: Agenten 64 gew\. · Bauleiter 0 gew\. · Konto ≈ 3,0 % \/ 0,0 %/)
     await ui.unmount()
     ui = await pane($, 'terminal')
-    expect(await ui.find({ type: 'Text', text: /Agenten: 68 gew\. · neu/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Agenten: 64 gew\. · neu/ })).toBeDefined()
     // Terminal: kein Limit in der Seitenleiste, es steht in der Fußzeile rechts
     expect(await ui.find({ type: 'Text', text: /5 Std\./ })).toBeUndefined()
     await ui.unmount()
