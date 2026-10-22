@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.1 / Werkzeug 0.8.1] – 2026-10-22
+
+### Behoben
+
+- Solo-Weg: Ein Fund zählt erst als behoben, wenn in `TASK.md` ein Commit in Klammern steht (`- M1: behoben (abc1234)`). Ohne Commit, etwa `behoben (undefined)`, melden `codecycle solo funde` und die Merge-Sperre den Fund als offen.
+
 ## [0.22.0 / Werkzeug 0.8.0] – 2026-10-22
 
 ### Neu

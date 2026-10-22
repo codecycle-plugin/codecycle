@@ -25,7 +25,7 @@ export type FindingStatus = { id: string; status: 'behoben' | 'verworfen' | 'off
 export type FindingsCheck = {
   /** Fund-IDs aus dem Bericht, in Reihenfolge */
   ids: string[]
-  /** IDs ohne gültigen Status (fehlt, `offen`, `verworfen` ohne Grund) */
+  /** IDs ohne gültigen Status (fehlt, `offen`, `verworfen` ohne Grund, `behoben` ohne Commit in Klammern) */
   fehlend: string[]
 }
 
@@ -65,7 +65,10 @@ export function findingStatuses(taskText: string): FindingStatus[] {
   return out
 }
 
-/** Jede Fund-ID des Berichts braucht `behoben` oder `verworfen` mit Grund; der letzte Eintrag je ID gilt. */
+/** `behoben` gilt nur mit Commit in Klammern: `(abc1234)`, 7 bis 40 Hex-Zeichen. */
+const FIXED_WITH_COMMIT = /^\(\s*[0-9a-f]{7,40}\b/i
+
+/** Jede Fund-ID des Berichts braucht `behoben (<commit>)` oder `verworfen` mit Grund; der letzte Eintrag je ID gilt. */
 export function checkFindings(reportText: string, taskText: string): FindingsCheck {
   const ids = reportFindingIds(reportText)
   const last = new Map<string, FindingStatus>()
@@ -73,7 +76,7 @@ export function checkFindings(reportText: string, taskText: string): FindingsChe
   const fehlend = ids.filter(id => {
     const s = last.get(id)
     if (!s) return true
-    if (s.status === 'behoben') return false
+    if (s.status === 'behoben') return !FIXED_WITH_COMMIT.test(s.grund)
     if (s.status === 'verworfen') return s.grund === ''
     return true
   })

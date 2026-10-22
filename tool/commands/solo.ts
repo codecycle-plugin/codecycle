@@ -141,9 +141,9 @@ function soloFunde(f: Folder, ctx: Ctx): number {
   const stop = questions.length === r.fehlend.length ? 5 : 4
   const reached = raiseStop(f, stop)
   if (r.fehlend.length > 0) {
-    ctx.out(`rot: ${r.fehlend.length} von ${r.ids.length} Funden ohne Status in TASK.md, Abschnitt „Funde“: ${r.fehlend.join(', ')}`)
+    ctx.out(`rot: ${r.fehlend.length} von ${r.ids.length} Funden ohne gültigen Status in TASK.md, Abschnitt „Funde“: ${r.fehlend.join(', ')}`)
     if (stop === 5) ctx.out(`  offen als Frage an den Nutzer im Abschluss: ${questions.join(', ')} · haltepunkt ${reached}`)
-    else ctx.out(`  Je Fund eine Zeile: „- M1: behoben (…)“ oder „- M1: verworfen: <Grund>“ · haltepunkt ${reached}`)
+    else ctx.out(`  Je Fund eine Zeile: „- M1: behoben (<commit>)“ oder „- M1: verworfen: <Grund>“ · haltepunkt ${reached}`)
     return 1
   }
   ctx.out(`${r.ids.length === 0 ? 'grün: Bericht ohne Funde' : `grün: alle ${r.ids.length} Funde mit Status`}, haltepunkt ${reached}`)

@@ -96,7 +96,7 @@ describe('Solo-Weg im Mod', () => {
     fakeWorld(on, FILES)
     const branch: Record<string, string | null> = {
       [`codecycle/s:${SDIR}/STATE.md`]: soloState('abc1234'),
-      [`codecycle/s:${SDIR}/TASK.md`]: '# x\n\n## Funde\n- M1: behoben (abc)\n',
+      [`codecycle/s:${SDIR}/TASK.md`]: '# x\n\n## Funde\n- M1: behoben (abc1234)\n',
       [`codecycle/s:${SDIR}/reports/pruefung.md`]: null,
     }
     gitAnswers(on, args => {
@@ -109,7 +109,7 @@ describe('Solo-Weg im Mod', () => {
     expect((await bash('git switch main && git merge --no-ff codecycle/s')).deny).toMatch(/kein Merge ohne Prüfung/)
     branch[`codecycle/s:${SDIR}/reports/pruefung.md`] = '# Prüfung\n\n## M1 Grenze\n## M2 Text\n'
     expect((await bash('git merge codecycle/s')).deny).toMatch(/offenen Funden \(M2\)/)
-    branch[`codecycle/s:${SDIR}/TASK.md`] = '# x\n\n## Funde\n- M1: behoben (abc)\n- M2: verworfen: Wortlaut verlangt es nicht\n'
+    branch[`codecycle/s:${SDIR}/TASK.md`] = '# x\n\n## Funde\n- M1: behoben (abc1234)\n- M2: verworfen: Wortlaut verlangt es nicht\n'
     expect((await bash('git merge codecycle/s')).deny).toBeUndefined()
     // andere Branches und Aufgaben des vollen Ablaufs bleiben frei
     expect((await bash('git merge codecycle/t')).deny).toBeUndefined()
@@ -118,7 +118,7 @@ describe('Solo-Weg im Mod', () => {
     expect((await bash('git merge codecycle/s')).deny).toMatch(/pruefung-sicherheit\.md fehlt/)
     branch[`codecycle/s:${SDIR}/reports/pruefung-sicherheit.md`] = '# Sicherheit\n\n### Z1 Sperre\n'
     expect((await bash('git merge codecycle/s')).deny).toMatch(/offenen Funden \(Z1\)/)
-    branch[`codecycle/s:${SDIR}/TASK.md`] += '- Z1: behoben (def)\n'
+    branch[`codecycle/s:${SDIR}/TASK.md`] += '- Z1: behoben (def5678)\n'
     expect((await bash('git merge codecycle/s')).deny).toBeUndefined()
   })
 })
