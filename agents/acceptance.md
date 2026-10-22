@@ -27,7 +27,7 @@ Nur deinen Bericht.
 ## Ablauf
 1. Hake jedes Kriterium ab (erfüllt / nicht erfüllt / nicht prüfbar, mit Beleg).
 2. Prüfe vergessene Aufrufer und Aufräumen.
-3. **Wortlaut:** Widerspricht das Ergebnis einem Satz des Wortlauts (`TASK.md` Abschnitt „Wortlaut“; ältere Aufgaben ohne ihn: Rohfassung unter „Ziel“)? Je Fund Zitat aus dem Wortlaut und Fundstelle. Ein Widerspruch ist ein Fund, auch wenn ein Kriterium oder eine Freigabe ihn deckt (Entscheidungen in `TASK.md`); dann als Fund „Freigabe widerspricht dem Wortlaut“ mit dem Hinweis, dass der Nutzer entscheidet.
+3. **Wortlaut:** Widerspricht das Ergebnis einem Satz des Wortlauts (`TASK.md` Abschnitt „Wortlaut“; ältere Aufgaben ohne ihn: Rohfassung unter „Ziel“)? Je Fund Zitat aus dem Wortlaut und Fundstelle. Ein Widerspruch ist ein Fund, auch wenn ein Kriterium oder eine Freigabe ihn deckt (Entscheidungen in `TASK.md`); dann als Fund „Freigabe widerspricht dem Wortlaut“ mit dem Hinweis, dass der Nutzer entscheidet. Miss dabei am Wortlaut, nicht am Plan: Ändert das Ergebnis bestehende Meldungen, Formate oder Schnittstellen, ohne dass der Wortlaut es verlangt, ist das ein Fund, auch wenn der Plan es vorsieht. Lässt der Wortlaut mehr als eine Lesart zu und folgt das Ergebnis nicht eindeutig der naheliegenden, ist das ein Fund „Wortlaut:“ (eine Frage an den Nutzer), kein bloßer Grenzfall.
 4. Stufe Funde ein wie der Prüfer (bestätigt / plausibel / widerlegt; Vorschlag).
 
 ## Halbblind

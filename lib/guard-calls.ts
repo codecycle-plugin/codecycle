@@ -108,7 +108,7 @@ export function commitTestsOutsidePackageCall(command: string): boolean {
 
 /**
  * `codecycle paket start` und `paket fertig`: Worktree, `guard --record`, Merge in den Aufgaben-Branch und
- * `STATE.md`; ebenso `solo teil start|fertig` (Teil-Worktree, Merge). Nur der Bauleiter bzw. die Solo-Sitzung
+ * `STATE.md`; ebenso `solo teil start|fertig` (Teil-Worktree, Merge) sowie `solo plan` und `solo zwischenstand` (Teile in `STATE.md`). Nur der Bauleiter bzw. die Solo-Sitzung
  * (Hauptsitzung); `paket pruefen` prüft nur und bleibt frei.
  */
 export function packageBookkeepingCall(command: string): boolean {
@@ -117,6 +117,7 @@ export function packageBookkeepingCall(command: string): boolean {
     const pos = args.filter((a, i) => !a.startsWith('-') && !/^--(aufgabe|runden|test-commit)$/.test(args[i - 1] ?? ''))
     if (pos[0] === 'paket') return pos[1] === 'start' || pos[1] === 'fertig'
     // Solo-Weg: Teil-Worktree anlegen und übernehmen (Merge in den Aufgaben-Branch) wie paket start|fertig
+    if (pos[0] === 'solo' && (pos[1] === 'plan' || pos[1] === 'zwischenstand')) return true
     return pos[0] === 'solo' && pos[1] === 'teil' && (pos[2] === 'start' || pos[2] === 'fertig')
   }, ['paket', 'solo'])
 }

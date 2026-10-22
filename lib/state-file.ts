@@ -160,6 +160,8 @@ export function parseState(text: string, quelle: string): TaskState {
     weg: str(scalar(head.weg ?? '')) === 'solo' ? 'solo' : 'voll',
     geprueftAuf: str(scalar(head.geprueftAuf ?? '')),
     haltepunkt: num(scalar(head.haltepunkt ?? '0')),
+    zweitpruefung: str(scalar(head.zweitpruefung ?? '')),
+    teile: Object.entries(flowMap(head.teile ?? '{}')).map(([name, v]) => ({ name, status: str(v, 'offen') })),
     pakete,
     naechsterSchritt: sectionItems(sections['nächster schritt'] ?? []),
     offeneFragen: sectionItems(sections['offene fragen'] ?? []),

@@ -41,8 +41,8 @@ In einer Sitzung im Zielprojekt:
 
 **Welcher Weg?**
 
-- **Solo-Weg** (`/codecycle:solo`) für kleine und mittlere Aufgaben: Die Sitzung baut selbst, ein frischer Prüfer prüft das Ergebnis gegen den Wortlaut der Aufgabe und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage. Verlangt die Aufgabe etwas schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen), fragt der Solo-Weg vorher, ob der volle Ablauf besser passt. <!-- doku-ok -->
-- **Voller Ablauf** (`/codecycle:new`) für große oder riskante Aufgaben: Ein Bauleiter verteilt Erkunden, Planen, Tests, Bauen und Prüfen auf eigene Agenten, je Paket in einem eigenen Worktree. Gründlicher, aber ein Vielfaches an Verbrauch.
+- **Solo-Weg** (`/codecycle:solo`) für fast alle Aufgaben, auch große und solche mit Risikobereichen: Die Sitzung baut selbst, ein frischer Prüfer prüft das Ergebnis gegen den Wortlaut der Aufgabe und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage. Große Aufgaben bekommen einen Plan in Teilen mit einem Haltepunkt je Teil; ab zwei berührten Risikobereichen prüft ein zweiter Prüfer nur die Sicherheit. Weicht die Sitzung bewusst vom Wortlaut ab, fragt sie dich im Abschluss. Verlangt die Aufgabe etwas schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen), fragt der Solo-Weg vorher, ob der volle Ablauf besser passt. <!-- doku-ok -->
+- **Voller Ablauf** (`/codecycle:new`) für schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen): Ein Bauleiter verteilt Erkunden, Planen, Tests, Bauen und Prüfen auf eigene Agenten, je Paket in einem eigenen Worktree. Gründlicher, aber ein Vielfaches an Verbrauch.
 - `/codecycle:new` schlägt den passenden Weg zuerst vor (eine Frage mit Empfehlung) und wechselt auf Wunsch in den Solo-Weg.
 - Beide Wege legen einen Aufgabenordner mit Auftrag und Stand an; nach `/clear` setzt `/codecycle:continue` fort.
 
@@ -62,7 +62,7 @@ Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `in
 |---|---|
 | `/codecycle:setup` | Projekt einrichten: `.claude/codecycle.md`, Doku-Aufbau, Werkzeug-Kopie (`install-tool`), Hooks (`hooks install`), Graph-Anbieter, Ablage, Profil |
 | `/codecycle:new <Beschreibung>` | neue Aufgabe: Klären, Planen, Umsetzen, Prüfen, Abnahme, Abschluss |
-| `/codecycle:solo <Beschreibung>` | Solo-Weg: die Sitzung baut selbst, ein frischer Prüfer (Opus) prüft gegen den Wortlaut und probiert aus, berührte Risikobereiche zusätzlich auf Sicherheit, eine Runde Nachbesserung, Merge-Frage; ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfbericht und Status je Fund kein Merge |
+| `/codecycle:solo <Beschreibung>` | Solo-Weg: die Sitzung baut selbst, ein frischer Prüfer (Opus) prüft gegen den Wortlaut und probiert aus, berührte Risikobereiche zusätzlich auf Sicherheit (ab zwei ein zweiter Prüfer nur dafür), große Aufgaben in Teilen mit Haltepunkt je Teil, eine Runde Nachbesserung, Merge-Frage; ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfberichte und Status je Fund kein Merge |
 | `/codecycle:continue [Ordner]` | Aufgabe fortsetzen; Git ist die Wahrheit, fragt zuerst nach ausstehenden Merges, schlägt die zuletzt bearbeitete vor |
 | `/codecycle:status` | Übersicht aller Aufgaben mit Git-Abgleich; fragt zuerst nach ausstehenden Merges |
 | `/codecycle:ideas [Stichwort]` | Brainstorming ohne Code, Ergebnis ist ein Auftrags-Entwurf |

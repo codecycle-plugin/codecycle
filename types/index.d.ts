@@ -49,6 +49,10 @@ export type TaskState = {
   geprueftAuf?: string
   /** Solo-Weg: Haltepunkt 1–6, an dem die Aufgabe steht; 0 = nicht gesetzt */
   haltepunkt?: number
+  /** Solo-Weg, große Aufgabe: Teile aus dem Plan mit Status (`offen` | `fertig`), in der Reihenfolge des Plans; leer = ohne Teile */
+  teile?: { name: string; status: string }[]
+  /** Solo-Weg: `sicherheit`, wenn `codecycle solo check` mindestens zwei Risikobereiche fand (zweiter Prüfer Pflicht); sonst leer oder `nein` */
+  zweitpruefung?: string
   pakete: Package[]
   naechsterSchritt: string[]
   offeneFragen: string[]

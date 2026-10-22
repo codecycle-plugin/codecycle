@@ -52,6 +52,11 @@ describe('Solo-Weg im Mod', () => {
     expect(ok.deny).toBeUndefined()
     expect(ok.model).toBe('opus')
     expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/pruefung\.md/)
+    // zweiter Prüfer: Startnachricht mit „Auftrag: Sicherheit“ → eigener Bericht, gleiche Startsperre, gleiches Modell
+    const sec = await spawn($, `Aufgabenordner: ${SDIR}/\nAuftrag: Sicherheit\nRisikobereiche: …`, 'codecycle:solo-reviewer')
+    expect(sec.deny).toBeUndefined()
+    expect(sec.model).toBe('opus')
+    expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/pruefung-sicherheit\.md/)
   })
 
   test('Schreiben in der Solo-Aufgabe: Handwerker ja, andere Rollen nein, Prüfer nur Bericht, fremde Agenten nur lesen', async ($, on) => {
@@ -108,5 +113,12 @@ describe('Solo-Weg im Mod', () => {
     expect((await bash('git merge codecycle/s')).deny).toBeUndefined()
     // andere Branches und Aufgaben des vollen Ablaufs bleiben frei
     expect((await bash('git merge codecycle/t')).deny).toBeUndefined()
+    // ab zwei Risikobereichen (zweitpruefung: sicherheit): auch der Bericht des zweiten Prüfers und seine Funde
+    branch[`codecycle/s:${SDIR}/STATE.md`] = soloState('abc1234').replace('haltepunkt: 3', 'haltepunkt: 5\nzweitpruefung: sicherheit')
+    expect((await bash('git merge codecycle/s')).deny).toMatch(/pruefung-sicherheit\.md fehlt/)
+    branch[`codecycle/s:${SDIR}/reports/pruefung-sicherheit.md`] = '# Sicherheit\n\n### Z1 Sperre\n'
+    expect((await bash('git merge codecycle/s')).deny).toMatch(/offenen Funden \(Z1\)/)
+    branch[`codecycle/s:${SDIR}/TASK.md`] += '- Z1: behoben (def)\n'
+    expect((await bash('git merge codecycle/s')).deny).toBeUndefined()
   })
 })

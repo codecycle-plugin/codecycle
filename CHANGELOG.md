@@ -2,6 +2,22 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.0 / Werkzeug 0.8.0] – 2026-10-22
+
+### Neu
+
+- Solo-Weg für große Aufgaben: Statt des Kurzplans schreibt die Sitzung einen Plan in Teilen (je Teil Dateien, Schnittstelle, Prüfweg). `codecycle solo plan <ordner> <teil> …` hält die Teile in `STATE.md` fest, `codecycle solo zwischenstand <ordner> <teil>` setzt nach einem fertigen Teil einen Zwischen-Haltepunkt (Check grün, alles committet). Dort darf die Sitzung wechseln; `/codecycle:continue` setzt beim nächsten offenen Teil fort, `codecycle tasks` zeigt den Stand der Teile. Getrennte Bereiche mit fester Schnittstelle baut die Sitzung in der Regel gleichzeitig mit `codecycle solo teil`.
+- Zweiter Prüfer im Solo-Weg: Berührt die Änderung mindestens zwei Risikobereiche, prüft nach dem ersten Prüfer ein zweiter Lauf nur die Sicherheit dieser Bereiche (Startnachricht mit `Auftrag: Sicherheit`, Bericht `reports/pruefung-sicherheit.md`, Funde `Z1` …). Der Merge braucht dann beide Berichte und einen Status je Fund.
+
+### Geändert
+
+- `/codecycle:new` schlägt den vollen Ablauf nur noch bei schwer Rückgängigem vor (Datenmigration, Löschen, Veröffentlichen, Zahlungen); große Aufgaben und mehrere Risikobereiche gehen in den Solo-Weg. <!-- doku-ok -->
+- Der Wortlaut der Aufgabe ist Maßstab, keine unfehlbare Vorschrift: Deine Antwort gilt vor dem Wortlaut, der Wortlaut vor dem Plan. Weicht die Sitzung bewusst ab, auch mit einer besseren Idee, steht das als Annahme mit Grund in `TASK.md` und kommt im Abschluss als Frage zu dir.
+- Bestehende Meldungen, Formate, Schnittstellen und Seiten bleiben wörtlich gleich, außer die Aufgabe verlangt eine Änderung; sonst wird die Änderung eine Frage. Das gilt im Solo-Weg und im vollen Ablauf (Architekt, Plan-Prüfer, Abschlussprüfung, Abnahme messen am Wortlaut, nicht am Plan).
+- Lässt der Wortlaut mehr als eine Lesart zu und folgt das Ergebnis nicht eindeutig der naheliegenden, melden Plan-Prüfer, Abschlussprüfung und Abnahme das als Frage an dich und nicht nur als Grenzfall.
+- Solo-Prüfer und Randfall-Liste prüfen zusätzlich: Änderungen am Bestand, Aufrufe, die Server oder Oberfläche blockieren, und ob README, Changelog und betroffene `CLAUDE.md` zur Änderung passen.
+- Solo-Weg: Doku wird vor der eigenen Kontrolle nachgezogen, damit der Prüfer sie sieht, auch wenn die Aufgabe sie nicht erwähnt. Speichert der Server nach der Änderung Daten, obwohl `serverTemp` auf „ohne Daten“ steht, schlägt die Sitzung eine Variable für Wegwerf-Daten vor.
+
 ## [0.21.0 / Werkzeug 0.7.6] – 2026-10-22
 
 ### Geändert

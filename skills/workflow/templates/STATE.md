@@ -4,7 +4,7 @@ art: feature            # feature | bugfix | refactoring | routine | review
 groesse: mittel         # klein | mittel | gross
 zustand: erfasst        # erfasst | geklaert | geplant | in-arbeit | geprueft | fertig | verworfen | blockiert
 branch: codecycle/<thema>
-weg: voll               # voll | solo; nur solo: haltepunkt (1–6), geprueftAuf (schreibt codecycle solo check)
+weg: voll               # voll | solo; nur solo: haltepunkt (1–6), geprueftAuf und zweitpruefung (schreibt codecycle solo check), teile (schreibt codecycle solo plan)
 budget: { geplant: 0, verbraucht: 0, nachlauf: 0 }
 planrunden: 0           # Planänderungen mit erneuter Prüfung, Grenze 2
 zuletzt: <JJJJ-MM-TT>

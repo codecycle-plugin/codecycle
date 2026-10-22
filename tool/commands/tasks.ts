@@ -89,8 +89,13 @@ export function tasks(_args: string[], ctx: Ctx): number {
     }
     // Solo-Weg: kein Paket, sondern der Haltepunkt (1–6)
     if (s.weg === 'solo') {
+      const teile = s.teile ?? []
+      const done = teile.filter(p => p.status === 'fertig').length
+      const open = teile.find(p => p.status !== 'fertig')
+      // große Aufgabe: Zwischen-Haltepunkt 2.n nach jedem fertigen Teil
+      const parts = teile.length > 0 ? ` · Teile ${done}/${teile.length}${open ? ` (jetzt ${open.name})` : ''}` : ''
       const halt = s.haltepunkt ? `Haltepunkt ${s.haltepunkt}${SOLO_STOPS[s.haltepunkt] ? ` (${SOLO_STOPS[s.haltepunkt]})` : ''}` : 'Haltepunkt ?'
-      ctx.out(`${s.aufgabe} · ${s.zustand} · solo · ${halt}${s.geprueftAuf ? ` · geprüft auf ${s.geprueftAuf.slice(0, 7)}` : ''} · zuletzt ${s.zuletzt}`)
+      ctx.out(`${s.aufgabe} · ${s.zustand} · solo · ${halt}${parts}${s.geprueftAuf ? ` · geprüft auf ${s.geprueftAuf.slice(0, 7)}` : ''} · zuletzt ${s.zuletzt}`)
       if (s.naechsterSchritt[0]) ctx.out(`  nächster Schritt: ${s.naechsterSchritt[0]}`)
       for (const hint of gitHints(root, s, main, today)) ctx.out(`  ! ${hint}`)
       for (const hint of agentHints(root, `${TASKS_DIR}/${row.folder}`, s, today)) ctx.out(`  ! ${hint}`)

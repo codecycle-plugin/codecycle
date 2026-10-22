@@ -4,6 +4,22 @@
 /** Bericht des Prüfers im Aufgabenordner */
 export const SOLO_REPORT = 'reports/pruefung.md'
 
+/** Bericht des zweiten Prüfers (Startnachricht `Auftrag: Sicherheit`); Funde `Z1`, `Z2` … */
+export const SOLO_SECURITY_REPORT = 'reports/pruefung-sicherheit.md'
+
+/** Wert von `zweitpruefung` in STATE.md, wenn `codecycle solo check` mindestens zwei Risikobereiche fand */
+export const SECOND_REVIEW = 'sicherheit'
+
+/** Berichtsname des Solo-Prüfers nach seiner Startnachricht */
+export function soloReportFor(prompt: string): string {
+  return /^\s*Auftrag:\s*Sicherheit\b/im.test(prompt) ? SOLO_SECURITY_REPORT : SOLO_REPORT
+}
+
+/** Berichte, die vor dem Merge da sein müssen: immer der Prüfbericht, mit `zweitpruefung: sicherheit` auch der zweite. */
+export function requiredReports(state: { zweitpruefung?: string | undefined }): string[] {
+  return state.zweitpruefung === SECOND_REVIEW ? [SOLO_REPORT, SOLO_SECURITY_REPORT] : [SOLO_REPORT]
+}
+
 export type FindingStatus = { id: string; status: 'behoben' | 'verworfen' | 'offen'; grund: string }
 
 export type FindingsCheck = {
@@ -13,9 +29,9 @@ export type FindingsCheck = {
   fehlend: string[]
 }
 
-const ID_AT_START = /^\s*(?:#{1,6}\s*|[-*]\s+|\d+\.\s+)?(?:\*\*|__)?\s*(M\d+)\b/
+const ID_AT_START = /^\s*(?:#{1,6}\s*|[-*]\s+|\d+\.\s+)?(?:\*\*|__)?\s*([MZ]\d+)\b/
 
-/** Fund-IDs (`M1`, `M2` …) am Anfang einer Überschrift, eines Listenpunkts oder einer Zeile; jede nur einmal. */
+/** Fund-IDs (`M1`, `M2` …; zweiter Prüfer `Z1` …) am Anfang einer Überschrift, eines Listenpunkts oder einer Zeile; jede nur einmal. */
 export function reportFindingIds(text: string): string[] {
   const ids: string[] = []
   let fence = false
@@ -42,7 +58,7 @@ export function findingStatuses(taskText: string): FindingStatus[] {
       continue
     }
     if (!inside) continue
-    const m = line.match(/^\s*[-*]\s+(?:\*\*|__)?(M\d+)(?:\*\*|__)?\s*[:–-]?\s*(behoben|verworfen|offen)\b\s*[:–-]?\s*(.*)$/i)
+    const m = line.match(/^\s*[-*]\s+(?:\*\*|__)?([MZ]\d+)(?:\*\*|__)?\s*[:–-]?\s*(behoben|verworfen|offen)\b\s*[:–-]?\s*(.*)$/i)
     if (!m) continue
     out.push({ id: m[1]!, status: m[2]!.toLowerCase() as FindingStatus['status'], grund: m[3]!.trim() })
   }

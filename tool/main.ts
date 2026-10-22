@@ -82,7 +82,7 @@ const HELP = [
   '  paket pruefen P<n>          guard gegen den Aufgaben-Branch, Tests des Test-Autors aus commit-tests',
   '  paket fertig P<n>           nach grünem pruefen: Merge in den Aufgaben-Branch, Worktree weg, Paket fertig (--runden <n>)',
   '  solo check <ordner>         Solo-Weg vor dem Prüfer: check grün, alles committet; nennt berührte Risikobereiche für den Prüfauftrag',
-  '  solo funde <ordner>         Solo-Weg vor dem Merge: jeder Fund aus reports/pruefung.md mit Status in TASK.md',
+  '  solo funde <ordner>         Solo-Weg vor dem Merge: jeder Fund aus reports/pruefung.md (und pruefung-sicherheit.md) mit Status in TASK.md',
   '  effort <ordner> [--set k=v] [--drop rolle] [--keep rolle] [--record]   Rollen-Set und Läufe aus Merkmalen (aufwand.json)',
   '  package-info "Datei :: Symbol" …   JSON für das Kontextpaket: Graph-Treffer, Signaturen',
   '  plan-html <aufgabenordner>  schreibt plan.html (Pakete, Kriterien, Budget) in den Aufgabenordner',

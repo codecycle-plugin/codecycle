@@ -145,7 +145,7 @@ import { TOOL_VERSION } from '../tool/version.ts'
 import type { Signatur } from '../lib/signatures.ts'
 import { bookWritable, parseState as parseTaskState } from '../lib/state-file.ts'
 import { parseTask, type Task } from '../lib/task-file.ts'
-import { SOLO_REPORT } from '../lib/solo-findings.ts'
+import { requiredReports, soloReportFor } from '../lib/solo-findings.ts'
 import {
   type Effort,
   type Switches,
@@ -1004,8 +1004,8 @@ async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; pa
   const root = await rootOf($)
   let bericht: string | undefined
   if (root) {
-    // Solo-Prüfer: fester Name, den Merge-Sperre und `codecycle solo funde` lesen
-    const named = role === SOLO_REVIEWER ? SOLO_REPORT : parsed.bericht
+    // Solo-Prüfer: fester Name, den Merge-Sperre und `codecycle solo funde` lesen (`Auftrag: Sicherheit`: zweiter Bericht)
+    const named = role === SOLO_REVIEWER ? soloReportFor(e.prompt) : parsed.bericht
     bericht = reportPath({ root, dir, paket: paketId, rolle: role, ...(named ? { bericht: named } : {}) })
     // Pflicht ausdrücklich, weil allgemeine Vorgaben der Umgebung von Berichts-Dateien abraten
     text = appendNote(text, reportNote(bericht))
@@ -2692,7 +2692,8 @@ async function denySoloMerge($: EngineInterface, e: ToolEvt, next: ToolNxt) {
           continue
         }
         if (state.weg !== 'solo' || state.branch !== branch) continue
-        const problem = soloMergeProblem(dir, await show(`${branch}:${dir}/${SOLO_REPORT}`), await show(`${branch}:${dir}/TASK.md`))
+        const reports = await Promise.all(requiredReports(state).map(async path => ({ path, text: await show(`${branch}:${dir}/${path}`) })))
+        const problem = soloMergeProblem(dir, reports, await show(`${branch}:${dir}/TASK.md`))
         if (problem) return { deny: problem }
       }
     }

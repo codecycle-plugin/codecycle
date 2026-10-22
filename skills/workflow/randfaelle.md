@@ -7,6 +7,7 @@ Gilt beim Klären (voller Ablauf) und im Kurzplan (Solo-Weg). Ziel: Sonderfälle
 - **Grenzen:** Jede Grenze im Wortlaut („ab“, „bis“, „höchstens“, „nur wenn“) und jede Bedingung an den Fundstellen im Code (`if`, Schwellen, Konstanten, Fallunterscheidungen): genau auf der Grenze, knapp darunter, knapp darüber.
 - **Umwandlungen:** Jede Umwandlung (Einheit, Format, Typ, Sprache, Zeitzone): Was geht dabei verloren (Runden auf 0, Runden über eine Grenze, Reihenfolge von Runden und Wechsel)? Gilt sie in beide Richtungen?
 - **Zustände:** Jeder Zustand, den die Aufgabe anfasst (Datei, Datensatz, Sitzung, Auftrag): gibt es nicht, leer, schon vorhanden.
+- **Bestand:** Bestehende Meldungen, Formate, Schnittstellen und Seiten, die die Aufgabe berührt, bleiben wörtlich gleich. Jede Änderung daran, die der Wortlaut nicht ausdrücklich verlangt, ist eine Abweichung und kommt als Frage zum Nutzer.
 
 ## Stufe 2: Liste nach Bereichen (nur was zur Aufgabe passt)
 
@@ -15,7 +16,7 @@ Gilt beim Klären (voller Ablauf) und im Kurzplan (Solo-Weg). Ziel: Sonderfälle
 | Zahlen und Mengen | Schwellen; Runden auf 0 oder über eine Grenze; negativ; sehr groß |
 | Text und Eingaben | leer, nur Leerzeichen; sehr lang; Schreibweisen; Sonderzeichen, Umlaute, Emoji; Zeilenenden; ungültig: melden, übergehen oder unverändert lassen? |
 | Zeit und Datum | Monatsende, Schaltjahr, Jahreswechsel; Zeitzone, Sommerzeit; kurz nach Mitternacht; Datum in der Vergangenheit |
-| Abläufe und Zustand | doppelt ausgelöst; Abbruch mittendrin; zwei gleichzeitig; Wiederholung nach einem Fehler; falsche Reihenfolge |
+| Abläufe und Zustand | doppelt ausgelöst; Abbruch mittendrin; zwei gleichzeitig; Wiederholung nach einem Fehler; falsche Reihenfolge; ein Aufruf blockiert Server oder Oberfläche (synchrone Krypto, große Datei, lange Schleife) |
 | Zugriff und Daten | nicht angemeldet; fremde Daten; keine Rechte; alte Daten aus einer früheren Version |
 | Umgebung | Datei oder Ordner fehlt; Netz weg; anderes Betriebssystem (Pfade, Zeilenenden); leere oder alte Konfiguration |
 | Oberfläche | schmale Breite, lange Wörter; nur Tastatur; sehr viele Einträge; leere Liste |

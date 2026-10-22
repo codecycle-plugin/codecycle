@@ -3,7 +3,7 @@
 // Ein Netz gegen Versehen, keine Sicherheitsgrenze (wie der Zaun).
 
 import { commandName, positionals, walkSegments } from '../../lib/bash-shell.ts'
-import { SOLO_REPORT, checkFindings } from '../../lib/solo-findings.ts'
+import { SOLO_REPORT, SOLO_SECURITY_REPORT, checkFindings } from '../../lib/solo-findings.ts'
 import { samePath } from './ledger-registry.ts'
 import { isWriteTool, writeTargetsOf, type ToolCall } from './fence.ts'
 
@@ -80,12 +80,16 @@ export function mergedBranches(command: string): string[] {
 }
 
 /**
- * Merge-Sperre (Haltepunkte „Prüfung“ und „Nachbesserung“): Bericht und TASK.md aus dem Stand des Aufgaben-Branchs;
- * null = Bericht fehlt bzw. nicht committet. Rückgabe: Meldung, sonst null.
+ * Merge-Sperre (Haltepunkte „Prüfung“ und „Nachbesserung“): die nötigen Berichte (`requiredReports`) und TASK.md aus dem
+ * Stand des Aufgaben-Branchs; Text null = Bericht fehlt bzw. nicht committet. Rückgabe: Meldung, sonst null.
  */
-export function soloMergeProblem(dir: string, report: string | null, task: string | null): string | null {
-  if (report === null) return `codecycle: kein Merge ohne Prüfung. ${dir}/${SOLO_REPORT} fehlt im Aufgaben-Branch: Prüfer (${SOLO_REVIEWER}) starten, Bericht committen.`
-  const r = checkFindings(report, task ?? '')
+export function soloMergeProblem(dir: string, reports: readonly { path: string; text: string | null }[], task: string | null): string | null {
+  const missing = reports.filter(r => r.text === null).map(r => r.path)
+  if (missing.length > 0) {
+    const second = missing.includes(SOLO_SECURITY_REPORT) ? ' (zweiter Prüfer mit „Auftrag: Sicherheit“)' : ''
+    return `codecycle: kein Merge ohne Prüfung. ${missing.map(p => `${dir}/${p}`).join(', ')} fehlt im Aufgaben-Branch: Prüfer (${SOLO_REVIEWER})${second} starten, Bericht committen.`
+  }
+  const r = checkFindings(reports.map(x => x.text).join('\n'), task ?? '')
   if (r.fehlend.length > 0) {
     return `codecycle: kein Merge mit offenen Funden (${r.fehlend.join(', ')}). In TASK.md, Abschnitt „Funde“, je Fund „behoben“ oder „verworfen: <Grund>“ eintragen, committen; prüfen mit \`codecycle solo funde ${dir}\`.`
   }

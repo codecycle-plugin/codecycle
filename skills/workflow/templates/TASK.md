@@ -51,5 +51,5 @@ Nach der Freigabe nur hier ergänzen (Datum, was, warum).
 - keine
 
 ## Funde
-<Nur Solo-Weg: je Fund aus `reports/pruefung.md` eine Zeile `- M1: behoben (<commit>)`, `- M2: verworfen: <Grund>` oder `- M3: offen: Frage an den Nutzer`.>
+<Nur Solo-Weg: je Fund aus `reports/pruefung.md` (und `reports/pruefung-sicherheit.md`, Funde `Z1` …) eine Zeile `- M1: behoben (<commit>)`, `- M2: verworfen: <Grund>` oder `- M3: offen: Frage an den Nutzer`.>
 - keine

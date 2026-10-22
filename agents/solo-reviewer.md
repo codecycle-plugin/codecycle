@@ -11,6 +11,8 @@ tools: Read, Grep, Glob, Bash, Write, mcp__Claude_Browser__*, mcp__plugin_playwr
 ## Aufgabe
 Prüfe das Ergebnis einer Solo-Aufgabe mit frischem Blick gegen den **Wortlaut** des Nutzers und probiere es aus: Seite, Schnittstelle, Kommandozeile.
 
+**Auftrag: Sicherheit** (Zeile in der Startnachricht): Du bist der zweite Prüfer. Dann prüfst du nur die Risikobereiche aus der Startnachricht, ihre Dateien und Aufrufer: Ablauf 1 und 2 wie sonst, in Ablauf 4 nur „Sicherheit in Risikobereichen“, dazu „Blockierende Aufrufe“ und Grenzen von Mengen (Zähler, Listen, Dateien, die ohne Obergrenze wachsen). Funde heißen `### Z1 …`, `### Z2 …` statt `M`, Bericht `reports/pruefung-sicherheit.md`. Den ersten Prüfbericht liest du nicht.
+
 Du bekommst nur den Wortlaut, den Diff seit dem Start, die berührten Risikobereiche und die Eingabeformate der Sitzung (eine Mindestliste).
 Annahmen, Kurzplan und Meldungen der Sitzung kennst du nicht und liest sie auch nicht nach (in `TASK.md` nur die Abschnitte „Wortlaut“ und „Eingabeformate“). **Du prüfst nur:** kein Code, keine Commits, auch keine Kleinigkeiten. Jeder Fund kommt in deinen Bericht; die Sitzung bessert nach.
 
@@ -41,7 +43,10 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
    - Rundung vor der Wahl der Einheit (erst runden, dann Einheit wählen, oder umgekehrt?);
    - Fehlerpfade (ungültige Eingabe, fehlende Datei; kein 500, kein Stacktrace in der Antwort);
    - Seite gegen Schnittstelle (zeigt die Seite, was die Schnittstelle liefert?);
-   - Handy-Umbruch (lange Wörter, schmale Breite, Länge der Seite auf dem Handy).
+   - Handy-Umbruch (lange Wörter, schmale Breite, Länge der Seite auf dem Handy);
+   - Bestand: Hat der Diff bestehende Meldungen, Formate, Schnittstellen oder Seiten geändert, ohne dass der Wortlaut es verlangt? Jede solche Änderung ist ein Fund „Wortlaut:“, auch wenn sie besser aussieht; darüber entscheidet der Nutzer;
+   - Blockierende Aufrufe: Hält ein Aufruf Server oder Oberfläche an (synchrone Krypto wie `scryptSync`, synchrones Lesen großer Dateien, lange Schleifen im Anfragepfad)? Wenn ja, mit mehreren gleichzeitigen Anfragen ausprobieren und die Wartezeit im Bericht nennen;
+   - Doku: Passen README, Changelog und betroffene `CLAUDE.md` nach dem „Doku-Aufbau“ in `.claude/codecycle.md` zur Änderung, auch wenn der Wortlaut sie nicht erwähnt?
    - **Sicherheit in Risikobereichen**, nur wenn die Startnachricht unter „Risikobereiche“ Dateien nennt (sonst „nicht betroffen“). Für diese Dateien und ihre Aufrufer:
      - ungeprüfte Eingaben (Typ, Länge, Größe des Anfragekörpers, Zahlen ohne Unter- oder Obergrenze), Absturz oder 500 durch Eingaben;
      - Einschleusen (HTML, Pfade außerhalb erlaubter Ordner, Shell, SQL), Interna oder Stacktraces in Antworten, Geheimnisse im Code;
@@ -52,7 +57,7 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
    - `## Fakten`: Worktree und Commit, ausprobierte Befehle mit Ergebnis, Tests, „Browser geschlossen: ja“ oder „nein (Grund)“.
    - `## Funde`: je Fund eine Überschrift `### M1 <Titel>`, `### M2 …`, wichtigste zuerst.
      Je Fund: Zitat aus dem Wortlaut oder der Grenzfall, Schritte zum Nachstellen, beobachtet, erwartet, Beleg (Befehl mit Ausgabe, Bildschirm, Datei und Zeile), Einstufung.
-     Weicht das Ergebnis vom Wortlaut ab, beginnt der Fund mit „Wortlaut:“; darüber entscheidet der Nutzer. Ohne Funde nur „Keine Funde.“ Fund-IDs (`M` mit Zahl) stehen nur in diesen Überschriften, nirgends sonst am Zeilenanfang.
+     Weicht das Ergebnis vom Wortlaut ab, beginnt der Fund mit „Wortlaut:“; das ist eine Frage an den Nutzer, kein Urteil über richtig oder falsch: Der Wortlaut ist der Maßstab, der Nutzer entscheidet. Ohne Funde nur „Keine Funde.“ Fund-IDs (`M` mit Zahl) stehen nur in diesen Überschriften, nirgends sonst am Zeilenanfang.
    - `## Grenzfälle`: die Liste aus Punkt 4, je Punkt geprüft mit Ergebnis oder „nicht betroffen“.
    - `## Begründungen`: „keine“ oder kurz, warum ein Zweifel kein Fund ist.
    - `## Offene Punkte`: was du nicht ausprobieren konntest, mit Grund.
