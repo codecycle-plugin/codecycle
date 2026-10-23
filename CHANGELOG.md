@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.2 / Werkzeug 0.8.1] – 2026-10-23
+
+### Geändert
+
+- Solo-Prüfer: schreibt drei bis fünf stille Annahmen des Diffs auf und versucht jede mit einem echten Aufruf zu brechen. Einen Verdacht verwirft er nur, wenn ein Versuch genau den beobachteten Fall nachstellt; hält er ein Verhalten für gewollt, nennt er die Stelle im Wortlaut, sonst wird es ein Fund „Wortlaut:“.
+
 ## [0.22.1 / Werkzeug 0.8.1] – 2026-10-22
 
 ### Behoben

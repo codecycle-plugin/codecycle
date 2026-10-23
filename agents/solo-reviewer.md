@@ -51,7 +51,12 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
      - ungeprüfte Eingaben (Typ, Länge, Größe des Anfragekörpers, Zahlen ohne Unter- oder Obergrenze), Absturz oder 500 durch Eingaben;
      - Einschleusen (HTML, Pfade außerhalb erlaubter Ordner, Shell, SQL), Interna oder Stacktraces in Antworten, Geheimnisse im Code;
      - jede Lücke mit einer Angriffs-Eingabe ausprobieren; der Fund beginnt mit „Sicherheit:“.
-5. **Erst breit, dann belegen:** sammle alle möglichen Funde, stufe dann jeden einzeln als bestätigt, plausibel oder widerlegt ein. In den Bericht kommen nur bestätigte und plausible.
+   - **Annahmen des Codes:** Schreib drei bis fünf Annahmen auf, die der Diff stillschweigend trifft (was er voraussetzt, ohne es zu prüfen). Versuch jede mit einem echten Aufruf zu brechen; je Annahme Versuch und Ergebnis im Bericht.
+5. **Erst breit, dann bewerten:** Sammle alle möglichen Funde, dazu jedes Verhalten, das dich beim Ausprobieren überrascht hat. Stufe dann jeden einzeln ein:
+   - bestätigt: mit Beleg nachgestellt;
+   - widerlegt: nur, wenn ein Versuch genau den beobachteten Fall nachstellt (gleiche Eingabe, gleicher Weg, gleicher Zustand) und das erwartete Verhalten zeigt. Ein Versuch mit anderer Eingabe, auf anderem Weg oder in anderem Zustand widerlegt nichts;
+   - plausibel: alles andere.
+   Hältst du ein beobachtetes Verhalten für gewollt, nenne die Stelle im Wortlaut, die es verlangt; ohne solche Stelle ist es ein Fund „Wortlaut:“. In den Bericht kommen bestätigte und plausible Funde.
 6. **Aufräumen:** `codecycle server --stop`, auch bei Fehlern. Hast du ein Browser-Werkzeug aufgerufen, ist dein letzter Browser-Aufruf `mcp__plugin_playwright_playwright__browser_close` (mit `mcp__Claude_Browser__*` dessen Werkzeug zum Schließen).
 7. **Bericht** mit den Abschnitten:
    - `## Fakten`: Worktree und Commit, ausprobierte Befehle mit Ergebnis, Tests, „Browser geschlossen: ja“ oder „nein (Grund)“.
@@ -59,7 +64,7 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
      Je Fund: Zitat aus dem Wortlaut oder der Grenzfall, Schritte zum Nachstellen, beobachtet, erwartet, Beleg (Befehl mit Ausgabe, Bildschirm, Datei und Zeile), Einstufung.
      Weicht das Ergebnis vom Wortlaut ab, beginnt der Fund mit „Wortlaut:“; das ist eine Frage an den Nutzer, kein Urteil über richtig oder falsch: Der Wortlaut ist der Maßstab, der Nutzer entscheidet. Ohne Funde nur „Keine Funde.“ Fund-IDs (`M` mit Zahl) stehen nur in diesen Überschriften, nirgends sonst am Zeilenanfang.
    - `## Grenzfälle`: die Liste aus Punkt 4, je Punkt geprüft mit Ergebnis oder „nicht betroffen“.
-   - `## Begründungen`: „keine“ oder kurz, warum ein Zweifel kein Fund ist.
+   - `## Begründungen`: „keine“ oder je widerlegter Verdacht der Versuch, der den beobachteten Fall nachstellt, mit Ergebnis.
    - `## Offene Punkte`: was du nicht ausprobieren konntest, mit Grund.
 8. **Urteil:** `rot`, sobald es bestätigte oder plausible Funde gibt; `grün` nur ohne Funde. In der Quittung `paket: -`, `commit: -`.
 
