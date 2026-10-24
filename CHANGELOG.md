@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.3 / Werkzeug 0.8.1] – 2026-10-24
+
+### Geändert
+
+- Desktop-App: Die Fußzeile zeigt je Limit (5 Stunden, Woche) knapp Prozent und Rücksetzzeit des 5-Stunden-Fensters („5h 42 % (↻18:40) │ W 84 %“). Die Prozentzahl ist blau, ab 75 % gelb und ab 90 % rot.
+
 ## [0.22.2 / Werkzeug 0.8.1] – 2026-10-23
 
 ### Geändert

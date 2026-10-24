@@ -6,7 +6,7 @@
 import type { ElementTable, RenderChildren } from 'claude-code'
 
 import type { Limits, PackageStatus } from '../types'
-import { deskFooterText } from './lib/desk-parts.ts'
+import { deskFooterParts, deskLimitColor } from './lib/desk-parts.ts'
 import type { ShownLimits } from './state'
 
 /** Fläche (Hinweise, Etiketten, Profil-Umschalter): in hell und dunkel dezent */
@@ -87,17 +87,29 @@ export function deskChip(ui: ElementTable, key: string, text: string, color?: st
   )
 }
 
-/** Fußzeile (Render-Platz `SessionMode`) in der Desktop-App (Text aus lib/desk-parts.ts :: deskFooterText); die Angaben der Engine bleiben rechts daneben */
+/**
+ * Fußzeile (Render-Platz `SessionMode`) in der Desktop-App: nur Text, „5h 42 % (↻18:40) │ W 84 %“; der Platz fasst rund
+ * 25 Zeichen, Flächen und Balken zeichnet die App dort nicht. Prozent in der Farbe nach Stand (lib/desk-parts.ts ::
+ * deskLimitColor), Rest gedimmt; die Angaben der Engine bleiben rechts daneben
+ */
 export function renderFooterDesk(ui: ElementTable, lim: Limits, alt: ShownLimits | undefined, theirs: RenderChildren) {
   const { Box, Text } = ui
-  const text = deskFooterText(lim, alt)
+  const parts = deskFooterParts(lim, alt)
+  const items: RenderChildren[] = []
+  parts.forEach((p, i) => {
+    if (i > 0) items.push(<Text key={`fuss-trenner-${i}`} dimColor>│</Text>)
+    items.push(
+      <Box key={`fuss-${p.key}`} columnGap={1} flexShrink={0}>
+        <Text dimColor>{p.label}</Text>
+        {p.neu ? <Text dimColor>{p.neu}</Text> : null}
+        {p.value !== null ? <Text color={deskLimitColor(p.value)}>{p.percent}</Text> : null}
+        {p.reset ? <Text dimColor>{`(↻${p.reset})`}</Text> : null}
+      </Box>,
+    )
+  })
   return (
     <Box columnGap={1} justifyContent="flex-end">
-      {text ? (
-        <Text key="fuss-limit" dimColor wrap="truncate-end">
-          {text}
-        </Text>
-      ) : null}
+      {items}
       {theirs}
     </Box>
   )

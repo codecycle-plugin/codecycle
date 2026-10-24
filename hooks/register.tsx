@@ -2236,7 +2236,7 @@ async function footerData($: EngineInterface): Promise<FooterData> {
 // mit Modell, Effort und Limit; die Angaben der Engine (z. B. „auto mode“) bleiben und stehen rechts daneben
 async function onRenderSessionMode($: EngineInterface, e: MEvt<MatchedHook<'ui.render', ModeMatcher>>, next: MNxt<MatchedHook<'ui.render', ModeMatcher>>) {
   if (e.surface !== 'terminal') {
-    // Nur das Limit als Text; die Desktop-App hat ihre eigene Modellauswahl und
+    // Nur das Limit (Etiketten mit Balken und Reset); die Desktop-App hat ihre eigene Modellauswahl und
     // kürzt diesen Platz
     const theirs = await next(e)
     const d = await footerData($)

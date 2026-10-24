@@ -535,11 +535,11 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     expect(head).not.toMatch(/Limit 5 Std\./)
     const deskFooter = async () => {
       const m = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', component: 'SessionMode', props: { modes: [] } } as never)
-      const t = await m.find({ type: 'Text', text: /^5h \d+ %/ })
+      const t = await m.find({ key: 'fuss-fuenf' })
       await m.unmount()
-      return String(t?.text)
+      return String(t?.text).replace(/\(↻.*$/, '')
     }
-    expect(await deskFooter()).toBe('5h 8 %')
+    expect(await deskFooter()).toBe('5h8 %')
     await ui.unmount()
     await step($, 'ag1')
     FIVE.percent = 11
@@ -549,7 +549,7 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     head = JSON.stringify(await ui.find({ type: 'Svg' }))
     // Fenster 11 % in der Fußzeile, nicht die Summe der Agenten (3 Punkte); im Kopf steht nur der Anteil der Aufgabe
     expect(head).not.toMatch(/Limit 5 Std\./)
-    expect(await deskFooter()).toBe('5h 11 %')
+    expect(await deskFooter()).toBe('5h11 %')
     expect(head).toMatch(/Aufgabe: Agenten 64 gew\. · Bauleiter 0 gew\. · Konto ≈ 3,0 % \/ 0,0 %/)
     await ui.unmount()
     ui = await pane($, 'terminal')

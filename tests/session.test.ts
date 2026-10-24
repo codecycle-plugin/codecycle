@@ -191,9 +191,9 @@ describe('Limit-Stand und Laufzeit', () => {
   }
   /**
    * Wo das Limit steht: in beiden Darstellungen in der Fußzeile (Render-Platz SessionMode): im Terminal mit Balken und
-   * Reset, in der Desktop-App nur als Text „5h 11 %“. Bautafel und Seitenleiste zeigen es nirgends mehr
+   * Reset, in der Desktop-App als Etikett „5h ▬ 11 % (↻ HH:MM)“. Bautafel und Seitenleiste zeigen es nirgends mehr
    * (weder Terminal noch Desktop-App). Die Desktop-Fußzeile kennzeichnet einen alten Stand nicht mit „Stand HH:MM“, nur
-   * „neu seit HH:MM“ bei abgelaufenem Fenster (hooks/lib/desk-parts.ts :: deskFooterText).
+   * „neu seit HH:MM“ bei abgelaufenem Fenster (hooks/lib/desk-parts.ts :: deskFooterParts).
    */
   const SURFACES = ['terminal', 'desktop'] as const
   const engineModes = (on: Ops) => on('ui.render', { component: 'SessionMode' }, () => ({ type: 'engine', ref: 1 }) as never)
@@ -211,7 +211,7 @@ describe('Limit-Stand und Laufzeit', () => {
       const ui = await mountLimit($, surface)
       // Terminal: Kennzeichnung „Stand HH:MM“; Desktop-App: nur der Text der Fußzeile
       if (surface === 'terminal') expect(await ui.find({ type: 'Text', text: new RegExp(`Stand ${hm(MEASURED)}`) })).toBeDefined()
-      else expect(String((await ui.find({ type: 'Text', text: /^5h / }))?.text)).toBe('5h 11 %')
+      else expect(String((await ui.find({ key: 'fuss-fuenf' }))?.text)).toMatch(/^5h11 %/)
       expect(await ui.find({ type: 'Text', text: /11 %/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /noch kein Messwert/ })).toBeUndefined()
       await ui.unmount()
@@ -233,7 +233,7 @@ describe('Limit-Stand und Laufzeit', () => {
     expect(await ui.find({ type: 'Text', text: /5 Std\.|11 %|Stand \d\d:\d\d/ })).toBeUndefined()
     await ui.unmount()
     const deskModes = await mountLimit($, 'desktop')
-    expect(await deskModes.find({ type: 'Text', text: /^5h 11 %$/ })).toBeDefined()
+    expect(await deskModes.find({ key: 'fuss-fuenf', text: /^5h11 %/ })).toBeDefined()
     await deskModes.unmount()
     // Terminal: Fußzeile, eingeklappte Bautafel und Seitenleiste ohne Limit
     const modes = await mountLimit($, 'terminal')
@@ -257,7 +257,7 @@ describe('Limit-Stand und Laufzeit', () => {
     const uis = [await mountLimit($, 'terminal'), await mountLimit($, 'desktop')]
     // Terminal kennzeichnet den alten Stand, die Desktop-Fußzeile zeigt nur den Wert
     expect(await uis[0]!.find({ type: 'Text', text: /Stand \d\d:\d\d/ })).toBeDefined()
-    expect(await uis[1]!.find({ type: 'Text', text: /^5h 11 %$/ })).toBeDefined()
+    expect(await uis[1]!.find({ key: 'fuss-fuenf', text: /^5h11 %/ })).toBeDefined()
     await $.session.measure({ context: { window: 200000, percent: 10 }, rateLimits: [{ kind: 'five_hour', percentUsed: 23, resetsAt: '2026-10-08T18:00:00Z' }], changed: ['rateLimits'] })
     for (const ui of uis) {
       expect(await ui.find({ type: 'Text', text: /Stand \d\d:\d\d/ })).toBeUndefined()

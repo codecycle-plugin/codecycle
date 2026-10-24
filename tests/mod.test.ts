@@ -486,13 +486,17 @@ describe('Fußzeile rechts im Terminal: Modell, Effort, Limit', () => {
     expect(String((await effort())?.label)).toBe('hoch')
     expect((await effort())?.dimColor).toBe(false)
     await modes.unmount()
-    // Desktop-App: nur das Limit als Text „5h 62 % · Woche 21 %“, kein Knopf `model` und kein Effort (die App hat
-    // ihre eigene Modellauswahl), keine Balken und kein Reset; die Angaben der Engine bleiben daneben
+    // Desktop-App: je Limit ein Etikett mit Name, kurzem Balken und Prozent in der Farbe nach Stand, kein Knopf `model`
+    // und kein Effort (die App hat ihre eigene Modellauswahl); die Angaben der Engine bleiben daneben
     const desktop = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', component: 'SessionMode', props: { modes: ['auto'] } } as never)
     expect(await desktop.find({ key: 'model' })).toBeUndefined()
     expect(await desktop.find({ key: 'effort' })).toBeUndefined()
-    expect(String((await desktop.find({ type: 'Text', text: /^5h / }))?.text)).toBe('5h 62 % · Woche 21 %')
-    expect(await desktop.find({ type: 'Text', text: /[━─↻]/ })).toBeUndefined()
+    // nur Text „5h 62 % (↻…) │ W 21 %“; Text eines Stücks ohne Abstände, Reset nur beim 5-Stunden-Fenster
+    expect(String((await desktop.find({ key: 'fuss-fuenf' }))?.text)).toMatch(/^5h62 %(\(↻.+\))?$/)
+    expect((await desktop.find({ type: 'Text', text: '62 %' }))?.props.color).toBe('suggestion')
+    expect(String((await desktop.find({ key: 'fuss-woche' }))?.text)).toMatch(/^W(\d+) %$/)
+    expect((await desktop.find({ type: 'Text', text: '21 %' }))?.props.color).toBe('suggestion')
+    expect(await desktop.find({ type: 'Text', text: /[━─]/ })).toBeUndefined()
     expect(JSON.stringify(await desktop.find({ type: 'Box' }))).toMatch(/engine/)
     await desktop.unmount()
   })

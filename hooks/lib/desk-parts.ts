@@ -2,18 +2,44 @@
 // Die Elemente (Box, Text, Button) baut hooks/desk.tsx.
 
 import type { Limits } from '../../types'
+import { resetText } from '../state.ts'
 
-const pct = (v: number) => `${Math.round(v)} %`
+/** Ab hier zeichnet die Fußzeile ein Limit gelb, ab `LIMIT_ALARM` rot (wie die App selbst, beobachtet) */
+export const LIMIT_WARN = 75
+export const LIMIT_ALARM = 90
+
+/** Farbe eines Limits als Theme-Schlüssel: blau wie der Kontext-Kreis der App, gelb ab 75 %, rot ab 90 % */
+export function deskLimitColor(pct: number): 'suggestion' | 'warning' | 'error' {
+  return pct >= LIMIT_ALARM ? 'error' : pct >= LIMIT_WARN ? 'warning' : 'suggestion'
+}
+
+/** Ein Limit der Fußzeile: Wert (null bei „neu seit“), Prozent und Reset als Text; die Fußzeile setzt den Reset in Klammern */
+export type FooterPart = {
+  key: 'fuenf' | 'woche'
+  label: '5h' | 'W'
+  value: number | null
+  /** gerundet mit Einheit („42 %“); leer bei „neu seit“ */
+  percent: string
+  /** „neu seit HH:MM“, wenn das Fenster seit der Messung zurückgesetzt wurde */
+  neu: string
+  /** Reset „18:40“ oder „Mo 09:00“, nur beim 5-Stunden-Fenster; leer ohne Zeit und bei „neu seit“ */
+  reset: string
+}
 
 /**
- * Text der Fußzeile in der Desktop-App: „5h 26 % · Woche 4 %“, ohne Balken und Reset. Ein Fenster, das seit der
- * letzten Messung schon zurückgesetzt wurde, steht als „5h neu seit HH:MM“ ohne Zahl; ohne Wert entfällt das Stück,
- * ohne beide Werte ist der Text leer.
+ * Stücke der Fußzeile in der Desktop-App, knapp für einen Platz von rund 25 Zeichen: „5h 42 % (↻18:40) │ W 84 %“.
+ * Die Woche steht als „W“ und ohne Reset. Ein Fenster, das seit der letzten Messung schon zurückgesetzt wurde, steht als
+ * „neu seit HH:MM“ ohne Zahl; ohne Wert entfällt das Stück.
  */
-export function deskFooterText(lim: Limits, alt?: { neuFuenf?: string; neuWoche?: string }): string {
-  const five = alt?.neuFuenf ? `5h neu seit ${alt.neuFuenf}` : lim.fuenfStunden === null ? '' : `5h ${pct(lim.fuenfStunden)}`
-  const week = alt?.neuWoche ? `Woche neu seit ${alt.neuWoche}` : lim.woche === null ? '' : `Woche ${pct(lim.woche)}`
-  return [five, week].filter(Boolean).join(' · ')
+export function deskFooterParts(lim: Limits, alt?: { neuFuenf?: string; neuWoche?: string }, now = new Date()): FooterPart[] {
+  const part = (key: FooterPart['key'], label: FooterPart['label'], value: number | null, iso: string | undefined, neu: string | undefined): FooterPart | null => {
+    if (neu) return { key, label, value: null, percent: '', neu: `neu seit ${neu}`, reset: '' }
+    if (value === null) return null
+    return { key, label, value, percent: `${Math.round(value)} %`, neu: '', reset: resetText(iso, now) }
+  }
+  return [part('fuenf', '5h', lim.fuenfStunden, lim.resetFuenf, alt?.neuFuenf), part('woche', 'W', lim.woche, undefined, alt?.neuWoche)].filter(
+    (p): p is FooterPart => p !== null,
+  )
 }
 
 /** Erste Version von Claude Code, deren Mod-Elemente `Text.weight`, `size`, `tabular` und Abstandsstufen kennen */
