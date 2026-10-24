@@ -20,7 +20,7 @@ export function hookBypass(command: string, shell: 'bash' | 'powershell' = 'bash
   const hit = bypassIn(text, 0, false, agent)
   if (hit) return hit
   // Schreibziele über alle Verpackungen, auch Cmdlets und [IO.File]:: (bash-write-targets.ts)
-  return bashWriteTargets(text).some(t => GIT_INTERNAL.test(normalize(t))) ? 'Schreiben in .git/config oder .git/hooks' : null
+  return writeReason(bashWriteTargets(text))
 }
 
 function bypassIn(command: string, depth: number, run: boolean, agent: boolean): string | null {
@@ -31,7 +31,8 @@ function bypassIn(command: string, depth: number, run: boolean, agent: boolean):
   for (const seg of segs) {
     const hit = gitBypass(seg.words, depth, agent) ?? envBypass(seg.words, hasGit, command)
     if (hit) return hit
-    if (segTargets(seg).some(t => GIT_INTERNAL.test(normalize(t)))) return 'Schreiben in .git/config oder .git/hooks'
+    const write = writeReason(segTargets(seg))
+    if (write) return write
     for (const inner of unwrap(seg.words)) {
       if (inner.encoded === null) return 'verschlüsselter Befehl (-EncodedCommand, nicht prüfbar)'
       const r = bypassIn(inner.encoded ?? inner.text, depth + 1, true, agent)
@@ -53,7 +54,14 @@ const REPO_INTERNAL = /(^|\/)\.git\/(config(\.worktree)?|worktrees\/[^/]+\/confi
  * `…/Git/etc/gitconfig`) und unter Windows `%PROGRAMDATA%/Git/config`. Ein Projektordner `git/config` zählt nicht.
  */
 const USER_CONFIG = /(^|\/)(\.gitconfig|\.config\/git\/config|etc\/gitconfig)$|(^|\/)(\$\{XDG_CONFIG_HOME[^}]*\}|\$XDG_CONFIG_HOME|\$env:XDG_CONFIG_HOME|%XDG_CONFIG_HOME%)\/git\/config$|(^|[/:%}])programdata%?\/git\/config$/i
-const GIT_INTERNAL = { test: (p: string): boolean => REPO_INTERNAL.test(p) || USER_CONFIG.test(p) }
+
+/** Grund für ein Schreibziel in der Git-Konfiguration oder den Hooks, nach Ort benannt; sonst null. */
+function writeReason(targets: string[]): string | null {
+  const paths = targets.map(normalize)
+  if (paths.some(t => REPO_INTERNAL.test(t))) return 'Schreiben in .git/config oder .git/hooks'
+  if (paths.some(t => USER_CONFIG.test(t))) return 'Schreiben in die Git-Konfiguration von Benutzer oder System'
+  return null
+}
 
 /** Schrägstriche vereinheitlichen, `.` und `..` auflösen (`.git/./config`, `src/../.git/config`). */
 export function normalize(p: string): string {

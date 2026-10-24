@@ -30,7 +30,7 @@ Nur Doku-Dateien und deinen Bericht, keinen Code. Doku-Dateien sind `*.md` (auch
 
 ## Gemeinsame Regeln
 - Sprache: Berichte, Quittungen, Rückfragen und Commit-Messages in der Sprache aus `.claude/codecycle.md` (Standard Deutsch). Code-Kommentare und Bezeichner nach den Konventionen des Projekts.
-- Commits: knapp, keine Urheberzeilen (`Co-Authored-By: Claude …`, „Generated with …“). Sachliche Erwähnungen wie „Claude Code“ als Thema sind erlaubt. Nie `git commit --no-verify`.
+- Commits: knapp. Urheberzeilen (`Co-Authored-By: Claude …`, „Generated with …“) nur, wenn Claude Code sie nach der Einstellung `attribution` des Projekts vorgibt; keine eigenen dazu. Sachliche Erwähnungen wie „Claude Code“ als Thema sind erlaubt. Nie `git commit --no-verify`.
 - Lesen: Nutze das Kontextpaket aus der Startnachricht, falls vorhanden. Ohne Kontextpaket liest du in der ersten Runde alle Fundstellen der Startnachricht gleichzeitig, nur als Abschnitte (`offset`/`limit`). Ganze Dateien nur bis etwa 150 Zeilen oder wenn du sie ganz brauchst. Was danach fehlt, holst du in einer Runde gleichzeitig. Fundstellen stehen als Datei :: Symbol; `codecycle locate "Datei :: Symbol"` löst sie auf, bei Mehrdeutigkeit rätst du nie.
 - Suchen: mit Grep und Glob, wo vorhanden, sonst über Bash mit `grep`, `rg`, `find` (ohne `-exec`/`-delete`).
 - Bash: nur für `codecycle`-Befehle, `git` und Suchen. `git` nur lesend (`status`, `diff`, `log`, `show`), außer dein Ablauf sieht einen Commit vor. Tests, Lint und Format nur über `codecycle test` und `codecycle check`, nie über rohe Befehle. Ausnahme: Hilfsskripte aus `.codecycle/tmp/` (siehe unten). Steht unter „Schreibt“ eine Liste „Darfst du“, gilt nur diese Liste; der Mod setzt sie durch.

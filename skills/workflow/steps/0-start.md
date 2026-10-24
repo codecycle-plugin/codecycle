@@ -22,7 +22,7 @@ Die Aufgabe anlegen: Check, Profil, Art und Merkmale, Weg, Konfliktcheck, Ordner
 5. **Thema** als kurzer Name (`<thema>`, Kleinbuchstaben, Bindestriche), Ordner `docs/codecycle/<JJJJ-MM-TT>-<thema>/` anlegen (heutiges Datum).
 6. Dateien aus `${CLAUDE_PLUGIN_ROOT}/skills/workflow/templates/` anlegen: `TASK.md`, `PLAN.md`, `STATE.md`, leerer Ordner `reports/` mit `.gitkeep` (Vorschlag). Beschreibung des Nutzers unverändert in `TASK.md` unter „Wortlaut“ (als Zitat, `> ` vor jeder Zeile, sonst nichts ändern, auch keine Tippfehler); „Ziel“ bleibt bis zum Klären leer. Kommt der Auftrag aus dem Brainstorming (`/codecycle:ideas`), stehen im Wortlaut die Worte des Nutzers aus dem Gespräch und darunter der freigegebene Entwurf, gekennzeichnet als `> Entwurf, freigegeben am <JJJJ-MM-TT>: …`. Den Abschnitt „Wortlaut“ bearbeitest du danach nie mehr.
 7. Branch `codecycle/<thema>` anlegen. Merkmale an das Regelwerk geben: `codecycle effort <aufgabenordner> --set art=… --set dateien=… --set risiko=ja|nein …` (alle Merkmale aus Punkt 3; `doku=nein|changelog|mehr`). `STATE.md`: `zustand: erfasst`, `groesse` aus der Ausgabe, `art`, `budget.geplant` = Obergrenze der angezeigten Läufe, `budget.nachlauf: 0`, `zuletzt` heute, Verlauf-Eintrag.
-8. Commit (ohne Urheberzeile).
+8. Commit (Urheberzeile nur nach `attribution`).
 
 ## Ergebnis
 Aufgabenordner mit `TASK.md`, `PLAN.md`, `STATE.md` (`erfasst`), `aufwand.json`, `reports/`; Aufgaben-Branch `codecycle/<thema>`; ein Commit.

@@ -2,6 +2,18 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.7 / Werkzeug 0.8.4] – 2026-10-24
+
+### Geändert
+
+- Urheberzeilen in Commits sind nicht mehr verboten: Agenten schreiben sie nur, wenn Claude Code sie nach der Einstellung `attribution` des Projekts vorgibt, und erfinden keine eigenen.
+- `/codecycle:setup` fragt nach der Kennzeichnung durch Claude ohne Empfehlung und zeigt je Antwort ein kurzes Beispiel; die Wahl lässt sich später unter `attribution` in `.claude/settings.json` ändern.
+
+### Behoben
+
+- Solo-Weg: Der Prüf-Worktree hat die Abhängigkeiten des Hauptordners, der Prüfer kann dort Lint und Tests ausführen. Neu `codecycle solo pruefung start|ende <aufgabenordner>`; das Entfernen löst erst die Verweise und nutzt nie `--force`.
+- Die Sperre gegen das Umgehen der Git-Hooks nennt beim Schreiben in die Git-Konfiguration von Benutzer oder System diesen Ort statt `.git/config`.
+
 ## [0.22.6 / Werkzeug 0.8.3] – 2026-10-24
 
 ### Geändert

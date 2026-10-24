@@ -88,7 +88,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 6. Verlauf in `STATE.md` ergänzen, Commit von `STATE.md` (Änderungen im Aufgabenordner zählen für die Sperre nicht).
 
 ### 4. Prüfung
-1. Wegwerf-Worktree am geprüften Commit, neben dem Projekt: `git worktree add --detach ../<projekt>--wt-solo-pruefung <geprueftAuf>`.
+1. Wegwerf-Worktree am geprüften Commit, neben dem Projekt, mit den Abhängigkeiten des Hauptordners: `codecycle solo pruefung start <ordner>` (nennt Worktree und Commit für die Startnachricht).
 2. `codecycle:solo-reviewer` starten, **nur** mit dieser Nachricht (keine Annahmen, kein Kurzplan, keine Meinung von dir; die Eingabeformate sind eine Mindestliste, er ergänzt eigene):
    ```
    Aufgabenordner: <ordner>
@@ -103,7 +103,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
    ```
    `<basis>` nennt die Ausgabe von `codecycle solo check`. Verweigert der Mod den Start, nennt die Meldung den fehlenden Schritt.
 3. **Zweiter Prüfer:** Nennt `codecycle solo check` die Zeile „Zweiter Prüfer: ja“, startest du nach der Quittung des ersten `codecycle:solo-reviewer` ein zweites Mal, frisch (kein Folgeauftrag), im selben Worktree, mit derselben Nachricht und direkt unter `Aufgabenordner:` der Zeile `Auftrag: Sicherheit`. Nacheinander, nicht gleichzeitig: Beide starten Server. Er schreibt `reports/pruefung-sicherheit.md` mit Funden `Z1`, `Z2` …
-4. Nach der letzten Quittung: `git worktree remove --force <worktree>`; `codecycle solo funde <ordner>` setzt `haltepunkt: 4` (Exit 1 heißt hier nur: Funde noch ohne Status); Bericht und `STATE.md` committen, erst dann nachbessern.
+4. Nach der letzten Quittung: `codecycle solo pruefung ende <ordner>` (entfernt erst die Verweise, nie `git worktree remove --force` auf diesen Worktree); `codecycle solo funde <ordner>` setzt `haltepunkt: 4` (Exit 1 heißt hier nur: Funde noch ohne Status); Bericht und `STATE.md` committen, erst dann nachbessern.
 
 ### 5. Nachbesserung (eine Runde)
 1. Lies den Bericht (mit zweitem Prüfer beide). Je Fund (`M1`, `M2` …, `Z1` …) unter „Funde“ in `TASK.md` genau eine Zeile:

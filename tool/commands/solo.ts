@@ -17,6 +17,9 @@
 //   zwischenstand <aufgabenordner> <teil>: Zwischen-Haltepunkt nach einem Teil. `codecycle check` grün und alles außerhalb
 //          des Aufgabenordners committet wie bei check; setzt den Teil auf `fertig`. Danach ist ein Sitzungswechsel erlaubt.
 //          `teil fertig` setzt einen Teil aus `teile` ebenso auf `fertig`.
+//   pruefung start|ende <aufgabenordner>: Wegwerf-Worktree des Solo-Prüfers. start legt ihn neben dem Projekt am
+//          Commit `geprueftAuf` an (losgelöst, Verweis auf node_modules) und nennt Worktree und Commit für die
+//          Startnachricht; ende entfernt ihn (erst die Verweise, nie `--force`).
 // Start ist der Abzweig vom Hauptbranch (`git merge-base <hauptbranch> HEAD`).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -35,7 +38,7 @@ const { GIT_QUIET } = pathsLib
 const { SECOND_REVIEW, SOLO_REPORT, SOLO_SECURITY_REPORT, checkFindings, findingStatuses, requiredReports } = soloFindingsLib
 
 const CODECYCLE_MD = '.claude/codecycle.md'
-const USAGE = 'Aufruf: codecycle solo check <aufgabenordner> | codecycle solo funde <aufgabenordner> | codecycle solo plan <aufgabenordner> <teil> … | codecycle solo zwischenstand <aufgabenordner> <teil> | codecycle solo teil start|fertig <aufgabenordner> <name>'
+const USAGE = 'Aufruf: codecycle solo check <aufgabenordner> | codecycle solo funde <aufgabenordner> | codecycle solo plan <aufgabenordner> <teil> … | codecycle solo zwischenstand <aufgabenordner> <teil> | codecycle solo teil start|fertig <aufgabenordner> <name> | codecycle solo pruefung start|ende <aufgabenordner>'
 /** Name eines Teils: wird Teil von Branch und Ordner */
 const PART_NAME = /^[a-z0-9][a-z0-9-]{0,30}$/
 
@@ -288,6 +291,64 @@ function partDone(f: Folder, name: string, ctx: Ctx): number {
   return 0
 }
 
+/** Ordner des Prüf-Worktrees neben dem Projekt */
+const reviewDir = (root: string): string => join(dirname(root), `${basename(root)}--wt-solo-pruefung`)
+
+/** Commit, auf dem ein Worktree an `path` losgelöst steht, oder null (kein Worktree dort). */
+function detachedAt(root: string, path: string): string | null {
+  let current: string | null = null
+  let head = ''
+  for (const line of git(['worktree', 'list', '--porcelain'], root).out.split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) current = resolve(line.slice('worktree '.length))
+    else if (line.startsWith('HEAD ')) head = line.slice('HEAD '.length)
+    else if (line === 'detached' && current === resolve(path)) return head
+  }
+  return null
+}
+
+/** Prüf-Worktree am geprüften Commit anlegen (oder vorhandenen nennen), mit Verweis auf node_modules. */
+function reviewStart(f: Folder, ctx: Ctx): number {
+  const root = findProjectRoot(ctx.cwd)
+  if (resolve(f.work) !== resolve(root)) throw new ToolBroken(`im Hauptordner ${root} aufrufen, nicht im Worktree`)
+  const commit = readState(f).geprueftAuf
+  if (!commit) {
+    ctx.out(`rot: ${f.rel}/STATE.md ohne geprueftAuf; erst codecycle solo check ${f.rel}`)
+    return 1
+  }
+  const wt = reviewDir(root)
+  const at = detachedAt(root, wt)
+  if (at !== null && at !== commit) {
+    ctx.out(`rot: Prüf-Worktree ${wt} steht auf ${at.slice(0, 7)}, geprüft ist ${commit.slice(0, 7)}; erst codecycle solo pruefung ende ${f.rel}`)
+    return 1
+  }
+  if (at === null) {
+    if (existsSync(wt)) throw new ToolBroken(`Ordner ${wt} gibt es schon, aber ohne Prüf-Worktree (nachsehen, nicht löschen)`)
+    const r = gitFull(['worktree', 'add', '--detach', wt, commit], root)
+    if (!r.ok) throw new ToolBroken(`git worktree add fehlgeschlagen: ${r.text}`)
+    ctx.out(`grün: Prüf-Worktree ${wt} am Commit ${commit.slice(0, 7)}`)
+  } else ctx.out(`grün: Prüf-Worktree ${wt} steht schon am Commit ${commit.slice(0, 7)}`)
+  const linked = linkNodeModules(root, wt)
+  if (linked) ctx.out(linked)
+  ctx.out('Für die Startnachricht:')
+  ctx.out(`  Worktree: ${wt}`)
+  ctx.out(`  Commit: ${commit}`)
+  return 0
+}
+
+/** Prüf-Worktree entfernen: erst die Verweise, dann `git worktree remove` ohne `--force`. */
+function reviewEnd(f: Folder, ctx: Ctx): number {
+  const root = findProjectRoot(ctx.cwd)
+  if (resolve(f.work) !== resolve(root)) throw new ToolBroken(`im Hauptordner ${root} aufrufen, nicht im Worktree`)
+  const wt = reviewDir(root)
+  if (detachedAt(root, wt) === null) {
+    ctx.out(existsSync(wt) ? `rot: Ordner ${wt} ist kein Prüf-Worktree (nachsehen, nicht löschen)` : 'grün: kein Prüf-Worktree da')
+    return existsSync(wt) ? 1 : 0
+  }
+  const leftover = removeWorktree(root, wt)
+  ctx.out(leftover ? `rot: Prüf-Worktree nicht entfernt${leftover}` : `grün: Prüf-Worktree ${wt} entfernt`)
+  return leftover ? 1 : 0
+}
+
 function partOf(f: Folder, name: string, ctx: Ctx) {
   if (!PART_NAME.test(name)) throw new ToolBroken(`Name „${name}“: nur Kleinbuchstaben, Ziffern und „-“, höchstens 31 Zeichen`)
   const root = findProjectRoot(ctx.cwd)
@@ -303,6 +364,12 @@ export function solo(args: string[], ctx: Ctx): number {
     if (!folder || !name || extra.length > 0 || (action !== 'start' && action !== 'fertig')) throw new ToolBroken(USAGE)
     const f = soloFolder(folder, ctx)
     return action === 'start' ? partStart(f, name, ctx) : partDone(f, name, ctx)
+  }
+  if (args[0] === 'pruefung') {
+    const [, action, folder, ...extra] = args
+    if (!folder || extra.length > 0 || (action !== 'start' && action !== 'ende')) throw new ToolBroken(USAGE)
+    const f = soloFolder(folder, ctx)
+    return action === 'start' ? reviewStart(f, ctx) : reviewEnd(f, ctx)
   }
   const [sub, ...rest] = args
   if (sub === 'plan' || sub === 'zwischenstand') {

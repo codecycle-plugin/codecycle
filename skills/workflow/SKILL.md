@@ -102,7 +102,7 @@ Ungeplante Läufe (frischer Agent statt Nachricht, Eskalation, Widerleger) erhö
 - **Was `codecycle paket` schreibt, schreibst du nicht noch einmal:** Paketstatus, `commit`, `runden`, `zuletzt`, die Verlaufszeile je Befehl und den Commit von `STATE.md`. Keine eigene Zeile „gestartet“ oder „fertig“, kein eigener Buchhaltungs-Commit. Selbst schreibst du Agenten-ID, `budget.verbraucht` (je neuem Agentenlauf) und Freitext (Annahmen, Offene Fragen, Nächster Schritt).
 - `STATE.md` ist ein Hinweis, **Git ist die Wahrheit**. `zustand: fertig` nur im selben Commit wie der Merge in den Hauptbranch.
 - **Branch-Namen:** Aufgaben-Branch `codecycle/<thema>`, Paket-Branch und Worktree `codecycle/<thema>--P<n>` (Git erlaubt einen Branch mit Schrägstrich vor dem P nicht neben `codecycle/<thema>`).
-- Commits: knapp, Projektsprache, **keine Urheberzeilen** (sachliche Erwähnungen wie „Claude Code“ sind erlaubt), nie `--no-verify`.
+- Commits: knapp, Projektsprache, Urheberzeilen nur nach der Einstellung `attribution` des Projekts (keine eigenen dazu; sachliche Erwähnungen wie „Claude Code“ sind erlaubt), nie `--no-verify`.
 - Änderungen an `TASK.md` nach Freigabe nur im Abschnitt „Änderungen“.
 - **Wer entschieden hat:** Entscheidungen in `STATE.md` und `TASK.md` immer mit der Antwort des Nutzers im Wortlaut: „Entscheidung: … · Nutzer: „…““. Trifft der Nutzer keine eigene Wahl (z. B. „nimm deine Empfehlung“), heißt es „Empfehlung übernommen (Nutzer: „…“)“, nie „Nutzer hat entschieden“.
 - **Negativ-Kriterien:** In Risikobereichen (laut `.claude/codecycle.md`) verlangt `TASK.md` mindestens ein Kriterium der Form „darf nicht möglich sein“ (z. B. „Fremde Gruppe sieht die Liste nicht“). Es wird bei der Auftragsfreigabe mitgezeigt, keine zusätzliche Unterbrechung.
