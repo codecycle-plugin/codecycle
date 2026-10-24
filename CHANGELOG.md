@@ -2,6 +2,19 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.6 / Werkzeug 0.8.3] – 2026-10-24
+
+### Geändert
+
+- Solo-Prüfer: Ein Fehler, den die Änderung nicht verursacht hat, kommt als „Nebenfund:“ in den Bericht. Die Sitzung bessert ihn nicht nach, sondern fragt im Abschluss: jetzt beheben, als eigene Aufgabe merken oder verwerfen. Gemerkte Nebenfunde stehen an der Stelle für offene Aufgaben aus dem Doku-Aufbau, sonst in `docs/codecycle/nebenfunde.md`; `codecycle solo funde` kennt dafür den Status `gemerkt: <Ort>`.
+- Solo-Prüfer: Eine Wortlaut-Frage gibt es nur, wenn das Verhalten vom Wortlaut abweicht. Abweichungen ohne Wirkung (Namen, Aufbau, Kommentare, Doku-Formulierungen) stehen gesammelt unter „Offene Punkte“.
+
+## [0.22.5 / Werkzeug 0.8.2] – 2026-10-24
+
+### Behoben
+
+- Ein per Folgenachricht fortgesetzter Agent darf seinen Bericht auch nach einem Neuladen des Mods oder in einer mit `--resume` fortgesetzten Sitzung schreiben. Der Solo-Prüfer wurde dort bisher auch beim eigenen Bericht abgewiesen. Das Agenten-Register (`agents.json`) führt dafür den Berichtspfad.
+
 ## [0.22.4 / Werkzeug 0.8.2] – 2026-10-24
 
 ### Behoben

@@ -53,6 +53,8 @@ export type AgentEntry = {
   urteil?: Verdict
   /** Arbeitszeit: Summe der Läufe (Start bzw. Folgenachricht bis Ende), ohne Wartezeit */
   arbeitszeitMs?: number
+  /** Eigener Bericht, relativ zum Hauptordner: gilt auch nach einem Neuladen des Mods (Folgenachricht, `--resume`) */
+  bericht?: string
 }
 
 export type Registry = { version: 1; aufgabe: string; agenten: Record<string, AgentEntry> }

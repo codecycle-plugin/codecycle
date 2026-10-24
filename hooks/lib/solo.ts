@@ -91,7 +91,7 @@ export function soloMergeProblem(dir: string, reports: readonly { path: string; 
   }
   const r = checkFindings(reports.map(x => x.text).join('\n'), task ?? '')
   if (r.fehlend.length > 0) {
-    return `codecycle: kein Merge mit offenen Funden (${r.fehlend.join(', ')}). In TASK.md, Abschnitt „Funde“, je Fund „behoben (<commit>)“ oder „verworfen: <Grund>“ eintragen, committen; prüfen mit \`codecycle solo funde ${dir}\`.`
+    return `codecycle: kein Merge mit offenen Funden (${r.fehlend.join(', ')}). In TASK.md, Abschnitt „Funde“, je Fund „behoben (<commit>)“, „verworfen: <Grund>“ oder (Nebenfund) „gemerkt: <Ort>“ eintragen, committen; prüfen mit \`codecycle solo funde ${dir}\`.`
   }
   return null
 }

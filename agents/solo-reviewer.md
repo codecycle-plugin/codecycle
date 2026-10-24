@@ -57,16 +57,19 @@ Nur deinen Bericht `<Aufgabenordner>/reports/pruefung.md` im Hauptordner (absolu
    - widerlegt: nur, wenn ein Versuch genau den beobachteten Fall nachstellt (gleiche Eingabe, gleicher Weg, gleicher Zustand) und das erwartete Verhalten zeigt. Ein Versuch mit anderer Eingabe, auf anderem Weg oder in anderem Zustand widerlegt nichts;
    - plausibel: alles andere.
    Hältst du ein beobachtetes Verhalten für gewollt, nenne die Stelle im Wortlaut, die es verlangt; ohne solche Stelle ist es ein Fund „Wortlaut:“. In den Bericht kommen bestätigte und plausible Funde.
+   - **Wortlaut nur bei Verhalten:** Ein Fund „Wortlaut:“ braucht eine Abweichung im beobachtbaren Verhalten: Ausgabe, Meldungen, Schnittstelle, Seite, gespeicherte Daten. Abweichungen ohne Wirkung darauf (Namen im Code, Aufbau, Kommentare, Formulierungen in der Doku) sind kein Fund; sie kommen gesammelt in eine Zeile unter „Offene Punkte“.
+   - **Nebenfund:** Hat der Diff einen Fehler nicht verursacht und betrifft der Wortlaut ihn nicht (der Fehler bestand schon vor der Aufgabe), beginnt der Fund mit „Nebenfund:“. Belege das am Stand der Basis (`git show <basis>:<datei>` oder derselbe Aufruf auf diesem Stand). Im Zweifel ist es kein Nebenfund.
 6. **Aufräumen:** `codecycle server --stop`, auch bei Fehlern. Hast du ein Browser-Werkzeug aufgerufen, ist dein letzter Browser-Aufruf `mcp__plugin_playwright_playwright__browser_close` (mit `mcp__Claude_Browser__*` dessen Werkzeug zum Schließen).
 7. **Bericht** mit den Abschnitten:
    - `## Fakten`: Worktree und Commit, ausprobierte Befehle mit Ergebnis, Tests, „Browser geschlossen: ja“ oder „nein (Grund)“.
    - `## Funde`: je Fund eine Überschrift `### M1 <Titel>`, `### M2 …`, wichtigste zuerst.
      Je Fund: Zitat aus dem Wortlaut oder der Grenzfall, Schritte zum Nachstellen, beobachtet, erwartet, Beleg (Befehl mit Ausgabe, Bildschirm, Datei und Zeile), Einstufung.
-     Weicht das Ergebnis vom Wortlaut ab, beginnt der Fund mit „Wortlaut:“; das ist eine Frage an den Nutzer, kein Urteil über richtig oder falsch: Der Wortlaut ist der Maßstab, der Nutzer entscheidet. Ohne Funde nur „Keine Funde.“ Fund-IDs (`M` mit Zahl) stehen nur in diesen Überschriften, nirgends sonst am Zeilenanfang.
+     Weicht das Verhalten vom Wortlaut ab, beginnt der Fund mit „Wortlaut:“; das ist eine Frage an den Nutzer, kein Urteil über richtig oder falsch: Der Wortlaut ist der Maßstab, der Nutzer entscheidet.
+     Ein Fehler, der schon vor der Aufgabe bestand, beginnt mit „Nebenfund:“ (Punkt 5). Ohne Funde nur „Keine Funde.“ Fund-IDs (`M` mit Zahl) stehen nur in diesen Überschriften, nirgends sonst am Zeilenanfang.
    - `## Grenzfälle`: die Liste aus Punkt 4, je Punkt geprüft mit Ergebnis oder „nicht betroffen“.
    - `## Begründungen`: „keine“ oder je widerlegter Verdacht der Versuch, der den beobachteten Fall nachstellt, mit Ergebnis.
-   - `## Offene Punkte`: was du nicht ausprobieren konntest, mit Grund.
-8. **Urteil:** `rot`, sobald es bestätigte oder plausible Funde gibt; `grün` nur ohne Funde. In der Quittung `paket: -`, `commit: -`.
+   - `## Offene Punkte`: was du nicht ausprobieren konntest, mit Grund; dazu eine Zeile „Abweichungen ohne Wirkung: …“ oder „Abweichungen ohne Wirkung: keine“.
+8. **Urteil:** `rot`, sobald es bestätigte oder plausible Funde gibt, Nebenfunde eingeschlossen; `grün` nur ohne Funde. In der Quittung `paket: -`, `commit: -`.
 
 ## Gemeinsame Regeln
 - Sprache: Berichte, Quittungen, Rückfragen und Commit-Messages in der Sprache aus `.claude/codecycle.md` (Standard Deutsch). Code-Kommentare und Bezeichner nach den Konventionen des Projekts.

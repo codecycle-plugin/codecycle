@@ -23,7 +23,7 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 | 2 | Kurzplan | 3–10 Zeilen in `TASK.md` (groß: Plan in Teilen, nach jedem Teil Zwischen-Haltepunkt 2.n), Annahmen; ohne Freigabe |
 | 3 | Eigene Kontrolle | Doku nachgezogen, alles committet, `codecycle solo check` grün, Oberfläche selbst angesehen |
 | 4 | Prüfung | frischer Prüfer gegen den Wortlaut, ab zwei Risikobereichen dazu ein zweiter für Sicherheit; nicht überspringbar |
-| 5 | Nachbesserung | jeder Fund `behoben` oder `verworfen: <Grund>`; Abweichung vom Wortlaut als Frage |
+| 5 | Nachbesserung | jeder Fund `behoben` oder `verworfen: <Grund>`; Abweichung vom Wortlaut und Nebenfund als Frage |
 | 6 | Abschluss | festes Format, Merge-Frage |
 
 ## Voraussetzungen
@@ -109,10 +109,12 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 1. Lies den Bericht (mit zweitem Prüfer beide). Je Fund (`M1`, `M2` …, `Z1` …) unter „Funde“ in `TASK.md` genau eine Zeile:
    - `- M1: behoben (<commit>)`: zutreffend und behoben;
    - `- M2: verworfen: <Grund>`: nicht zutreffend, mit nachprüfbarem Grund;
-   - `- M3: offen: Frage an den Nutzer`: nur für Abweichungen vom Wortlaut.
+   - `- M3: offen: Frage an den Nutzer`: nur für Abweichungen vom Wortlaut;
+   - `- M4: offen: Nebenfund`: für Funde „Nebenfund:“ (Fehler, die vor der Aufgabe bestanden).
 2. **Abweichung vom Wortlaut nie still verwerfen:** Sie wird eine Frage an den Nutzer im Abschluss; Empfehlung: den Wortlaut einhalten.
-3. Nach den Korrekturen `codecycle check` grün, Commit. Keine erneute Prüfung.
-4. `codecycle solo funde <ordner>`: setzt `haltepunkt: 5`, sobald jeder Fund einen Status hat; Exit 1 ist nur mit offenen Wortlaut-Fragen in Ordnung. Commit.
+3. **Nebenfunde nicht nachbessern:** Die Aufgabe bleibt so groß wie bestellt; jeder Nebenfund wird eine Frage im Abschluss. Hat der Diff den Fehler doch verursacht oder verlangt der Wortlaut die Stelle, ist er kein Nebenfund: Status wie bei jedem Fund, dahinter `· kein Nebenfund: <Grund>` (z. B. `- M4: behoben (<commit>) · kein Nebenfund: <Grund>`).
+4. Nach den Korrekturen `codecycle check` grün, Commit. Keine erneute Prüfung.
+5. `codecycle solo funde <ordner>`: setzt `haltepunkt: 5`, sobald jeder Fund einen Status hat; Exit 1 ist nur mit offenen Wortlaut-Fragen und Nebenfunden in Ordnung. Commit.
 
 ### 6. Abschluss
 1. Hat die Nachbesserung Sichtbares geändert, Doku und Changelog dazu nachziehen; Commit.
@@ -120,12 +122,14 @@ Innen arbeitest du frei; fest sind sechs Haltepunkte. Drei davon sperrt der Mod:
 3. `STATE.md`: `zustand: geprueft`, `haltepunkt: 6`, Nächster Schritt „Merge auf Ja“; Commit.
 4. Letzte Nachricht, in dieser Reihenfolge:
    - **Gebaut:** 2–4 Sätze in einfachen Worten.
-   - **Funde:** je Fund Titel und Status, verworfene mit Grund.
+   - **Funde:** je Fund Titel und Status, verworfene mit Grund; ohne Nebenfunde.
+   - **Nebenfunde:** je Nebenfund Titel, Beleg in einem Satz und was er für Nutzer bedeutet (oder „keine“).
    - **Annahmen:** die Zeilen aus `TASK.md`.
    - **Abgaben:** an welche Rolle, was, warum (oder „keine“).
    - **Kosten:** die Zeile aus `effort --record`, Modelle je Agentenlauf.
-   - Ganz unten **„Entscheidungen für dich“**, nummeriert, je Frage Erklärung, Antworten, Folge, Empfehlung: zuerst offene Wortlaut-Fragen, dann je Annahme `Abweichung:` eine Frage (behalten oder wie im Wortlaut, Empfehlung nach deinem Urteil), dann die Merge-Frage „Aufgabe X ist geprüft und noch nicht in <Hauptbranch>: jetzt mergen und die Branches löschen?“ mit „Ja, mergen und Branches löschen“ (Standard; bei offenen Wortlaut-Fragen „Später“), „Nur mergen, Branches behalten“, „Später“. <!-- doku-ok -->
+   - Ganz unten **„Entscheidungen für dich“**, nummeriert, je Frage Erklärung, Antworten, Folge, Empfehlung: zuerst offene Wortlaut-Fragen, dann je Annahme `Abweichung:` eine Frage (behalten oder wie im Wortlaut, Empfehlung nach deinem Urteil), dann je Nebenfund eine Frage (jetzt beheben, als eigene Aufgabe merken, verwerfen; Empfehlung nach deinem Urteil), dann die Merge-Frage „Aufgabe X ist geprüft und noch nicht in <Hauptbranch>: jetzt mergen und die Branches löschen?“ mit „Ja, mergen und Branches löschen“ (Standard; bei offenen Wortlaut-Fragen oder Nebenfunden „Später“), „Nur mergen, Branches behalten“, „Später“. <!-- doku-ok -->
 5. **Antwort auf eine Wortlaut-Frage:** ändern → beheben, Commit, Status `behoben`; so lassen → `verworfen: Nutzer: „<Antwort>“`. Dann `codecycle solo funde <ordner>` erneut.
+   - **Antwort auf einen Nebenfund:** jetzt beheben → beheben, Commit, Status `behoben (<commit>)`; merken → eine Zeile (Datum, Aufgabe, Titel, Beleg) an der Stelle für offene Aufgaben, die der „Doku-Aufbau“ in `.claude/codecycle.md` nennt, sonst in `docs/codecycle/nebenfunde.md`; Commit, Status `gemerkt: <Pfad>`; verwerfen → `verworfen: Nutzer: „<Antwort>“`. <!-- doku-ok -->
    - **Antwort auf eine Abweichung:** behalten → hinter die Annahme `· Nutzer: „<Antwort>“`; wie im Wortlaut → zurückbauen, Commit, Annahme mit `· zurückgebaut (<commit>)`.
 6. **Merge nur auf ausdrückliches Ja**, Ablauf wie `${CLAUDE_PLUGIN_ROOT}/skills/workflow/steps/7-finish.md` Punkt 5 („Ja“, Unterpunkte 1–4 und 6): `zustand: fertig`, Abschluss-Commit im Aufgaben-Branch, auf den Hauptbranch wechseln, `git merge codecycle/<thema>`, bei „Ja, mergen und Branches löschen“ `git branch -d codecycle/<thema>`. Verweigert der Mod den Merge, nennt die Meldung, was fehlt.
 

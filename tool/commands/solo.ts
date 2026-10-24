@@ -5,8 +5,9 @@
 //          es `zweitpruefung: sicherheit` (zweiter Prüfer Pflicht), sonst `zweitpruefung: nein`.
 //   funde: Haltepunkte „Prüfung“ und „Nachbesserung“. Jeder Fund aus reports/pruefung.md (mit `zweitpruefung: sicherheit`
 //          auch aus reports/pruefung-sicherheit.md) hat in TASK.md, Abschnitt „Funde“,
-//          `behoben` oder `verworfen: <Grund>`. Exit 0 vollständig, 1 sonst. Mit Bericht mindestens `haltepunkt: 4`;
-//          hat jeder Fund einen Status (auch `offen` als Wortlaut-Frage), `haltepunkt: 5`. Nie niedriger als vorher.
+//          `behoben`, `verworfen: <Grund>` oder (Nebenfund) `gemerkt: <Ort>`. Exit 0 vollständig, 1 sonst. Mit Bericht
+//          mindestens `haltepunkt: 4`; hat jeder Fund einen Status (auch `offen` als Frage zu Wortlaut oder Nebenfund),
+//          `haltepunkt: 5`. Nie niedriger als vorher.
 //   teil start|fertig <aufgabenordner> <name>: gleichzeitige Abgabe an einen Handwerker. start legt Branch `<aufgabe>--<name>`
 //          und Worktree neben dem Projekt an (Verweis auf node_modules) und nennt die Zeilen für die Startnachricht; fertig
 //          merged ihn in den Aufgaben-Branch (Konflikt, Uncommittetes im Hauptordner in berührten Dateien, Worktree-Ordner
@@ -135,7 +136,7 @@ function soloFunde(f: Folder, ctx: Ctx): number {
   const task = existsSync(taskPath) ? readFileSync(taskPath, 'utf8') : ''
   // Funde beider Berichte zusammen: M1 … aus der Prüfung, Z1 … aus der Sicherheitsprüfung
   const r = checkFindings(reports.map(p => readFileSync(join(f.abs, p), 'utf8')).join('\n'), task)
-  // `offen` ist eine Wortlaut-Frage an den Nutzer: zählt für die Merge-Sperre als fehlend, die Nachbesserung ist aber durch.
+  // `offen` ist eine Frage an den Nutzer (Wortlaut oder Nebenfund): zählt für die Merge-Sperre als fehlend, die Nachbesserung ist aber durch.
   const last = new Map(findingStatuses(task).map(s => [s.id, s.status]))
   const questions = r.fehlend.filter(id => last.get(id) === 'offen')
   const stop = questions.length === r.fehlend.length ? 5 : 4

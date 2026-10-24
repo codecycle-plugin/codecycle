@@ -20,12 +20,12 @@ export function requiredReports(state: { zweitpruefung?: string | undefined }): 
   return state.zweitpruefung === SECOND_REVIEW ? [SOLO_REPORT, SOLO_SECURITY_REPORT] : [SOLO_REPORT]
 }
 
-export type FindingStatus = { id: string; status: 'behoben' | 'verworfen' | 'offen'; grund: string }
+export type FindingStatus = { id: string; status: 'behoben' | 'verworfen' | 'gemerkt' | 'offen'; grund: string }
 
 export type FindingsCheck = {
   /** Fund-IDs aus dem Bericht, in Reihenfolge */
   ids: string[]
-  /** IDs ohne gültigen Status (fehlt, `offen`, `verworfen` ohne Grund, `behoben` ohne Commit in Klammern) */
+  /** IDs ohne gültigen Status (fehlt, `offen`, `verworfen` ohne Grund, `gemerkt` ohne Ort, `behoben` ohne Commit in Klammern) */
   fehlend: string[]
 }
 
@@ -45,7 +45,8 @@ export function reportFindingIds(text: string): string[] {
 }
 
 /**
- * Status je Fund aus TASK.md, Abschnitt „Funde“: `- M1: behoben (…)`, `- M2: verworfen: <Grund>`, `- M3: offen: …`.
+ * Status je Fund aus TASK.md, Abschnitt „Funde“: `- M1: behoben (…)`, `- M2: verworfen: <Grund>`, `- M3: gemerkt: <Ort>`
+ * (Nebenfund als eigene Aufgabe gemerkt), `- M4: offen: …`.
  * Ohne den Abschnitt eine leere Liste.
  */
 export function findingStatuses(taskText: string): FindingStatus[] {
@@ -58,7 +59,7 @@ export function findingStatuses(taskText: string): FindingStatus[] {
       continue
     }
     if (!inside) continue
-    const m = line.match(/^\s*[-*]\s+(?:\*\*|__)?([MZ]\d+)(?:\*\*|__)?\s*[:–-]?\s*(behoben|verworfen|offen)\b\s*[:–-]?\s*(.*)$/i)
+    const m = line.match(/^\s*[-*]\s+(?:\*\*|__)?([MZ]\d+)(?:\*\*|__)?\s*[:–-]?\s*(behoben|verworfen|gemerkt|offen)\b\s*[:–-]?\s*(.*)$/i)
     if (!m) continue
     out.push({ id: m[1]!, status: m[2]!.toLowerCase() as FindingStatus['status'], grund: m[3]!.trim() })
   }
@@ -68,7 +69,7 @@ export function findingStatuses(taskText: string): FindingStatus[] {
 /** `behoben` gilt nur mit Commit in Klammern: `(abc1234)`, 7 bis 40 Hex-Zeichen. */
 const FIXED_WITH_COMMIT = /^\(\s*[0-9a-f]{7,40}\b/i
 
-/** Jede Fund-ID des Berichts braucht `behoben (<commit>)` oder `verworfen` mit Grund; der letzte Eintrag je ID gilt. */
+/** Jede Fund-ID des Berichts braucht `behoben (<commit>)`, `verworfen` mit Grund oder `gemerkt` mit Ort; der letzte Eintrag je ID gilt. */
 export function checkFindings(reportText: string, taskText: string): FindingsCheck {
   const ids = reportFindingIds(reportText)
   const last = new Map<string, FindingStatus>()
@@ -77,7 +78,7 @@ export function checkFindings(reportText: string, taskText: string): FindingsChe
     const s = last.get(id)
     if (!s) return true
     if (s.status === 'behoben') return !FIXED_WITH_COMMIT.test(s.grund)
-    if (s.status === 'verworfen') return s.grund === ''
+    if (s.status === 'verworfen' || s.status === 'gemerkt') return s.grund === ''
     return true
   })
   return { ids, fehlend }

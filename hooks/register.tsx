@@ -700,10 +700,12 @@ async function loadBook($: EngineInterface, dir: string): Promise<Book> {
   const registry = parseRegistry(await readText($, `${dir}/agents.json`), name)
   const book: Book = { costs, registry, dirty: false, saved: bookSnapshot(costs, registry) }
   books.set(dir, book)
-  // Agenten nach einem Neuladen des Mods wieder kennen
+  // Agenten nach einem Neuladen des Mods wieder kennen; der Bericht gilt im Hauptordner (wie reportPath)
+  const root = await rootOf($)
   for (const a of Object.values(registry.agenten)) {
     if (!agents.has(a.id)) {
-      agents.set(a.id, { id: a.id, rolle: a.rolle, paket: a.paket, dir: dir === SETUP_DIR ? null : dir, book: dir, groesse: '', baseline: null })
+      const bericht = a.bericht && root && !/^([\\/]|[A-Za-z]:|~)/.test(a.bericht) ? `${root.replace(/\\/g, '/').replace(/\/+$/, '')}/${a.bericht}` : undefined
+      agents.set(a.id, { id: a.id, rolle: a.rolle, paket: a.paket, dir: dir === SETUP_DIR ? null : dir, book: dir, groesse: '', baseline: null, ...(bericht ? { bericht } : {}) })
     }
   }
   return book
@@ -1105,9 +1107,19 @@ async function onSpawned($: EngineInterface, cwd: string | undefined, s: Spawn, 
   // Ohne Aufgabe ins Rückfall-Buch SETUP_DIR
   const b = await bookOf($, rt.book)
   const now = iso(await $.clock.now())
+  const bericht = s.bericht ? relPath(s.bericht, [await rootOf($)]) : undefined
   registerAgent(
     b.registry,
-    { id: agentId, rolle: s.role, paket: s.paket, modell: model || s.model || '', gestartet: now, mitgeliefert: s.mitgeliefert, ...(s.eltern ? { eltern: s.eltern } : {}) },
+    {
+      id: agentId,
+      rolle: s.role,
+      paket: s.paket,
+      modell: model || s.model || '',
+      gestartet: now,
+      mitgeliefert: s.mitgeliefert,
+      ...(s.eltern ? { eltern: s.eltern } : {}),
+      ...(bericht ? { bericht } : {}),
+    },
     now,
   )
   noteRun(b.costs, s.role)

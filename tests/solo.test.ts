@@ -91,6 +91,51 @@ describe('Solo-Weg im Mod', () => {
     expect((await bash('ag3', 'node cli.js --wert 0 > /tmp/aus.txt')).deny).toBeUndefined()
   })
 
+  test('Fortgesetzter Solo-Prüfer: Bericht steht im Register und gilt nach einem Neuladen des Mods weiter', async ($, on) => {
+    mock.store(on)
+    const written = fakeWorld(on, {
+      ...FILES,
+      'profiles.json': PROFILES,
+      [`${SDIR}/STATE.md`]: soloState('abc1234'),
+      // Prüfer aus einem früheren Prozess (nur im Register bekannt), zweiter Prüfer mit eigenem Bericht
+      [`${SDIR}/agents.json`]: JSON.stringify({
+        version: 1,
+        aufgabe: 'solo-s',
+        agenten: {
+          alt1: { id: 'alt1', rolle: 'solo-reviewer', paket: null, modell: 'opus', gestartet: '2026-10-23T08:00:00.000Z', mitgeliefert: [], letzteAktivitaet: '2026-10-23T08:01:00.000Z', gelesen: [], geaendert: [], erstellt: [], suchen: 0, bericht: `${SDIR}/reports/pruefung-sicherheit.md` },
+        },
+      }),
+    })
+    gitAnswers(on, () => '')
+    let n = 0
+    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: e.resume?.agentId ?? `ag${++n}` }))
+    on('tool.call', () => ({ result: {} }))
+    const write = (agentId: string, file_path: string) => $.tool.call({ tool: 'Write', file_path, content: 'x', agentId } as never)
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+
+    // neuer Start: Bericht repo-relativ im Register
+    await spawn($, `Aufgabenordner: ${SDIR}/`, 'codecycle:solo-reviewer') // ag1
+    // Fortsetzen nach einem Neuladen: Laufzeit nur aus dem Register
+    await $.agent.spawn({
+      tool_use_id: 'tu2',
+      prompt: 'Schreibe den Bericht fertig.',
+      description: 'Test',
+      subagentType: 'codecycle:solo-reviewer',
+      provider: { plugin: 'engine', tier: 'core' },
+      parentModel: 'claude-sonnet-5-5',
+      background: false,
+      fork: false,
+      resume: { agentId: 'alt1' },
+    } as never)
+    expect((await write('alt1', `/proj/${SDIR}/reports/pruefung-sicherheit.md`)).deny).toBeUndefined()
+    expect((await write('alt1', `/proj/${SDIR}/reports/pruefung.md`)).deny).toMatch(/nicht dein Bericht/)
+    expect((await write('alt1', '/proj/src/a.ts')).deny).toMatch(/nicht dein Bericht/)
+    await $.session.end({ reason: 'other', sessionId: 's' } as never)
+    const reg = JSON.parse(written[`${SDIR}/agents.json`]!)
+    expect(reg.agenten.ag1.bericht).toBe(`${SDIR}/reports/pruefung.md`)
+    expect(reg.agenten.alt1.bericht).toBe(`${SDIR}/reports/pruefung-sicherheit.md`)
+  })
+
   test('Merge-Sperre: ohne Prüfbericht oder mit offenen Funden kein git merge des Solo-Branchs', async ($, on) => {
     mock.store(on)
     fakeWorld(on, FILES)
