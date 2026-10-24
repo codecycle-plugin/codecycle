@@ -430,7 +430,7 @@ const UPDATE_TIMEOUT_MS = 600_000
  * Meldung nach /codecycle:update mit Neuladen. Ehrlich: In der Desktop-App lief /reload-plugins per command.run an, meldete
  * aber selbst „isn't available over a remote connection“; command.run lehnt dann nicht ab, der Rückfall greift nicht.
  */
-const RELOAD_PLANNED = 'Neuladen eingeplant: /reload-plugins läuft gleich. Falls nicht neu geladen wird: /reload-plugins eingeben.'
+const RELOAD_PLANNED = 'Neuladen eingeplant: /reload-plugins läuft gleich. Falls nicht neu geladen wird: /reload-plugins eingeben oder Claude Code neu starten.'
 /** `codecycle notiz` hängt nur eine Zeile an */
 const NOTIZ_TIMEOUT_MS = 15_000
 /**

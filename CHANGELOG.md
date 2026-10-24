@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.22.4 / Werkzeug 0.8.2] – 2026-10-24
+
+### Behoben
+
+- `/codecycle:update` bei mehreren Installationen (für alle Projekte und für einzelne Projekte): Es zählt die Installation des aktuellen Ordners, beide werden angehoben, eine ältere Version wird nie mehr als Update gemeldet. Haben die Installationen verschiedene Versionen, sagt der Befehl welche. Klappt das Neuladen nicht, rät er zum Neustart.
+
 ## [0.22.3 / Werkzeug 0.8.1] – 2026-10-24
 
 ### Geändert

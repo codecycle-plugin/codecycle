@@ -8,7 +8,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 import { COPY_DIR, readCopyInfo } from '../copy.ts'
 import { ToolBroken } from '../errors.ts'
@@ -86,12 +86,36 @@ export function lastJson(text: string): unknown {
  * mit `--available` ein Objekt `{ installed, available }`, beides wird verstanden.
  */
 export function installPathOf(listJson: unknown): string | null {
-  const installed = Array.isArray(listJson) ? (listJson as { id?: string; installPath?: string }[]) : (listJson as { installed?: { id?: string; installPath?: string }[] } | null)?.installed
-  const entry = Array.isArray(installed) ? installed.find(p => p.id === PLUGIN_ID) : undefined
+  const entry = entriesOf(listJson)[0]
   return typeof entry?.installPath === 'string' ? entry.installPath : null
 }
 
-const norm = (p: string): string => resolve(p).replace(/\\/g, '/').toLowerCase()
+/** Ein Eintrag von codecycle in `claude plugin list --json`; je Bereich (`user`, `project`, `local`) einer, `local`/`project` mit `projectPath`. */
+export type Entry = { id?: string; scope?: string; projectPath?: string; installPath?: string; version?: string }
+
+/** Alle Einträge von codecycle, in der Reihenfolge der Liste. */
+export function entriesOf(listJson: unknown): Entry[] {
+  const installed = Array.isArray(listJson) ? (listJson as Entry[]) : (listJson as { installed?: Entry[] } | null)?.installed
+  return Array.isArray(installed) ? installed.filter(p => p.id === PLUGIN_ID) : []
+}
+
+const SCOPE_RANK: Record<string, number> = { local: 0, project: 1 }
+/**
+ * Der Eintrag, der für den Arbeitsordner gilt: `local` oder `project`, dessen `projectPath` der Ordner oder ein Oberordner
+ * ist (der längste gewinnt, so hat ein Worktree im Projekt seinen eigenen; `local` vor `project`), sonst `user`, sonst der
+ * erste (Liste ohne Bereiche). Unbestätigt: ob Claude Code `projectPath` genauso zuordnet.
+ */
+export function entryFor(listJson: unknown, cwd: string): Entry | null {
+  const entries = entriesOf(listJson)
+  const here = norm(cwd)
+  const matching = entries
+    .filter(e => e.scope !== undefined && e.scope in SCOPE_RANK && typeof e.projectPath === 'string')
+    .filter(e => here === norm(e.projectPath!) || here.startsWith(`${norm(e.projectPath!)}/`))
+    .sort((a, b) => norm(b.projectPath!).length - norm(a.projectPath!).length || SCOPE_RANK[a.scope!]! - SCOPE_RANK[b.scope!]!)
+  return matching[0] ?? entries.find(e => e.scope === 'user') ?? entries[0] ?? null
+}
+
+const norm = (p: string): string => resolve(p).replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
 /** Aus dem Cache von Claude Code geladen? Sonst `--plugin-dir` (Entwicklungsstand): nichts aktualisieren. */
 export const fromCache = (root: string): boolean => norm(root).includes('/.claude/plugins/cache/')
 
@@ -130,21 +154,51 @@ export function updatePlugin(ctx: Ctx, run: Runner, pluginRoot: string, plugin: 
     ctx.out(`Plugin ${plugin.vorher}: ${plugin.hinweis}`)
     return null
   }
+  const list = (): unknown => lastJson(run(['claude', 'plugin', 'list', '--json'], ctx.cwd).stdout)
   const market = run(['claude', 'plugin', 'marketplace', 'update', MARKETPLACE], ctx.cwd)
-  const upd = market.code === 0 ? run(['claude', 'plugin', 'update', PLUGIN_ID, '--json'], ctx.cwd) : market
+  let upd = market
+  if (market.code === 0) {
+    // Ohne --scope hebt `claude plugin update` nur einen Eintrag an: erst den dieses Ordners, dann den für alle Projekte (user)
+    const before = list()
+    const own = entryFor(before, ctx.cwd)
+    const scopes = own?.scope === undefined ? [undefined] : [...new Set([own.scope, ...(entriesOf(before).some(e => e.scope === 'user') ? ['user'] : [])])]
+    for (const [i, scope] of scopes.entries()) {
+      const r = run(['claude', 'plugin', 'update', PLUGIN_ID, ...(scope ? ['--scope', scope] : []), '--json'], ctx.cwd)
+      if (i === 0) upd = r
+      // Scheitert nur der zusätzliche Bereich, gilt der Eintrag dieses Ordners trotzdem: Hinweis, weiter
+      else if (r.code !== 0) ctx.out(`Plugin-Update für ${scope} nicht möglich (${lastLine(r.stderr) || lastLine(r.stdout) || `Exit ${r.code}`}); Update über /plugin`)
+      if (upd.code !== 0) break
+    }
+  }
   if (upd.code !== 0) {
     const why = upd.missing ? '`claude` nicht gefunden' : (lastLine(upd.stderr) || lastLine(upd.stdout) || `Exit ${upd.code}`)
     plugin.hinweis = `Plugin-Update nicht möglich (${why}); Update über /plugin`
     ctx.out(`Plugin ${plugin.vorher}: ${plugin.hinweis}`)
     return null
   }
-  const path = installPathOf(lastJson(run(['claude', 'plugin', 'list', '--json'], ctx.cwd).stdout))
+  const after = list()
+  const versions = entriesOf(after).map(e => `${e.scope === 'user' || e.scope === undefined ? (e.scope ?? '?') : `${e.scope} ${basename(e.projectPath ?? '?')}`} ${e.version ?? '?'}`)
+  if (new Set(entriesOf(after).map(e => e.version)).size > 1) ctx.out(`Installationen mit verschiedenen Versionen: ${versions.join(', ')}`)
+  const path = entryFor(after, ctx.cwd)?.installPath ?? null
   if (path === null || norm(path) === norm(pluginRoot) || !existsSync(join(path, 'tool', 'cli.ts'))) {
     ctx.out(`Plugin ${plugin.vorher}: aktuell`)
     return null
   }
+  const found = pluginVersionOf(path)
+  const cmp = versionsLib.compareVersions(found, plugin.vorher)
+  if (cmp !== 1) {
+    // Gleich, älter oder nicht vergleichbar: nie als Update melden, Teil B mit dem laufenden Werkzeug
+    ctx.out(
+      cmp === 0
+        ? `Plugin ${plugin.vorher}: aktuell`
+        : cmp === null
+          ? `Plugin ${plugin.vorher}: Version für diesen Ordner nicht vergleichbar (${found}), nicht gewechselt; /plugin zeigt die Einträge`
+          : `Plugin ${plugin.vorher}: für diesen Ordner ist ${found} installiert, nicht zurückgestuft; /plugin zeigt die Einträge`,
+    )
+    return null
+  }
   // Neue Version auf der Platte (gerade geholt oder schon im Hintergrund): ihr Werkzeug macht Teil B
-  ctx.out(`Plugin ${plugin.vorher} → ${pluginVersionOf(path)} (gilt ab jetzt für alle Projekte auf diesem Rechner)`)
+  ctx.out(`Plugin ${plugin.vorher} → ${found} (gilt ab jetzt für alle Projekte auf diesem Rechner)`)
   const child = run(['node', join(path, 'tool', 'cli.ts'), 'update', '--nur-werkzeug', '--plugin-vorher', plugin.vorher], ctx.cwd)
   for (const line of child.stdout.replace(/\r?\n$/, '').split(/\r?\n/)) if (line !== '') ctx.out(line)
   return child.code

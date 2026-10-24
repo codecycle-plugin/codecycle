@@ -525,7 +525,7 @@ describe('/codecycle:update ohne KI', () => {
     expect(r.text).not.toMatch(/UPDATE_RESULT/)
     expect(r.text).toMatch(/Neuladen eingeplant/)
     // Desktop-App: /reload-plugins kann anlaufen und selbst scheitern, ohne dass command.run ablehnt
-    expect(r.text).toMatch(/Falls nicht neu geladen wird: \/reload-plugins eingeben\.$/)
+    expect(r.text).toMatch(/Falls nicht neu geladen wird: \/reload-plugins eingeben oder Claude Code neu starten\.$/)
     expect(skill).toEqual([])
     await CLOCK.current!.advance(10)
     expect(reloads).toEqual(['reload-plugins'])
