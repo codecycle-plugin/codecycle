@@ -1,0 +1,9 @@
+{
+  "name": "codecycle-doku",
+  "version": "0.1.0",
+  "description": "Doku-Baukasten für Claude Code: feste Orte und Arten für die Doku, Festhalten von Ideen, Bugs und To-dos mit erzeugter Übersicht, Prüfer und Hook.",
+  "author": {
+    "name": "codecycle-doku"
+  },
+  "license": "MIT"
+}

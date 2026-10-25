@@ -1,0 +1,11 @@
+{
+  "_status": "Vorläufige Werte; die Zeile der Rolle toolsmith ist offen bis Messung. Einzige Quelle für Rolle -> Modell; Werte sind Aliase von Claude Code. part-reviewer: Modell des Schlussprüfers mit „Auftrag: Teil“ (Prüfer je Teil), ohne eigene Agentendatei.",
+  "models": {
+    "setup": "sonnet",
+    "toolsmith": "sonnet",
+    "plan-reviewer": "opus",
+    "builder": "opus",
+    "final-reviewer": "opus",
+    "part-reviewer": "sonnet"
+  }
+}

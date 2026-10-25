@@ -1,0 +1,13 @@
+{
+  "name": "codecycle",
+  "version": "0.25.0",
+  "description": "Fester, wiederholbarer Arbeitsablauf für Claude Code: Befehle (new, solo, continue, status, setup, ideas, check, update), Rollen-Agenten, Projekt-Werkzeug und optionaler Mod (Statuszeile, Bautafel, Seitenleiste).",
+  "author": {
+    "name": "codecycle"
+  },
+  "license": "MIT",
+  "dependencies": ["codecycle-doku"],
+  "repository": "https://github.com/codecycle-plugin/codecycle",
+  "homepage": "https://github.com/codecycle-plugin/codecycle",
+  "types": "./types/index.d.ts"
+}

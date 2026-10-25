@@ -1,0 +1,35 @@
+# Beitragen
+
+Rückmeldungen und Pull Requests sind willkommen.
+
+- **Fehler und Ideen:** als Issue anlegen. Bei Fehlern helfen die Version (`claude plugin list`), das Betriebssystem und eine kurze Beschreibung, wie es dazu kam.
+- **Pull Requests:** Sie werden geprüft und als Patch in die Entwicklung übernommen, nicht direkt gemergt. Auf GitHub steht der Pull Request danach als „Closed“, nicht als „Merged“: Sobald die Änderung in einer veröffentlichten Version steckt, wird der Pull Request mit einem Hinweis auf diese Version geschlossen. Wer beigetragen hat, steht im Versions-Commit als Mitautor.
+- **Vor dem Pull Request** im Ordner `codecycle/` prüfen:
+
+  ```
+  claude plugin validate .
+  claude plugin test .
+  ```
+
+  `validate` prüft, ob das Plugin formal gültig ist (Manifest, Agenten, Skills, Mod). `test` führt die Mod-Tests in `tests/` aus; sie liegen im Plugin, weil `claude plugin test` nur dort sucht, und laufen bei Nutzern nie mit. Zum Ausprobieren das Plugin direkt aus dem Ordner laden, zusammen mit dem Doku-Plugin, das es voraussetzt: `claude --plugin-dir . --plugin-dir ../codecycle-doku` (ohne das zweite `--plugin-dir` lädt codecycle nicht; eine installierte Fassung vorher mit `claude plugin disable codecycle@codecycle` abschalten). <!-- doku-ok -->
+
+- Die Texte (Skills, Agenten, README, Changelog) sind auf Deutsch.
+- Mit einem Beitrag stimmst du zu, dass er unter der [MIT-Lizenz](LICENSE) des Projekts steht.
+
+## Aufbau
+
+| Ordner / Datei | Inhalt |
+|---|---|
+| `.claude-plugin/` | `plugin.json` (Name, Version, Abhängigkeit `codecycle-doku`); den Katalog des Marktplatzes (`marketplace.json`) hat die Wurzel des Repos |
+| `skills/` | die Befehle `/codecycle:*` als Anleitungen für Claude; `workflow/` enthält die gemeinsamen Regeln, den Merge-Ablauf, die Randfälle und die Vorlagen |
+| `agents/` | eine Datei je Rolle (Planprüfer, Bauender, Schlussprüfer, Einrichter, Werkzeugmeister): Aufgabe, erlaubte Werkzeuge, Regeln; der Block „Gemeinsame Regeln“ ist in allen Agenten wortgleich |
+| `models.json` | Modell je Rolle (Tabelle Rolle → Modell), dazu `part-reviewer` für den Prüfer je Teil; den Effort nennt die Agenten-Datei |
+| `hooks/` | der Mod: `register.tsx` (Anmeldung, Ereignisse, Werkzeuge), `band.tsx` (Bautafel), `panel.tsx` und `desk.tsx` (Seitenleiste), `hooks.json`; in `hooks/lib/` Budget, Token-Buch, Agenten-Figuren und der Zaun für Befehle der Agenten |
+| `tool/` | das Projekt-Werkzeug `codecycle` (TypeScript, läuft direkt mit Node); `/codecycle:setup` kopiert es ins Projekt nach `.codecycle/tool/` |
+| `lib/` | Bausteine, die Mod und Werkzeug teilen (Aufgaben-Dateien lesen, Schalter, geschützte Pfade, Regeln für `guard`, Bash-Prüfung) |
+| `bin/` | Starter für `codecycle` in sh, cmd und PowerShell |
+| `githooks/` | Vorlagen für die Git-Hooks, die `codecycle hooks install` im Projekt nach `.githooks/` legt (Pre-Commit-Prüfung, Graph-Aktualisierung) |
+| `tests/` | Mod-Tests für `claude plugin test .` |
+| `types/` | Typen des Mod-Zustands (nur für TypeScript) |
+
+Bei einer Änderung am Werkzeug (`tool/`, `lib/`, `githooks/`) steigt auch dessen Version in `tool/version.ts`, damit Projekte ihre Kopie mit `/codecycle:update` erneuern.

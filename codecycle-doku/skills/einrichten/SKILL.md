@@ -1,0 +1,122 @@
+---
+description: "Richtet die Doku eines Projekts ein oder ergänzt sie: erkundet Vorhandenes, fragt nach Bausteinen, Ablage, Verschieben und Überarbeiten und legt nur an, was der Nutzer zugestimmt hat."
+argument-hint: ""
+---
+
+# /codecycle-doku:einrichten
+
+## Zweck
+Die Doku des Projekts einrichten: feste Orte und Arten, Festhalten von Ideen, Bugs und To-dos, Prüfer und Hook. Du fragst, das Skript führt aus.
+
+## Grundsätze
+- **Erst einfinden.** In einem Projekt mit Doku änderst, verschiebst oder legst du nichts an, ohne dass der Nutzer zugestimmt hat.
+- **Du schreibst keine Doku-Datei selbst** (kein Write, kein Edit). Alles Anlegen, Anhängen, Verschieben und Überarbeiten macht das Skript mit der Liste der zugestimmten Schritte.
+- **Fragen stellst du wortgleich wie unten**, eine je Nachricht, im Format „a) Empfehlung / b) Dagegen spricht“. Der Nutzer antwortet mit einem Buchstaben; setze in `<…>` nur die Angaben aus dem Projekt ein.
+
+## Skript
+- Skript: `${CLAUDE_PLUGIN_ROOT}/skripte/einrichten.mjs`, Prüfer: `${CLAUDE_PLUGIN_ROOT}/skripte/pruefer.mjs`, Erkunder: Agent `codecycle-doku:erkunder`.
+- `node "<Skript>" --root "<Projekt>" --stand`: JSON mit `eingerichtet`, `leer`, `repo`, `bausteine`, `changelog` und je Schritt `zustand` (`fehlt`, `vorhanden`, `veraltet`, `eigener Inhalt`).
+- `node "<Skript>" --root "<Projekt>" --antworten - --dry-run`: zeigt jeden Schritt mit Inhalt, schreibt nichts. Ohne `--dry-run` führt es aus.
+- Antworten als JSON über stdin, in Bash mit Heredoc (`<<'JSON'` … `JSON`), in PowerShell mit Pipe. Felder:
+  - `schritte` (Pflicht): zugestimmte Schritte; eine leere Liste schreibt nichts.
+  - `bausteine`, `ablage` (`teilen` oder `lokal`), `zuordnung` (`[{ "pfad", "art" }]`), `changelog` (`{ "datei", "schema", "beschreibung" }`), `festhalten`, `orte`: nur, wo das Projekt vom Standard abweicht.
+  - `verschieben`: `[{ "von", "nach" }]`, dazu je Datei der Schritt `verschieben:<von>`. Nur einzelne Dateien; einen Ordner lehnt das Skript ab.
+  - `inhalte`: `{ "<pfad>": "<neuer Text>" }`, dazu je Datei der Schritt `ueberarbeiten:<pfad>`.
+- Schritte je Baustein: `doku-json`, `karte`, `verweis` immer; `readme`, `claude-md`, `changelog`, `schreibregeln`, `festhalten:idee`, `festhalten:bug`, `festhalten:todo`, `chronik`, `entscheidungen`, `wegweiser`, `berichte`, `prompts`; `gitignore` bei Ablage „lokal“ und im leeren Projekt; `git-init` nur nach der Git-Frage.
+- Eine vorhandene Datei ersetzt das Skript nur mit `ueberarbeiten:<pfad>`. Ein erzeugter Changelog wird nie geändert.
+
+## Bausteine
+| Baustein | Grundausstattung | Wozu |
+|---|---|---|
+| `readme` | ja | Einstieg für Menschen: was, Installation, Benutzung |
+| `claude-md` | ja | Regeln, die jede Sitzung braucht, mit Verweis auf die Karte der Doku |
+| `changelog` | ja | Änderungen je Version; ein vorhandenes Schema wird erkannt und beschrieben |
+| `schreibregeln` | ja | Regeldatei mit Arten und Schreibregeln; lädt nur beim Arbeiten an Markdown |
+| `festhalten` | ja | feste Orte für Ideen, Bugs und To-dos mit Gerüst, Feldern und erzeugter Übersicht |
+| `chronik` | ja | was geschah: Datum, was, ein Halbsatz Warum, Verweis |
+| `entscheidungen` | ja | Entscheidungen mit allen Alternativen und der Antwort im Wortlaut |
+| `wegweiser` | Erweiterung | Wegweiser durch die Doku-Dateien; lohnt ab etwa zehn Dateien |
+| `berichte` | Erweiterung | Ordner für einmalige Befunde |
+| `prompts` | Erweiterung | Ordner für Aufträge an Sitzungen oder Agenten |
+| `mermaid` | Erweiterung | verknüpfte Einträge in der Übersicht zusätzlich als Diagramm |
+
+Prüfer und Hook gehören zur Grundausstattung; sie laufen, sobald `.claude/doku.json` da ist. Zu jedem Baustein, den du anbietest, nennst du die Zeile „Wozu“.
+
+## Ablauf
+1. Führe `--stand` aus. `eingerichtet: true` → „Erneuter Aufruf“. `leer: true` (außer `.git`, `.gitignore`, `.gitattributes` und `.claude/settings.local.json` keine Datei und kein Ordner) → „Leeres Projekt“. Sonst → „Projekt mit Doku“.
+
+### Leeres Projekt
+2. Stelle Frage 1, dann Frage 2. Nur bei `repo: false` zusätzlich Frage 3.
+3. Schritte: die der gewählten Bausteine (Liste unter „Skript“) mit `gitignore`, dazu `git-init`, wenn Frage 3 mit „a“ beantwortet ist. Führe ohne weitere Einzelfragen aus.
+4. Weiter mit „Abschluss“.
+
+### Projekt mit Doku
+2. Starte den Erkunder. Startnachricht: Projektwurzel, Pfad des Prüfers, Ausgabe von `--stand`.
+3. Bericht an den Nutzer, „So sieht deine Doku aus“: Zahlen des Prüfers, Zuordnung des Vorhandenen zu den Bausteinen, Changelog mit Schema, was fehlt. Kurze Punkte, keine Wertung.
+4. Stelle Frage 4, dann Frage 2.
+5. Nur wenn der Erkunder Unübersichtliches meldet: Frage 5 je vorgeschlagener Datei.
+6. Überarbeiten: Für jede Datei mit Treffern des Prüfers bereitest du den überarbeiteten Text vor (nur die Treffer beheben, Inhalt und Ton des Nutzers behalten), zeigst die Änderung als Gegenüberstellung und stellst Frage 6. Bei mehr als fünf Dateien zuerst Frage 7.
+7. Stelle die Antworten zusammen (Zuordnung und Changelog aus dem Bericht des Erkunders), führe `--dry-run` aus, zeige die Ausgabe und stelle Frage 8. Erst nach „a“ ausführen.
+8. Weiter mit „Abschluss“.
+
+### Erneuter Aufruf
+2. Zeige aus `--stand` die Schritte mit `fehlt` (gewählte und nicht gewählte Bausteine getrennt, je mit „Wozu“) und die mit `veraltet` (Karte, Schreibregeln oder Übersicht weichen vom Stand des Plugins ab).
+3. Nichts fehlt und nichts veraltet: sag das und ende.
+4. Stelle Frage 9, dann `--dry-run`, Frage 8, ausführen.
+
+### Abschluss
+- Lass den Prüfer über das Projekt laufen und nenne die Schlusszeile.
+- Nenne angelegte, geänderte, verschobene und übersprungene Dateien aus der Ausgabe des Skripts.
+- Ob committet wird, entscheidet der Nutzer; frage einmal.
+
+## Fragen
+
+**Frage 1: Bausteine im leeren Projekt**
+> Welche Bausteine lege ich an?
+> a) Empfehlung: die Grundausstattung: README, CLAUDE.md, CHANGELOG, Regeldatei, Festhalten (Ideen, Bugs, To-dos), Chronik, Entscheidungen; Prüfer und Hook laufen damit.
+> b) Dagegen spricht: Wächst das Projekt, fehlen Wegweiser, Berichte, Prompts und das Diagramm der Übersicht; dann die Grundausstattung mit allen Erweiterungen.
+> Einzelne Erweiterungen kannst du auch beim Namen nennen.
+
+**Frage 2: Ablage der Arbeits-Doku**
+> Wo liegt die Arbeits-Doku (Festhalten, Chronik, Entscheidungen, Berichte, Prompts)?
+> a) Empfehlung: teilen; sie liegt im Repo, geht auf jedes Gerät mit, und eine neue Sitzung findet sie dort.
+> b) Dagegen spricht: In einem öffentlichen Repo wären Notizen, Wortlaut und offene Bugs lesbar; dann lokal, sie kommt in die `.gitignore` und bleibt auf diesem Gerät.
+
+**Frage 3: Git**
+> Hier gibt es kein Git-Repo. Soll ich eins anlegen (`git init -b main`)?
+> a) Empfehlung: ja; Doku und Code haben dann eine Geschichte, und die Ablage „teilen“ wirkt erst damit.
+> b) Dagegen spricht: Gehört der Ordner in ein anderes Repo oder soll er nicht versioniert werden, bleibt es ohne Repo.
+
+**Frage 4: Bausteine im Projekt mit Doku**
+> Was soll ich zu deiner Doku dazulegen? Fehlend: <Bausteine mit je einer Zeile Wozu>.
+> a) Empfehlung: die fehlenden Teile der Grundausstattung; Vorhandenes bleibt, wo es ist, und wird in `.claude/doku.json` zugeordnet.
+> b) Dagegen spricht: Jeder neue Ort ist eine Datei mehr; dann nur `.claude/doku.json` mit der Zuordnung, Prüfer und Hook laufen damit, sonst ändert sich nichts.
+> Erweiterungen kannst du beim Namen dazunehmen, einzelne Bausteine abwählen.
+
+**Frage 5: Verschieben (je Datei)**
+> `<von>` liegt abseits der übrigen Doku. Soll ich sie nach `<nach>` verschieben und die Links darauf anpassen?
+> a) Empfehlung: verschieben; die Doku liegt dann beisammen, Links bleiben heil.
+> b) Dagegen spricht: Werkzeuge, Lesezeichen oder Verweise von außen kennen den alten Pfad; dann bleibt sie und wird nur zugeordnet.
+
+**Frage 6: Überarbeiten (je Datei)**
+> So würde ich `<Datei>` überarbeiten (Änderung oben). Übernehmen?
+> a) Empfehlung: übernehmen; die Datei hält danach die Schreibregeln ein, und der Prüfer findet dort keine Treffer.
+> b) Dagegen spricht: Es ist dein Text, und Hinweise sind keine Fehler; dann bleibt die Datei, wie sie ist.
+
+**Frage 7: Viele Dateien zum Überarbeiten**
+> <Anzahl> Dateien haben Treffer. Soll ich sie einzeln mit dir durchgehen?
+> a) Empfehlung: nur die mit scharfen Treffern (tote Links, Felder, Inhaltsverzeichnis); die übrigen beheben sich, wenn die Datei sowieso angefasst wird.
+> b) Dagegen spricht: Dann bleiben Hinweise stehen; dann alle einzeln.
+
+**Frage 8: Ausführen**
+> Das ist der Probelauf (oben). Soll ich genau das ausführen?
+> a) Empfehlung: ja, ausführen.
+> b) Dagegen spricht: Ein Schritt passt nicht; nenne ihn, ich nehme ihn heraus und zeige den Probelauf neu.
+
+**Frage 9: Ergänzen**
+> Es fehlen oder sind veraltet: <Schritte mit je einer Zeile Wozu>. Soll ich sie anlegen oder erneuern?
+> a) Empfehlung: alle, die zu gewählten Bausteinen gehören; nicht gewählte nur, wenn du sie nennst.
+> b) Dagegen spricht: Jeder Schritt ändert das Projekt; dann nenne die, die du willst.
+
+## Ergebnis
+`.claude/doku.json`, Karte `.claude/rules/codecycle-doku.md`, dazu nur die zugestimmten Gerüste, Ordner und Einträge; Prüfer-Schlusszeile im Abschluss.

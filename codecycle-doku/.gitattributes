@@ -1,0 +1,4 @@
+# Shell-Starter immer mit LF, sonst bricht er (#!/bin/sh mit CR)
+bin/* text eol=lf
+# cmd.exe braucht CRLF; die spätere Zeile gewinnt
+bin/*.cmd text eol=crlf

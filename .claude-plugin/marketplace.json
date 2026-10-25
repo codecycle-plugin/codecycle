@@ -1,14 +1,19 @@
 {
   "name": "codecycle",
-  "description": "Marktplatz für das Plugin codecycle",
+  "description": "Marktplatz für die Plugins codecycle und codecycle-doku",
   "owner": {
     "name": "codecycle"
   },
   "plugins": [
     {
       "name": "codecycle",
-      "source": ".",
-      "description": "Fester, wiederholbarer Arbeitsablauf für Claude Code mit Profilen, Rollen-Agenten und optionalem Mod"
+      "source": "./codecycle",
+      "description": "Fester, wiederholbarer Arbeitsablauf für Claude Code mit Modell je Rolle, Rollen-Agenten und optionalem Mod"
+    },
+    {
+      "name": "codecycle-doku",
+      "source": "./codecycle-doku",
+      "description": "Doku-Baukasten: feste Orte und Arten für die Doku, Festhalten mit erzeugter Übersicht, Prüfer und Hook"
     }
   ]
 }

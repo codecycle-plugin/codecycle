@@ -1,0 +1,92 @@
+{
+  "sprache": "de",
+  "arten": {
+    "anweisung": {
+      "titel": "Anweisung: Regeln, die immer gelten, im Befehlston",
+      "regeln": ["herkunft", "datum", "zeitwort", "version", "laenge-400"],
+      "maxZeilen": 200
+    },
+    "nachschlagen": {
+      "titel": "Nachschlagen: Ist-Zustand und Fundstellen",
+      "regeln": ["herkunft", "datum", "zeitwort", "laenge-800"]
+    },
+    "entscheidung": { "titel": "Entscheidung: Frage, Alternativen, Wortlaut, Datum", "regeln": [] },
+    "chronik": { "titel": "Chronik: wer, wann, was; nur anhängen", "regeln": ["laenge-1000"] },
+    "changelog-eigen": { "titel": "Changelog mit eigenem Schema: nur Länge und Links", "regeln": ["laenge-1000"] },
+    "bericht": { "titel": "Bericht: einmalig, danach eingefroren", "regeln": [] },
+    "prompt": { "titel": "Prompt: Auftrag für eine Sitzung, danach Vorlage", "regeln": [] },
+    "eintrag": { "titel": "Eintrag zum Festhalten (Idee, Bug, To-do): Felder im Kopf", "regeln": [] }
+  },
+  "standardZuordnung": [
+    { "pfad": "CLAUDE.md", "art": "anweisung" },
+    { "pfad": "**/CLAUDE.md", "art": "anweisung" },
+    { "pfad": ".claude/rules/**", "art": "anweisung" },
+    { "pfad": "README.md", "art": "nachschlagen" },
+    { "pfad": "CHANGELOG.md", "art": "chronik" }
+  ],
+  "woerter": {
+    "de": [
+      "derzeit", "aktuell", "aktuelle", "aktuellen", "aktueller", "aktuelles", "jetzt", "nun", "nunmehr",
+      "vorher", "bisher", "bisherige", "bisherigen",
+      "noch nicht", "nicht mehr", "bald", "inzwischen", "mittlerweile", "künftig", "künftige", "künftigen",
+      "früher", "frühere", "früheren", "ab sofort", "ab jetzt"
+    ],
+    "en": [
+      "as of this writing", "currently", "does not yet", "eventually", "future", "latest",
+      "newer", "now", "older", "presently", "at present", "soon"
+    ]
+  },
+  "regeln": {
+    "herkunft": {
+      "titel": "Herkunft",
+      "grund": "Woher eine Regel stammt, gehört in Entscheidung oder Chronik; hier steht nur, was gilt.",
+      "muster": "vorher galt|\\(Nutzer[,)]|Nutzerw(?:unsch)|(?<!\\p{L})seit (?:Version |v)?\\d+\\.\\d+|(?<!\\p{L})seit 20\\d\\d-",
+      "flags": "iu"
+    },
+    "datum": {
+      "titel": "Datum",
+      "grund": "Ein Datum markiert Geschichte; was gilt, braucht keins. Daten in Pfaden und Dateinamen zählen nicht.",
+      "muster": "(?<![/\\w-])20\\d\\d-\\d\\d-\\d\\d(?![\\w-])",
+      "flags": "u"
+    },
+    "zeitwort": {
+      "titel": "Zeitwort",
+      "grund": "Zeitlos schreiben: beschreiben, was gilt, nicht wie es sich geändert hat.",
+      "woerter": true
+    },
+    "version": {
+      "titel": "Versionsnummer",
+      "grund": "Eine Version veraltet unbemerkt; sie steht nur in der Datei, die sie festlegt.",
+      "muster": "(?<![\\w.])v?\\d+\\.\\d+\\.\\d+(?:-\\w+(?:\\.\\w+)*)?(?!\\w|\\.\\d)",
+      "flags": "u"
+    },
+    "laenge-400": { "titel": "Zeile über 400 Zeichen", "grund": "Ein Punkt, eine Regel; lange Absätze werden überlesen.", "maxZeichen": 400 },
+    "laenge-800": { "titel": "Zeile über 800 Zeichen", "grund": "Nachschlagen in kurzen Punkten.", "maxZeichen": 800 },
+    "laenge-1000": { "titel": "Zeile über 1000 Zeichen", "grund": "Chronik in kurzen Einträgen.", "maxZeichen": 1000 }
+  },
+  "links": { "dateien": ["**/*.md"] },
+  "inhaltsverzeichnis": { "dateien": ["**/README.md"], "abZeilen": 100 },
+  "festhalten": {
+    "felder": ["titel", "datum", "bezug", "status", "wichtigkeit"],
+    "status": ["offen", "erledigt"],
+    "wichtigkeit": ["wichtig", "normal"],
+    "arten": {
+      "idee": {
+        "titel": "Ideen",
+        "ergebnis": ["umgesetzt", "verworfen", "ersetzt"],
+        "abschnitte": ["Möglichkeiten", "Grund dafür", "Grund dagegen"]
+      },
+      "bug": {
+        "titel": "Bugs",
+        "ergebnis": ["behoben", "kein Fehler", "wird nicht behoben"],
+        "abschnitte": ["So stellt man ihn nach", "Erwartet", "Tatsächlich"]
+      },
+      "todo": {
+        "titel": "To-dos",
+        "ergebnis": null,
+        "abschnitte": ["Was", "Warum", "Fertig, wenn"]
+      }
+    }
+  },
+  "hookHoechstens": 20
+}

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Starter für die Einrichtung: liegt mit dem Plugin auf dem PATH des Bash-Werkzeugs, damit andere Plugins und
+# Sitzungen sie ohne Pfad aufrufen können (etwa `codecycle-doku-einrichten --nachtragen bug`). Gibt alle Argumente an
+# skripte/einrichten.mjs weiter. Fehlt Node: Exit 2 mit Meldung, nicht der Exit-Code der Shell.
+if ! command -v node >/dev/null 2>&1; then
+  echo "Einrichtung nicht gestartet: node fehlt"
+  exit 2
+fi
+here=$(cd "$(dirname "$0")/.." && pwd)
+exec node "$here/skripte/einrichten.mjs" "$@"
