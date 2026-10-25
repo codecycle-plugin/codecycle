@@ -21,9 +21,9 @@ Rückmeldungen und Pull Requests sind willkommen.
 | Ordner / Datei | Inhalt |
 |---|---|
 | `.claude-plugin/` | `plugin.json` (Name, Version) und `marketplace.json` (Katalog, damit das Repo als Marktplatz dient) |
-| `skills/` | die Befehle `/codecycle:*` als Anleitungen für Claude; `workflow/` enthält die gemeinsamen Regeln und unter `steps/` die einzelnen Schritte des Ablaufs |
-| `agents/` | eine Datei je Rolle (Gutachter, Architekt, Test-Autor, Handwerker, Prüfer, Abnahme …): Aufgabe, erlaubte Werkzeuge, Regeln; der Block „Gemeinsame Regeln“ ist in allen Agenten wortgleich |
-| `profiles.json` | Modell und Effort je Rolle für die Profile sparsam, großzügig und extrem |
+| `skills/` | die Befehle `/codecycle:*` als Anleitungen für Claude; `workflow/` enthält die gemeinsamen Regeln, den Merge-Ablauf, die Randfälle und die Vorlagen |
+| `agents/` | eine Datei je Rolle (Planprüfer, Bauender, Schlussprüfer, Einrichter, Werkzeugmeister): Aufgabe, erlaubte Werkzeuge, Regeln; der Block „Gemeinsame Regeln“ ist in allen Agenten wortgleich |
+| `profiles.json` | Modell je Rolle für die Profile sparsam, großzügig und extrem, dazu `part-reviewer` für den Prüfer je Teil; den Effort nennt die Agenten-Datei |
 | `hooks/` | der Mod: `register.tsx` (Anmeldung, Ereignisse, Werkzeuge), `band.tsx` (Bautafel), `panel.tsx` und `desk.tsx` (Seitenleiste), `hooks.json`; in `hooks/lib/` Budget, Token-Buch, Agenten-Figuren und der Zaun für Befehle der Agenten |
 | `tool/` | das Projekt-Werkzeug `codecycle` (TypeScript, läuft direkt mit Node); `/codecycle:setup` kopiert es ins Projekt nach `.codecycle/tool/` |
 | `lib/` | Bausteine, die Mod und Werkzeug teilen (Aufgaben-Dateien lesen, Schalter, geschützte Pfade, Regeln für `guard`, Bash-Prüfung) |

@@ -10,8 +10,30 @@ export const SOLO_SECURITY_REPORT = 'reports/pruefung-sicherheit.md'
 /** Wert von `zweitpruefung` in STATE.md, wenn `codecycle solo check` mindestens zwei Risikobereiche fand */
 export const SECOND_REVIEW = 'sicherheit'
 
-/** Berichtsname des Solo-Prüfers nach seiner Startnachricht */
+/** Startnachricht mit der Zeile `Auftrag: Teil`: Prüfer je Teil (Bericht `partReportPath`, Funde `TF1`, `TF2` …) */
+export function isPartReview(prompt: string): boolean {
+  return /^\s*Auftrag:\s*Teil\s*$/im.test(prompt)
+}
+
+/** Name des Teils aus der Zeile `Teil: <name>` der Startnachricht (erstes Wort), sonst null */
+export function partNameOf(prompt: string): string | null {
+  const m = prompt.match(/^\s*Teil:\s*([a-z0-9][a-z0-9-]{0,30})(?=\s|$)/im)
+  return m ? m[1]! : null
+}
+
+/** Bericht des Prüfers je Teil im Aufgabenordner; ohne Namen `reports/pruefung-teil.md` */
+export function partReportPath(name: string | null): string {
+  return name ? `reports/pruefung-teil-${name}.md` : 'reports/pruefung-teil.md'
+}
+
+/** Bericht des Bauenden eines Teils (Zeile `Bericht:` seiner Startnachricht); ein neuer Bauender desselben Teils schreibt ihn neu */
+export function partBuilderReport(name: string): string {
+  return `reports/teil-${name}-builder.md`
+}
+
+/** Berichtsname des Schlussprüfers nach seiner Startnachricht (`Auftrag: Teil`, `Auftrag: Sicherheit`, sonst der Prüfbericht) */
 export function soloReportFor(prompt: string): string {
+  if (isPartReview(prompt)) return partReportPath(partNameOf(prompt))
   return /^\s*Auftrag:\s*Sicherheit\b/im.test(prompt) ? SOLO_SECURITY_REPORT : SOLO_REPORT
 }
 
@@ -29,19 +51,41 @@ export type FindingsCheck = {
   fehlend: string[]
 }
 
-const ID_AT_START = /^\s*(?:#{1,6}\s*|[-*]\s+|\d+\.\s+)?(?:\*\*|__)?\s*([MZ]\d+)\b/
+const ID_AT_START = /^\s*(?:#{1,6}\s*|[-*]\s+|\d+\.\s+)?(?:\*\*|__)?\s*((?:TF|[MZ])\d+)\b/
 
-/** Fund-IDs (`M1`, `M2` …; zweiter Prüfer `Z1` …) am Anfang einer Überschrift, eines Listenpunkts oder einer Zeile; jede nur einmal. */
-export function reportFindingIds(text: string): string[] {
-  const ids: string[] = []
+/** Zeilen außerhalb von Codeblöcken, die mit einer Fund-ID der Arten `kinds` beginnen: [ID, Zeile] */
+function findingLines(text: string, kinds: readonly string[]): [string, string][] {
+  const out: [string, string][] = []
   let fence = false
   for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
     if (/^\s*(```|~~~)/.test(line)) fence = !fence
     if (fence) continue
     const m = line.match(ID_AT_START)
-    if (m && !ids.includes(m[1]!)) ids.push(m[1]!)
+    if (m && kinds.includes(m[1]!.replace(/\d+$/, ''))) out.push([m[1]!, line])
   }
+  return out
+}
+
+/**
+ * Fund-IDs (`M1`, `M2` …; zweiter Prüfer `Z1` …) am Anfang einer Überschrift, eines Listenpunkts oder einer Zeile; jede nur
+ * einmal. `kinds`: erlaubte Arten; Funde des Prüfers je Teil (`TF1` …) zählen für den Merge nicht.
+ */
+export function reportFindingIds(text: string, kinds: readonly string[] = ['M', 'Z']): string[] {
+  const ids: string[] = []
+  for (const [id] of findingLines(text, kinds)) if (!ids.includes(id)) ids.push(id)
   return ids
+}
+
+/**
+ * Offene Funde im Bericht des Prüfers je Teil: jede ID `TF<n>`, deren letzte Zeile nicht mit `· behoben` endet
+ * (`### TF1 <Titel> · behoben` bzw. `· offen`; ohne Stand gilt der Fund als offen).
+ */
+export function openPartFindings(text: string): string[] {
+  const last = new Map<string, string>()
+  for (const [id, line] of findingLines(text, ['TF'])) last.set(id, line)
+  // Stand = Text nach dem letzten `·`, ohne Hervorhebung; nur genau `behoben` gilt („nicht behoben“ bleibt offen)
+  const done = (line: string): boolean => (line.split('·').at(-1) ?? '').replace(/[*_\s.]/g, '').toLowerCase() === 'behoben'
+  return [...last].filter(([, line]) => !line.includes('·') || !done(line)).map(([id]) => id)
 }
 
 /**

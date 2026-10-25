@@ -1,6 +1,6 @@
 {
   "name": "codecycle",
-  "version": "0.22.7",
+  "version": "0.24.0",
   "description": "Fester, wiederholbarer Arbeitsablauf für Claude Code: Befehle (new, solo, continue, status, setup, ideas, check, update), Rollen-Agenten, Projekt-Werkzeug und optionaler Mod (Statuszeile, Bautafel, Seitenleiste, /profile).",
   "author": {
     "name": "codecycle"

@@ -1,5 +1,5 @@
-// Schnittstelle der Graph-Anbieter (Adapter-Schicht). Die Befehle locate, callers,
-// tests-for, impact und test --affected sprechen nur diese Schnittstelle an.
+// Schnittstelle der Graph-Anbieter (Adapter-Schicht). Die Befehle locate, callers
+// und test --affected sprechen nur diese Schnittstelle an.
 // Ein Adapter liefert `null`, wenn er eine Frage nicht beantworten kann (Anbieter
 // fehlt, Index fehlt, Aufruf scheitert, Ausgabe unlesbar): der Aufrufer fällt dann
 // auf Outline bzw. Textsuche zurück und sagt das. Adapter raten nie.

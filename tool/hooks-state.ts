@@ -41,7 +41,7 @@ export function isOwnHooksPath(current: string, root: string): boolean {
 
 /**
  * Gewünschter Wert für `core.hooksPath`: relativ `.githooks`; absolut auf den Hauptordner, wenn `.githooks`
- * nicht versioniert, aber ausgeschlossen ist (`codecycle exclude`): Paket-Worktrees bekommen den Ordner
+ * nicht versioniert, aber ausgeschlossen ist (`codecycle exclude`): Worktrees bekommen den Ordner
  * dann nicht, relativ liefen dort keine Hooks.
  */
 export function desiredHooksPath(root: string): string {

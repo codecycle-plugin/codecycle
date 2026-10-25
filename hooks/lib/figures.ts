@@ -48,46 +48,18 @@ function body(f: Fill, armUp = false, armCls?: string): void {
 
 const COSTUMES: Record<string, (f: Fill) => void> = {
   // Ingenieur mit Schutzhelm; der Schraubenschlüssel dreht an einer Schraube.
-  'builder-logic': f => {
+  builder: f => {
     body(f)
     hat(f, ['.....oooooooo.....', '..oooooohhoooooo..', '..oooooohhoooooo..', '..oooooohhoooooo..', '.ooooooohhooooooo.', 'dddddddddddddddddd'], { o: '#F28C28', h: '#F9C27A', d: '#B5651D' })
     stamp(f, 0, 9, ['s.s.', 'sss.', '.s..', '.s..', '.s..'], { s: '#8E929A' }, 'it')
   },
-  // Rennfahrer mit Helm und Visier; läuft doppelt so schnell, die Zielflagge flattert.
-  'builder-routine': f => {
-    body(f, true)
-    hat(f, ['....wwwwwwwwww....', '..wwwwwwrrwwwwww..', '.wwwwwwwrrwwwwwww.', '.wwwwwwwrrwwwwwww.', '.wvvvvvvvvvvvvvvw.', '.wwwwwwwwwwwwwwww.'], { w: '#F4F3EE', r: '#D0453F', v: '#2A3F5F' })
-    f(25, 1, 1, 9, '#8E929A')
-    stamp(f, 26, 1, ['wkwk', 'kwkw', 'wkwk'], { w: '#F8F6F1', k: INK }, 'flag')
-  },
-  // Detektiv mit Filzhut; die Lupe tastet die Fläche ab.
-  reviewer: f => {
-    body(f, true, 'it')
-    hat(f, ['.....bbbbbbbb.....', '....bbbbbbbbbb....', '....bbbbbbbbbb....', '....kkkkkkkkkk....', '.bbbbbbbbbbbbbbbb.'], { b: '#7A4A26', k: '#3A2412' })
-    stamp(f, 23, 0, ['.kkk.', 'k...k', 'k...k', 'k...k', '.kkk.'], { k: '#3A3A3C' }, 'it')
-    f(24, 1, 3, 3, GLASS, 'it')
-    f(25, 5, 1, 5, '#7A4A26', 'it')
-  },
-  // Solo-Prüfer: Detektiv mit grauem Hut und Brille; die Lupe tastet die Fläche ab.
-  'solo-reviewer': f => {
+  // Schlussprüfer: Detektiv mit grauem Hut und Brille; die Lupe tastet die Fläche ab.
+  'final-reviewer': f => {
     body(f, true, 'it')
     hat(f, ['.....gggggggg.....', '....gggggggggg....', '....gggggggggg....', '....kkkkkkkkkk....', '.gggggggggggggggg.'], { g: '#5E6470', k: '#2E2E33' })
     stamp(f, 23, 0, ['.kkk.', 'k...k', 'k...k', 'k...k', '.kkk.'], { k: '#3A3A3C' }, 'it')
     f(24, 1, 3, 3, GLASS, 'it')
     f(25, 5, 1, 5, '#5E6470', 'it')
-  },
-  // Wachmann mit Schirmmütze und Wappen; das Schild wiegt hin und her.
-  'security-reviewer': f => {
-    body(f)
-    hat(f, ['....nnnnnnnnnn....', '...nnnnnnnnnnnn...', '...nnnnnggnnnnn...', '...nnnnnnnnnnnn...', '.kkkkkkkkkkkkkkkk.'], { n: '#2B3F6B', g: '#F5C542', k: INK })
-    stamp(f, 23, 8, ['.sssss.', 'sbbbbbs', 'sbbwbbs', 'sbwwwbs', 'sbbwbbs', '.sbbbs.', '..sss..'], { s: '#C9CCD2', b: '#3A6EA5', w: '#F8F6F1' }, 'it')
-  },
-  // Richter mit Perücke; der Hammer fällt.
-  refuter: f => {
-    body(f, true)
-    hat(f, ['.....gggggggg.....', '...gggggggggggg...', '..ggwwggggggwwgg..', '..gwwwwggggwwwwg..', '.gggg........gggg.'], { g: '#B8BCC8', w: '#E8EAF0' })
-    f(22, 4, 6, 3, '#7A4A26', 'it')
-    f(24, 7, 2, 7, '#A0703F', 'it')
   },
   // Lehrer mit Doktorhut; der Rotstift streicht an.
   'plan-reviewer': f => {
@@ -98,106 +70,6 @@ const COSTUMES: Record<string, (f: Fill) => void> = {
     f(26, 6, 2, 1, '#F0A0A8', 'it')
     f(26, 7, 2, 5, '#D0453F', 'it')
     f(26, 12, 2, 1, '#E8C9A0', 'it')
-  },
-  // Browser-Prüfer (früher TÜV) mit Kappe und Taschenlampe; der Lichtkegel flackert.
-  'browser-reviewer': f => {
-    body(f, true)
-    hat(f, ['....cccccccccc....', '...cccccccccccc...', '..cccccccccccccc..', '.dddddddddddddddd.'], { c: '#3E6B5A', d: '#2A4A3E' })
-    f(24, 8, 3, 5, '#8E929A', 'it')
-    f(23, 6, 5, 2, '#C9CCD2', 'it')
-    stamp(f, 22, 1, ['..yyy..', '.yyyyy.', 'yyyyyyy'], { y: 'rgba(255,230,120,.6)' }, 'beam')
-  },
-  // Sachbearbeiter mit grünem Augenschirm; der Stempel drückt, der Haken erscheint.
-  acceptance: f => {
-    body(f, true)
-    hat(f, ['....gggggggggg....', '...gggggggggggg...', '.gggggggggggggggg.'], { g: '#3B9C5F' })
-    f(25, 3, 3, 2, '#7A4A26', 'it')
-    f(26, 5, 1, 4, '#A0703F', 'it')
-    f(24, 9, 5, 2, '#B03A3A', 'it')
-    f(24, 14, 6, 4, '#F8F6F1')
-    stamp(f, 25, 15, ['...k', '.k.k', '..k.'], { k: '#3B9C5F' }, 'ok')
-  },
-  // Architekt mit Baskenmütze und Brille; die Bauplan-Rolle rollt sich auf.
-  architect: f => {
-    body(f)
-    hat(f, ['.......bb.........', '......bbbbbb......', '....bbbbbbbbbb....', '..bbbbbbbbbbbbbb..', '...bbbbbbbbbbbb...'], { b: '#3B5B8C' })
-    f(8, 11, 4, 1, INK)
-    f(8, 14, 4, 1, INK)
-    f(8, 12, 1, 2, INK)
-    f(11, 12, 1, 2, INK)
-    f(18, 11, 4, 1, INK)
-    f(18, 14, 4, 1, INK)
-    f(18, 12, 1, 2, INK)
-    f(21, 12, 1, 2, INK)
-    f(12, 12, 6, 1, INK)
-    f(24, 6, 5, 9, '#2F6FB5', 'it')
-    f(24, 6, 5, 1, '#CFE3F7', 'it')
-    f(24, 14, 5, 1, '#CFE3F7', 'it')
-    f(25, 9, 3, 1, '#F8F6F1', 'it')
-    f(25, 11, 3, 1, '#F8F6F1', 'it')
-  },
-  // Bereichs-Architekt mit Helm und Federbusch; die Karte wiegt, das rote Kreuz blinkt.
-  'area-architect': f => {
-    body(f, true)
-    hat(f, ['.......rrrr.......', '.....ssssssss.....', '...ssssssssssss...', '..ssssssssssssss..', '..ssssssssssssss..', '.kkkkkkkkkkkkkkkk.'], { r: '#D0453F', s: '#B8BCC8', k: '#4A4A48' })
-    f(23, 2, 6, 8, '#E9D9A8', 'it')
-    f(24, 8, 1, 1, '#A0703F', 'it')
-    f(25, 7, 1, 1, '#A0703F', 'it')
-    f(26, 6, 1, 1, '#A0703F', 'it')
-    stamp(f, 26, 3, ['k.k', '.k.', 'k.k'], { k: '#D0453F' }, 'x')
-  },
-  // Paketleiter mit Schirmmütze und Megafon; die Schallpunkte blinken.
-  'package-lead': f => {
-    body(f, true)
-    hat(f, ['....pppppppppp....', '...pppppppppppp...', '..pppppppppppppp..', '.pppppppppppkkkkkk'], { p: '#6C4FB0', k: '#3E2E70' })
-    f(23, 10, 2, 2, '#E8673C', 'it')
-    f(25, 9, 2, 4, '#E8673C', 'it')
-    f(27, 8, 2, 6, '#E8673C', 'it')
-    f(29, 7, 1, 8, '#F4F3EE', 'it')
-    f(25, 5, 1, 1, '#F5C542', 'wv')
-    f(27, 4, 1, 1, '#F5C542', 'wv')
-    f(29, 5, 1, 1, '#F5C542', 'wv')
-  },
-  // Pirat mit Kopftuch und Augenklappe; das Fernrohr sucht den Horizont ab.
-  surveyor: f => {
-    body(f, true)
-    hat(f, ['.....rrrrrrrr.....', '...rrwrrrrrwrrr...', '.rrrrrrrrrrrrrrrr.'], { r: '#C0392B', w: '#F8F6F1' })
-    f(4, 9, 3, 3, '#C0392B')
-    f(8, 11, 4, 4, '#3A3A3C')
-    f(7, 10, 2, 1, '#3A3A3C')
-    for (let i = 0; i < 5; i++) f(24 + i, 10 - 2 * i, 2, 3, i % 2 === 0 ? '#7A4A26' : '#C9A24A', 'it')
-  },
-  // Laborkittel mit Schutzbrille und Wuschelhaar; das Reagenzglas blubbert.
-  'test-author': f => {
-    body(f, true)
-    f(8, 16, 14, 6, '#F4F3EE')
-    f(14, 16, 2, 6, '#D2D1C8')
-    f(12, 8, 1, 2, '#4A4A48')
-    f(14, 7, 1, 3, '#4A4A48')
-    f(16, 8, 1, 2, '#4A4A48')
-    f(7, 10, 16, 1, '#3A3A3C')
-    f(8, 11, 5, 4, 'rgba(120,220,170,.55)')
-    f(17, 11, 5, 4, 'rgba(120,220,170,.55)')
-    f(13, 12, 4, 1, '#3A3A3C')
-    f(25, 5, 3, 9, 'rgba(210,230,245,.75)', 'it')
-    f(25, 9, 3, 5, '#58C98A', 'it')
-    f(26, 6, 1, 1, '#58C98A', 'bub')
-  },
-  // Fehlersucher mit Safarihut; das Netz schwingt, der Käfer darin blinkt.
-  debugger: f => {
-    body(f, true)
-    hat(f, ['......hhhhhh......', '....hhhhhhhhhh....', '....hhbbbbbbhh....', '....hhhhhhhhhh....', '.hhhhhhhhhhhhhhhh.'], { h: '#C8A96A', b: '#7A4A26' })
-    stamp(f, 23, 0, ['.kkkkk.', 'k.....k', 'k.....k', 'k.....k', '.kkkkk.'], { k: '#7A4A26' }, 'it')
-    f(24, 1, 5, 3, 'rgba(255,255,255,.3)', 'it')
-    f(26, 5, 1, 6, '#7A4A26', 'it')
-    f(25, 2, 2, 2, '#58C98A', 'bug')
-  },
-  // Gelehrter mit brauner Schiebermütze; die Feder schreibt.
-  'doc-keeper': f => {
-    body(f, true)
-    hat(f, ['......dd..........', '.....bbbbbbbb.....', '...bbbbbbbbbbbb...', '..bbbbbbbbbbbbbb..', '.bbbbbbbbbbbbbbbb.'], { b: '#8A5A3B', d: '#5C3A24' })
-    stamp(f, 23, 2, ['.....ww', '....wwk', '...wwk.', '..wwk..', '..wk...'], { w: '#F4F3EE', k: '#8E929A' }, 'it')
-    f(24, 7, 1, 3, '#2F4F8F', 'it')
   },
   // Schmied mit Lederschürze und Stirnband; der Hammer schlägt auf den Amboss, Funken fliegen.
   toolsmith: f => {
@@ -232,36 +104,19 @@ const COSTUMES: Record<string, (f: Fill) => void> = {
 
 // Bewegung je Rolle: [Gruppe, CSS]. Jede Krabbe läuft (Beine, Körper); dazu kommt die Requisite.
 const MOTION: Record<string, [string, string][]> = {
-  'builder-logic': [['it', 'transform-origin:100% 100%;animation:cc-twist .5s ease-in-out infinite']],
-  'builder-routine': [['flag', 'transform-origin:0 50%;animation:cc-wave .25s steps(1) infinite'], ['la', 'animation-duration:.25s'], ['lb', 'animation-duration:.25s;animation-delay:-.125s']],
-  reviewer: [['it', 'animation:cc-scan 1s steps(1) infinite']],
-  'solo-reviewer': [['it', 'animation:cc-scan .8s steps(1) infinite']],
-  'security-reviewer': [['it', 'transform-origin:50% 0;animation:cc-sway 1s ease-in-out infinite']],
-  refuter: [['it', 'transform-origin:50% 100%;animation:cc-strike .8s ease-in-out infinite']],
+  builder: [['it', 'transform-origin:100% 100%;animation:cc-twist .5s ease-in-out infinite']],
+  'final-reviewer': [['it', 'animation:cc-scan .8s steps(1) infinite']],
   'plan-reviewer': [['it', 'animation:cc-write .5s steps(1) infinite']],
-  'browser-reviewer': [['beam', 'animation:cc-blink .8s steps(1) infinite']],
-  acceptance: [['it', 'animation:cc-press 1s ease-in infinite'], ['ok', 'animation:cc-blink 1s steps(1) infinite']],
-  architect: [['it', 'transform-origin:50% 0;animation:cc-unroll 1s ease-in-out infinite']],
-  'area-architect': [['it', 'transform-origin:50% 100%;animation:cc-sway 1s ease-in-out infinite'], ['x', 'animation:cc-blink .5s steps(1) infinite']],
-  'package-lead': [['wv', 'animation:cc-blink .5s steps(1) infinite']],
-  surveyor: [['it', 'transform-origin:0 100%;animation:cc-sway 1.2s ease-in-out infinite']],
-  'test-author': [['it', 'animation:cc-shake .5s steps(1) infinite'], ['bub', 'animation:cc-blink .5s steps(1) infinite -.25s']],
-  debugger: [['it', 'transform-origin:50% 100%;animation:cc-swing 1s ease-in-out infinite'], ['bug', 'animation:cc-blink 1s steps(1) infinite']],
-  'doc-keeper': [['it', 'animation:cc-write .5s steps(1) infinite']],
   toolsmith: [['it', 'transform-origin:50% 100%;animation:cc-strike .6s ease-in-out infinite'], ['sp', 'animation:cc-blink .3s steps(1) infinite']],
   setup: [['it', 'animation:cc-bob .5s steps(1) infinite']],
 }
 
 /**
  * Augen laufender Figuren: `look` schaut nach links und rechts und blinzelt,
- * `blink` blinzelt nur (Brille oder Requisite direkt neben dem Auge), `still` bewegt die Augen nicht,
- * weil das Kostüm sie bedeckt (Augenklappe, durchsichtige Schutzbrille): bewegte Augen lägen sonst darüber.
+ * `blink` blinzelt nur (Brille oder Requisite direkt neben dem Auge).
  * Fehlt eine Rolle hier, gilt `look`.
  */
-const EYES: Record<string, 'look' | 'blink' | 'still'> = {
-  surveyor: 'still',
-  'test-author': 'still',
-  architect: 'blink',
+const EYES: Record<string, 'look' | 'blink'> = {
   'plan-reviewer': 'blink',
 }
 
@@ -289,13 +144,8 @@ export const FIGURE_CSS: string = `<style>
 @keyframes cc-blink{50%{opacity:.15}}
 @keyframes cc-twist{50%{transform:rotate(-35deg)}}
 @keyframes cc-strike{40%{transform:rotate(-30deg)}60%{transform:rotate(15deg)}}
-@keyframes cc-sway{50%{transform:rotate(8deg)}}
 @keyframes cc-scan{25%{transform:translate(-1px,1px)}50%{transform:translate(-2px,2px)}75%{transform:translate(-1px,1px)}}
-@keyframes cc-press{50%{transform:translateY(3px)}}
 @keyframes cc-write{50%{transform:translateX(-2px)}}
-@keyframes cc-unroll{50%{transform:scaleY(1.2)}}
-@keyframes cc-shake{25%{transform:rotate(-6deg)}75%{transform:rotate(6deg)}}
-@keyframes cc-swing{50%{transform:rotate(-25deg)}}
 @keyframes cc-wave{50%{transform:skewY(-12deg) scaleX(.85)}}
 .ey{transform-box:fill-box;transform-origin:50% 50%}
 .run.e-look .ey{animation:cc-eyes ${EYE_PERIOD}s steps(1) infinite;animation-delay:var(--eye,0s)}
@@ -327,9 +177,7 @@ export function figureSvg(o: FigureOptions): string {
   const role = known(o.role)
   const eyes = EYES[role] ?? 'look'
   const groups = new Map<string, string[]>([['bd', []]])
-  const f: Fill = (x, y, w, h, c, wanted = 'bd') => {
-    // bedeckte Augen bleiben im Körper (unter dem Kostüm), statt als eigene Gruppe darüber zu liegen
-    const cls = wanted === 'ey' && eyes === 'still' ? 'bd' : wanted
+  const f: Fill = (x, y, w, h, c, cls = 'bd') => {
     if (!groups.has(cls)) groups.set(cls, [])
     groups.get(cls)?.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`)
   }

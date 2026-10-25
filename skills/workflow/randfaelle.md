@@ -1,6 +1,6 @@
 # Randfälle am Anfang klären
 
-Gilt beim Klären (voller Ablauf) und im Kurzplan (Solo-Weg). Ziel: Sonderfälle entscheiden, bevor gebaut wird, nicht erst beim Prüfen.
+Gilt beim Plan (`/codecycle:new`). Ziel: Sonderfälle entscheiden, bevor gebaut wird, nicht erst beim Prüfen.
 
 ## Stufe 1: aus der Aufgabe herleiten (immer)
 
@@ -24,6 +24,4 @@ Gilt beim Klären (voller Ablauf) und im Kurzplan (Solo-Weg). Ziel: Sonderfälle
 ## Ergebnis
 
 - Je Randfall, den Wortlaut und Code nicht schon eindeutig regeln, ein Standard mit Grund in einem Satz. Was eindeutig geregelt ist oder nicht passt, entfällt ohne Erwähnung.
-- **Voller Ablauf:** Der Bauleiter fragt höchstens **eine** gebündelte Frage mit bis zu drei Randfällen (die, an denen am meisten hängt); die übrigen stehen als übernommene Standards unter „Entscheidungen“ in `TASK.md`. Ein Randfall mit Markierung `Wortlaut:` wird einzeln gefragt (mit Zitat und Standard) und zählt nicht zu den drei.
-- Jeder entschiedene Randfall wird ein Abnahmekriterium mit passendem Prüfweg: meist `Test`, bei Oberfläche (Breite, Tastatur, Darstellung) `Browser`.
-- **Solo-Weg:** Jeder Randfall wird eine Zeile unter „Annahmen“ (`- <Randfall>: <Standard> (Grund)`); keine Frage, außer der Wortlaut lässt eine Lücke, an der viel hängt (dann gebündelt mit den übrigen Fragen).
+- Jeder Randfall wird eine Zeile unter „Annahmen“ (`- <Randfall>: <Standard> (Grund)`); keine Frage, außer der Wortlaut lässt eine Lücke, an der viel hängt (dann gebündelt mit den übrigen Fragen).

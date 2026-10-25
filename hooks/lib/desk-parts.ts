@@ -4,13 +4,13 @@
 import type { Limits } from '../../types'
 import { resetText } from '../state.ts'
 
-/** Ab hier zeichnet die Fußzeile ein Limit gelb, ab `LIMIT_ALARM` rot (wie die App selbst, beobachtet) */
+/** Ab hier zeichnet die Fußzeile ein Limit orange, ab `LIMIT_ALARM` rot (wie die App selbst, beobachtet) */
 export const LIMIT_WARN = 75
 export const LIMIT_ALARM = 90
 
-/** Farbe eines Limits als Theme-Schlüssel: blau wie der Kontext-Kreis der App, gelb ab 75 %, rot ab 90 % */
-export function deskLimitColor(pct: number): 'suggestion' | 'warning' | 'error' {
-  return pct >= LIMIT_ALARM ? 'error' : pct >= LIMIT_WARN ? 'warning' : 'suggestion'
+/** Farbe eines Limits als Theme-Schlüssel: blau wie der Kontext-Kreis der App, orange wie der Kreis rechts in der Fußzeile ab 75 %, rot ab 90 % */
+export function deskLimitColor(pct: number): 'suggestion' | 'claude' | 'error' {
+  return pct >= LIMIT_ALARM ? 'error' : pct >= LIMIT_WARN ? 'claude' : 'suggestion'
 }
 
 /** Ein Limit der Fußzeile: Wert (null bei „neu seit“), Prozent und Reset als Text; die Fußzeile setzt den Reset in Klammern */

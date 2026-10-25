@@ -1,32 +1,18 @@
 // Entscheidungen des Zauns: reine Funktionen, ohne Node und ohne Mod-API.
-// Der Handler `on('tool.call')` in hooks/register.tsx holt die Daten (Plan, Register, STATE.md,
-// Einstellungen) mit `$` und ruft diese Funktionen. Sie geben Meldungstexte zurück (null = erlaubt), nie ein Ergebnis der Mod-API.
+// Der Handler `on('tool.call')` in hooks/register.tsx holt die Daten (Einstellungen, Pfade) mit `$` und ruft diese
+// Funktionen. Sie geben Meldungstexte zurück (null = erlaubt), nie ein Ergebnis der Mod-API.
 // Eigene schlichte Typen, kein Import aus 'claude-code' (sonst bricht die Typprüfung für die Tests).
 
-import { docKeeperBashProblem, readerBashAllowedText, readerBashProblem } from '../../lib/bash-allowlist.ts'
+import { readerBashAllowedText, readerBashProblem } from '../../lib/bash-allowlist.ts'
 import { bashWriteTargets } from '../../lib/bash-write-targets.ts'
-import { ALL_PACKAGES, type Plan } from '../../lib/plan-file.ts'
-import { isControlFile, isDocPath, type ProtectedConfig } from '../../lib/protected.ts'
-import { extraReadCost, extraReadCount, samePath, type AgentEntry, type Registry } from './ledger-registry.ts'
+import { isControlFile, type ProtectedConfig } from '../../lib/protected.ts'
+import { samePath } from './ledger-registry.ts'
 
 /**
- * Lese-Rollen: Rollen, die nur ihren Bericht schreiben (setup zusätzlich `.claude/codecycle.md`).
- * `inspector` ist der frühere Name des Browser-Prüfers. `package-lead` (Paketleiter) zählt mit: Er startet Agenten und
- * schreibt nur seinen Bericht; Bash nur für Suchen, lesendes git und codecycle-Lesebefehle (unter Linux und macOS gibt
- * es kein Grep und Glob).
+ * Lese-Rollen: Rollen, die nur ihren Bericht schreiben (setup zusätzlich `.claude/codecycle.md`); Bash nur für Suchen,
+ * lesendes git und codecycle-Lesebefehle (unter Linux und macOS gibt es kein Grep und Glob).
  */
-export const READER_ROLES: ReadonlySet<string> = new Set([
-  'surveyor',
-  'reviewer',
-  'security-reviewer',
-  'plan-reviewer',
-  'refuter',
-  'acceptance',
-  'browser-reviewer',
-  'inspector',
-  'setup',
-  'package-lead',
-])
+export const READER_ROLES: ReadonlySet<string> = new Set(['plan-reviewer', 'setup'])
 /** Ab so vielen Verweigerungen in Folge hängt der Lese-Zaun den Stopp-Hinweis an */
 export const READER_STOP_AFTER = 3
 
@@ -111,11 +97,9 @@ export type ReaderVerdict = {
  * (setup zusätzlich `.claude/codecycle.md`). Gilt unabhängig vom Schalter `fence`.
  */
 export function readerCheck(rt: FenceAgent, call: ToolCall, env: FenceEnv): ReaderVerdict {
-  const server = rt.rolle === 'browser-reviewer' || rt.rolle === 'inspector'
   const allowed = {
     cli: cliPaths(env),
     launchers: env.plugin ? [`${env.plugin}/bin/codecycle`] : [],
-    server,
   }
   const fallback = rt.dir ? `${rt.dir}/reports/${rt.paket ? `${rt.paket}-` : ''}${rt.rolle}.md` : `.codecycle/tmp/reports/${rt.rolle}.md`
   const own = [rt.bericht ?? fallback, ...(rt.rolle === 'setup' ? ['.claude/codecycle.md'] : [])]
@@ -138,31 +122,9 @@ export function readerCheck(rt: FenceAgent, call: ToolCall, env: FenceEnv): Read
       ? ` Stopp: ${verweigert} Verweigerungen in Folge. Versuche keine weiteren Wege; schreibe jetzt deinen Bericht mit dem, was du hast (Fehlendes unter „Offene Punkte“), und quittiere.`
       : ''
   return {
-    deny: `codecycle-Zaun (Lese-Rolle ${rt.rolle}): ${why}. Erlaubt sind: Lesen mit Read; Suchen mit Grep und Glob, wo vorhanden, sonst über Bash mit grep, rg, find; Write nur auf ${own.join(' und ')}; Bash nur für ${readerBashAllowedText(server)}. Nicht erlaubt: andere Dateien schreiben, Umleitungen (>), codecycle check/lint/format, Hilfsskripte, PowerShell. Nicht umgehen; was dir fehlt, im Bericht unter „Offene Punkte“ melden.${stop}`,
+    deny: `codecycle-Zaun (Lese-Rolle ${rt.rolle}): ${why}. Erlaubt sind: Lesen mit Read; Suchen mit Grep und Glob, wo vorhanden, sonst über Bash mit grep, rg, find; Write nur auf ${own.join(' und ')}; Bash nur für ${readerBashAllowedText()}. Nicht erlaubt: andere Dateien schreiben, Umleitungen (>), codecycle check/lint/format, Hilfsskripte, PowerShell. Nicht umgehen; was dir fehlt, im Bericht unter „Offene Punkte“ melden.${stop}`,
     verweigert,
   }
-}
-
-// ---------------------------------------------------------------------------
-// Doku-Pfleger
-
-/**
- * Doku-Pfleger-Zaun: Bash nur für git, codecycle und Lesen, Schreiben nur auf Doku-Pfade; PowerShell nicht.
- * Rückgabe: die vollständige Meldung bei Verweigerung, sonst null. Gilt unabhängig vom Schalter `fence`.
- */
-export function docKeeperCheck(call: ToolCall, env: FenceEnv): string | null {
-  const deny = (why: string) =>
-    `codecycle-Zaun (Doku-Pfleger): ${why}. Erlaubt sind Doku-Dateien (*.md, Ordner docs, README, CHANGELOG, CLAUDE.md), git status/diff/log/show, git add und commit auf Doku-Dateien, codecycle-Befehle und Lesebefehle.`
-  if (call.tool === 'PowerShell') return deny('PowerShell ist nicht freigegeben, nur Bash')
-  // node nur mit genau diesen cli.ts-Pfaden, codecycle mit Pfad nur als Starter des Plugins
-  const allowed = { cli: cliPaths(env), launchers: env.plugin ? [`${env.plugin}/bin/codecycle`] : [] }
-  const why = call.tool === 'Bash' && call.command ? docKeeperBashProblem(call.command, allowed) : null
-  if (why) return deny(why)
-  for (const t of writeTargetsOf(call)) {
-    const rel = env.rel(t)
-    if (!isDocPath(rel)) return deny(`${rel} ist keine Doku-Datei${call.tool === 'Bash' ? ' (Schreibziel im Bash-Befehl)' : ''}`)
-  }
-  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -176,56 +138,7 @@ export function controlFileReason(role: string, path: string, config: ProtectedC
   return null
 }
 
-/** Tests des Test-Autors (laut Plan und alles, was er anlegte oder änderte) bleiben für alle außer ihm unverändert. */
-export function testAuthorReason(role: string, path: string, plan: Plan, registry: Registry): string | null {
-  if (role === 'test-author') return null
-  const authors = Object.values(registry.agenten).filter(a => a.rolle === 'test-author')
-  const protectedTests = new Set<string>()
-  for (const a of authors) {
-    // Test-Autor im Aufgabenmodus (Paket alle): die Tests aller Pakete sind seine
-    for (const p of plan.pakete) if (a.paket === ALL_PACKAGES || p.id === a.paket) p.tests.forEach(t => protectedTests.add(t))
-    for (const t of [...a.erstellt, ...a.geaendert]) protectedTests.add(t.pfad)
-  }
-  for (const t of protectedTests) {
-    if (samePath(path, t) || samePath(t, path)) return `${path} gehört zu den Tests des Test-Autors und bleibt unverändert; Probleme unter „Offene Punkte“ melden.`
-  }
-  return null
-}
-
-/** Der Teil der STATE.md, den der Zaun braucht */
-export type FenceState = { pakete: readonly { id: string; status: string }[] }
-
-/** Datei eines anderen offenen Pakets (Neu/Ändern/Tests im Plan; fertige Pakete zählen nicht)? Paket „alle“ umfasst jedes. */
-export function otherPackageReason(paket: string | null, path: string, plan: Plan, state: FenceState | null): string | null {
-  if (!paket || paket === ALL_PACKAGES) return null
-  const own = plan.pakete.find(p => p.id === paket)
-  const ownFiles = own ? [...own.neu, ...own.aendern, ...own.tests] : []
-  if (ownFiles.some(f => samePath(path, f))) return null
-  for (const other of plan.pakete) {
-    if (other.id === paket) continue
-    const status = state?.pakete.find(p => p.id === other.id)?.status ?? 'offen'
-    if (status === 'fertig') continue
-    if ([...other.neu, ...other.aendern, ...other.tests].some(f => samePath(path, f))) {
-      return `${path} gehört zum offenen Paket ${other.id}; vorschlagen unter „Offene Punkte“, nicht selbst ändern.`
-    }
-  }
-  return null
-}
-
 /** Meldung des Zauns (Schalter `fence`) zu einem Grund */
 export function fenceDenyText(reason: string, tool: string): string {
   return `codecycle-Zaun: ${reason}${tool === 'Bash' ? ' (Schreibziel im Bash-Befehl)' : ''}`
-}
-
-// ---------------------------------------------------------------------------
-// Lese-Budget (Schalter `read-budget`)
-
-/** Meldung, wenn dieser Aufruf das Lese-Budget überschreitet; sonst null. */
-export function readBudgetDeny(entry: AgentEntry | undefined, limit: number, tool: string, path: string | undefined, command?: string): string | null {
-  // ein Bash-Befehl mit mehreren Suchstufen kostet so viele Aufrufe wie Stufen; er muss ganz ins Budget passen
-  const cost = entry ? extraReadCost(entry, tool, path, command) : 0
-  if (entry && cost > 0 && extraReadCount(entry) + cost > limit) {
-    return `codecycle-Lese-Budget erschöpft (${limit} zusätzliche Lese- oder Suchaufrufe). Arbeite mit dem, was du hast, und nenne im Bericht unter „Offene Punkte“, welche Dateien oder Symbole dir gefehlt haben.`
-  }
-  return null
 }

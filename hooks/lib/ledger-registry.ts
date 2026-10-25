@@ -1,7 +1,6 @@
-// Agenten-Register (agents.json): wer was gelesen, geändert und erstellt hat, Urteile, Lese-Budget.
+// Agenten-Register (agents.json): wer was gelesen, geändert und erstellt hat, Urteile.
 // Rein, ohne Node und ohne Mod-API. Das Token-Buch (costs.json) steht in `ledger-costs.ts`.
 
-import { bashSearchCount } from '../../lib/bash-search.ts'
 import { normPath } from '../../lib/paths.ts'
 
 export type Verdict = 'grün' | 'rot' | 'blockiert'
@@ -30,7 +29,7 @@ export function setWorkTime(reg: Registry, agentId: string, ms: number): void {
 // ---------------------------------------------------------------------------
 // Agenten-Register
 
-/** `bash: true`: aus einem Bash-/PowerShell-Befehl erkannt; zählt nicht gegen das Lese-Budget */
+/** `bash: true`: aus einem Bash-/PowerShell-Befehl erkannt */
 export type Touch = { pfad: string; zeit: string; abschnitt?: string; bash?: true }
 
 export type AgentEntry = {
@@ -40,15 +39,11 @@ export type AgentEntry = {
   modell: string
   gestartet: string
   letzteAktivitaet: string
-  /** Pfade, die das Kontextpaket mitgeliefert hat */
-  mitgeliefert: string[]
   gelesen: Touch[]
   geaendert: Touch[]
   erstellt: Touch[]
   /** Suchen: Aufrufe von Grep/Glob und erkannte Suchstufen in Bash-Befehlen (`lib/bash-search.ts :: bashSearchCount`) */
   suchen: number
-  /** Agent, der diesen gestartet hat (Paketleiter, Schalter `package-lead`); fehlt = Hauptsitzung */
-  eltern?: string
   /** Urteil aus der Quittung (`status:`) beim Ende des Laufs; fehlt = keine Quittung erkannt */
   urteil?: Verdict
   /** Arbeitszeit: Summe der Läufe (Start bzw. Folgenachricht bis Ende), ohne Wartezeit */
@@ -85,7 +80,7 @@ function compareForm(p: string): string {
 /**
  * Pfad relativ zum Projekt: Register und Token-Buch speichern keine absoluten
  * Pfade mit Benutzernamen oder Worktree. `roots` sind Hauptordner und Agenten-Worktree; die längste passende
- * Wurzel gewinnt. Rückfall: Muster `--wt-<name>/` (Paket-Worktree neben dem Hauptordner). Pfade außerhalb
+ * Wurzel gewinnt. Rückfall: Muster `--wt-<name>/` (Worktree neben dem Hauptordner). Pfade außerhalb
  * bleiben normalisiert absolut; relative Pfade bleiben, wie sie sind (ohne `./`).
  */
 export function toRepoRelative(
@@ -211,79 +206,16 @@ export type TouchKind = 'gelesen' | 'geaendert' | 'erstellt' | 'suche'
 
 const MAX_TOUCHES = 500
 
-/**
- * Eine Berührung eintragen. Rückgabe: true, wenn eine gelesene Datei nicht mitgeliefert war (fehlender Kontext).
- * `viaBash`: Lesen aus einem Bash-/PowerShell-Befehl: nur Register, kein Lese-Budget.
- */
-export function recordTouch(reg: Registry, agentId: string, kind: TouchKind, pfad: string, zeit: string, abschnitt?: string, viaBash = false): boolean {
+/** Eine Berührung eintragen. `viaBash`: Lesen aus einem Bash-/PowerShell-Befehl. */
+export function recordTouch(reg: Registry, agentId: string, kind: TouchKind, pfad: string, zeit: string, abschnitt?: string, viaBash = false): void {
   const a = reg.agenten[agentId]
-  if (!a) return false
+  if (!a) return
   a.letzteAktivitaet = zeit
   if (kind === 'suche') {
     a.suchen += 1
-    return false
+    return
   }
   const list = a[kind]
   const t: Touch = { pfad: normPath(pfad), zeit, ...(abschnitt ? { abschnitt } : {}), ...(viaBash ? { bash: true as const } : {}) }
   if (list.length < MAX_TOUCHES) list.push(t)
-  if (kind !== 'gelesen') return false
-  const delivered = a.mitgeliefert.some(m => samePath(pfad, m))
-  const before = a.gelesen.slice(0, -1).some(g => samePath(g.pfad, pfad))
-  return !delivered && !before
-}
-
-/** Wer hat die Datei zuletzt geändert oder erstellt? (Weiterleitung, Schalter `register-forwarding`) */
-export function ownersOf(reg: Registry, pfad: string): AgentEntry[] {
-  return Object.values(reg.agenten)
-    .filter(a => [...a.geaendert, ...a.erstellt].some(t => samePath(t.pfad, pfad) || samePath(pfad, t.pfad)))
-    .sort((a, b) => (a.letzteAktivitaet < b.letzteAktivitaet ? 1 : -1))
-}
-
-/** Dateien eines Agenten, die er gelesen, aber nicht mitgeliefert bekam. */
-export function extraReads(a: AgentEntry): string[] {
-  const seen: string[] = []
-  for (const g of a.gelesen) {
-    if (g.bash) continue // Lesen per Bash zählt nicht gegen das Lese-Budget
-    if (a.mitgeliefert.some(m => samePath(g.pfad, m))) continue
-    if (!seen.some(s => samePath(s, g.pfad))) seen.push(g.pfad)
-  }
-  return seen
-}
-
-// ---------------------------------------------------------------------------
-// Lese-Budget (Schalter `read-budget`, nur als Messvariante)
-//
-// Gezählt werden Aufrufe, keine Modell-Runden (Annahme: `tool.call` kennt die Runde nicht):
-// jede nicht mitgelieferte Datei einmal (weitere Abschnitte derselben Datei sind frei) plus jede Suche.
-
-/** Grenze, wenn der Schalter keinen Wert hat. vorläufiger Wert („z. B. höchstens 4“), nach Messung festlegen. */
-export const READ_BUDGET_DEFAULT = 4
-
-/** Wert des Schalters (`read-budget: an, 6` oder `an 6`) als Zahl; sonst der Standard. */
-export function parseReadBudget(value: string): number {
-  const n = Number(value.match(/\d+/)?.[0])
-  return Number.isInteger(n) && n > 0 ? n : READ_BUDGET_DEFAULT
-}
-
-/** Bisher verbrauchte zusätzliche Lese- und Suchaufrufe. */
-export function extraReadCount(a: AgentEntry): number {
-  return extraReads(a).length + a.suchen
-}
-
-/**
- * Wie viele zusätzliche Lese- oder Suchaufrufe kostet dieser Aufruf? Read einer nicht mitgelieferten, noch nicht
- * gelesenen Datei: 1; Grep, Glob: 1; Bash: je erkannte Suchstufe 1 (`bashSearchCount`, beide Wege immer, ohne das
- * System zu erkennen). Lesen per Bash (`cat` …) kostet nichts.
- */
-export function extraReadCost(a: AgentEntry, tool: string, pfad?: string, command?: string): number {
-  if (tool === 'Grep' || tool === 'Glob') return 1
-  if (tool === 'Bash') return command ? bashSearchCount(command) : 0
-  if (tool !== 'Read' || !pfad) return 0
-  if (a.mitgeliefert.some(m => samePath(pfad, m))) return 0
-  return a.gelesen.some(g => !g.bash && (samePath(g.pfad, pfad) || samePath(pfad, g.pfad))) ? 0 : 1
-}
-
-/** Zählt dieser Aufruf zum Lese-Budget? (`extraReadCost` > 0) */
-export function isExtraRead(a: AgentEntry, tool: string, pfad?: string, command?: string): boolean {
-  return extraReadCost(a, tool, pfad, command) > 0
 }

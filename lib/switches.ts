@@ -3,34 +3,20 @@
 //
 // Erkannte Schreibweisen (eine pro Zeile, das Format ist nicht festgelegt):
 //   - fence: an            - `fence` an            | fence | an |            fence = aus
-// Zusätze hinter dem Wert gelten als Parameter: `read-budget: an, 6`.
+// Zusätze hinter dem Wert gelten als Parameter: `graph: an, nur lesen`.
 
 export type SwitchState = { on: boolean; value: string }
 export type Switches = Record<string, SwitchState>
 
 const DEFAULT_ON = [
-  'context-package',
-  'sections',
-  'reuse-agents',
-  'half-blind',
-  'test-author',
-  'ideas-auto',
-  'multi-planner',
   'conflict-check',
   'helper-scripts',
-  'security-reviewer',
   'graph',
+  // Prüfer je Teil großer Aufgaben (final-reviewer mit `Auftrag: Teil`); `codecycle solo teil fertig` verlangt dann seinen Bericht
+  'part-review',
 ]
 const DEFAULT_OFF = [
-  'refuter',
   'fence',
-  'escalation',
-  'haiku-simple',
-  // effort-by-size entfällt seit 0.5.0 (Effort je Rolle und Risiko); steht er noch im Projekt, zeigt der Mod „wirkungslos“
-  'register-forwarding',
-  'package-lead',
-  'read-budget',
-  'plan-html',
   'auto-resume',
   'agent-progress',
   // Beispieldaten auf Bautafel und Seitenleiste, wenn keine Aufgabe offen ist
@@ -43,14 +29,13 @@ export function defaultSwitches(): Switches {
   const out: Switches = {}
   for (const n of DEFAULT_ON) out[n] = { on: true, value: '' }
   for (const n of DEFAULT_OFF) out[n] = { on: false, value: '' }
-  out['cache-ttl-builder'] = { on: true, value: '5m' }
   return out
 }
 
 const ON = /^(an|ein|on|true|ja|yes)\b/i
 const OFF = /^(aus|off|false|nein|no)\b/i
 
-/** Liest die Schalter; unbekannte Namen bleiben erhalten, Standardwerte füllen den Rest. */
+/** Liest die Schalter; unbekannte Namen (auch entfallene Schalter) bleiben erhalten, ohne Fehler und ohne Wirkung; Standardwerte füllen den Rest. */
 export function parseSwitches(markdown: string | null | undefined): Switches {
   const out = defaultSwitches()
   if (!markdown) return out
@@ -73,7 +58,6 @@ export function parseSwitches(markdown: string | null | undefined): Switches {
     const prev = out[name]
     if (ON.test(rest)) out[name] = { on: true, value: rest.replace(ON, '').replace(/^[\s,;(]+|[\s)]+$/g, '') }
     else if (OFF.test(rest)) out[name] = { on: false, value: rest.replace(OFF, '').replace(/^[\s,;(]+|[\s)]+$/g, '') }
-    else if (prev && name === 'cache-ttl-builder') out[name] = { on: true, value: rest }
     else if (rest !== '') out[name] = { on: prev?.on ?? true, value: rest }
   }
   return out
@@ -85,44 +69,6 @@ export function isOn(sw: Switches, name: string): boolean {
 
 export function switchValue(sw: Switches, name: string): string {
   return sw[name]?.value ?? ''
-}
-
-/**
- * Einträge im Abschnitt „Risikobereiche“ von `.claude/codecycle.md` (Listenpunkte, ohne den Platzhalter der Vorlage
- * `<…>` und ohne „keine“/„–“).
- */
-export function riskAreas(markdown: string | null | undefined): string[] {
-  if (!markdown) return []
-  const out: string[] = []
-  let level = 0
-  for (const line of markdown.replace(/\r\n/g, '\n').split('\n')) {
-    const h = line.match(/^(#{1,6})\s+(.*?)\s*$/)
-    if (h) {
-      const l = h[1]!.length
-      if (level > 0 && l <= level) level = 0
-      if (level === 0 && /^risikobereich/i.test(h[2]!)) level = l
-      continue
-    }
-    if (level === 0) continue
-    const item = line.match(/^\s*[-*]\s+(.*?)\s*$/)?.[1]
-    if (!item || item.startsWith('<') || /^(keine?|nichts|–|-)(\b|$|\s)/i.test(item)) continue
-    out.push(item)
-  }
-  return out
-}
-
-/**
- * Hinweis für die Auftragsfreigabe (`codecycle effort`): Die Aufgabe berührt einen Risikobereich (`risiko=ja`),
- * `.claude/codecycle.md` nennt einen, aber der Schalter `fence` ist aus. Dann setzt der Mod „Kontrolldateien ändert nur
- * der Werkzeugmeister“ u. ä. für Bau-Rollen nicht durch. Nur ein Hinweis, kein Umschalten: der Nutzer entscheidet.
- * Sonst null.
- */
-export function fenceHint(markdown: string | null | undefined, risiko: boolean): string | null {
-  if (!risiko || isOn(parseSwitches(markdown), 'fence')) return null
-  const areas = riskAreas(markdown)
-  if (areas.length === 0) return null
-  const named = areas.slice(0, 3).join('; ') + (areas.length > 3 ? ' …' : '')
-  return `Zaun: Schalter fence ist aus, obwohl die Aufgabe einen Risikobereich berührt (.claude/codecycle.md: ${named}). In die Auftragsfreigabe aufnehmen; einschalten mit „fence: an“ im Abschnitt „Schalter“ von .claude/codecycle.md (wirkt ab dem nächsten Agentenstart).`
 }
 
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'

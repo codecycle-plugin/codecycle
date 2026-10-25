@@ -5,7 +5,7 @@
 
 import type { ElementTable, RenderChildren } from 'claude-code'
 
-import type { Limits, PackageStatus } from '../types'
+import type { Limits } from '../types'
 import { deskFooterParts, deskLimitColor } from './lib/desk-parts.ts'
 import type { ShownLimits } from './state'
 
@@ -13,22 +13,6 @@ import type { ShownLimits } from './state'
 export const SURFACE = 'rgba(128,128,128,0.12)'
 /** Spur der Balken und Trennlinien */
 export const TRACK = 'rgba(128,128,128,0.25)'
-
-/** Paket-Punkte: Zeichen und Farbe (Theme-Schlüssel) je Zustand */
-export const DOT: Record<PackageStatus, { glyph: string; color: string }> = {
-  fertig: { glyph: '●', color: 'success' },
-  'in-arbeit': { glyph: '◐', color: 'text' },
-  offen: { glyph: '○', color: 'subtle' },
-  blockiert: { glyph: '●', color: 'error' },
-}
-
-/** Textfarbe des Zustands-Etiketts je Paket (offen ohne Farbe, gedimmt) */
-export const CHIP_COLOR: Record<PackageStatus, string | undefined> = {
-  fertig: 'success',
-  'in-arbeit': 'text',
-  offen: undefined,
-  blockiert: 'error',
-}
 
 /** Leicht getönte Fläche hinter Hinweisen und Blockern, in hell und dunkel dezent */
 export const TINT: Record<string, string> = {
@@ -77,7 +61,7 @@ export function deskNote(ui: ElementTable, key: string, color: string, text: Ren
   )
 }
 
-/** Kleines Etikett mit Fläche (Paketzustand, Hinweiszahl) */
+/** Kleines Etikett mit Fläche (Hinweiszahl) */
 export function deskChip(ui: ElementTable, key: string, text: string, color?: string) {
   const { Box, Text } = ui
   return (

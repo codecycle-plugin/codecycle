@@ -46,7 +46,7 @@ export function agentHints(root: string, taskDir: string, state: TaskState, now:
     if (minuten < STALE_AGENT_MINUTES) continue
     const id = String(a.id ?? '').slice(0, 8)
     hints.push(
-      `${String(a.rolle ?? '?')} ${typeof a.paket === 'string' ? a.paket : 'alle'} (${id}) ohne Urteil, still seit ${dauer(minuten)}: abgebrochen? Neu starten zählt als Nachlauf`,
+      `${String(a.rolle ?? '?')}${typeof a.paket === 'string' ? ` ${a.paket}` : ''} (${id}) ohne Urteil, still seit ${dauer(minuten)}: abgebrochen? Auftrag mit frischem Agenten neu starten`,
     )
   }
   return hints
@@ -86,9 +86,6 @@ export function gitHints(root: string, state: TaskState, main: string, today: Da
       const sameTip = git(['rev-parse', state.branch], root).out === git(['rev-parse', main], root).out
       if (merged && !sameTip) hints.push(`Branch ${state.branch} ist schon in ${main}: als fertig markieren?`)
     }
-  }
-  for (const p of state.pakete) {
-    if (p.status === 'in-arbeit' && p.commit === null) hints.push(`${p.id} in Arbeit, noch ohne Commit (abgebrochen?)`)
   }
   const days = daysSince(state.zuletzt, today)
   if (days !== null && days >= STALE_DAYS) hints.push(`ruht seit ${days} Tagen`)

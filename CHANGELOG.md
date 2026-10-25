@@ -2,6 +2,46 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.24.0 / Werkzeug 0.9.1] – 2026-10-25
+
+### Neu
+
+- Große Aufgaben werden in Teilen gebaut: Je Teil baut nacheinander ein frischer Bauender auf einem eigenen Branch im selben Ordner; jedes fertige Teil ist grün, übernommen und in `STATE.md` festgehalten. Geht das Limit mitten in einem Teil aus, baut `/codecycle:continue` in einer neuen Sitzung dort weiter.
+- Prüfer je Teil (Schalter `part-review`, Standard an, Modell Sonnet): Teile, die der Plan als groß markiert, prüft nach dem Bau ein frischer Prüfer gegen ihre Planzeile, mit einer Fixrunde; erst dann gilt der Teil als fertig. Sein Modell steht im Profil unter `part-reviewer`. Andere Teile brauchen keinen Teil-Bericht.
+
+### Geändert
+
+- Fünf Rollen: Planprüfer, Bauender, Schlussprüfer, Einrichter, Werkzeugmeister. Bauende arbeiten in allen Profilen mit Opus, der Prüfer je Teil mit Sonnet; die drei Profile haben damit dieselben Modelle.
+- Kosten pro Rolle zeigen alte Rollennamen älterer Aufgaben unter der heutigen Rolle, eine Zeile je Rolle.
+- Fußzeile der Desktop-App: Das Limit erscheint ab 75 % im Orange des Kreises der App.
+- `codecycle guard` meldet „guard rot: …“.
+
+### Entfernt
+
+- Der volle Ablauf mit seinen Rollen, Schritten, Werkzeug-Befehlen (`paket`, `commit-tests`, `package-info`, `plan-html`, `rework`, `tests-for`, `impact`, `solo zwischenstand`) und Schaltern (`context-package`, `sections`, `reuse-agents`, `half-blind`, `test-author`, `multi-planner`, `security-reviewer`, `refuter`, `escalation`, `haiku-simple`, `register-forwarding`, `package-lead`, `read-budget`, `plan-html`, `cache-ttl-builder`). Stehen diese Schalter noch in `.claude/codecycle.md`, wirken sie nicht. `codecycle effort` misst nur noch mit `--record`. <!-- doku-ok -->
+- Angefangene Aufgaben des vollen Ablaufs setzt `/codecycle:continue` nicht fort; Branch und Dateien bleiben, `/codecycle:new` beginnt sie neu.
+- Der Effort eines Agenten steigt bei Risikobereichen nicht mehr; er steht in der Agenten-Datei. <!-- doku-ok -->
+
+## [0.23.0 / Werkzeug 0.8.5] – 2026-10-24
+
+### Neu
+
+- Ein Weg für jede Aufgabe: `/codecycle:new` beginnt mit einem Brainstorming, legt einen Entwurf mit deinen Worten und Erfolgssätzen zur Freigabe vor, schreibt den Plan selbst, lässt ihn von einem Planprüfer gegen den Entwurf abgleichen und legt ihn zur Freigabe vor; danach baut die Sitzung selbst und ein frischer Prüfer prüft. Bei einer klaren Aufgabe sagt Claude in einem Satz, was es verstanden hat, und legt los.
+- `/codecycle:brainstorming`: Brainstorming, das Claude auch von selbst startet, mit einer Frage je Nachricht, eigenen Ideen und Kritik.
+
+### Geändert
+
+- Fragen an dich: „a) Empfehlung“ und „b) Dagegen spricht“ (das stärkste Gegenargument) statt Antwortlisten, du antwortest mit einem Buchstaben; einfache Fragen wie die Merge-Frage in einer Zeile mit Standard.
+- Eine neue Sitzung schlägt Claude nur vor, wenn die Sitzung voll wird; sonst geht es nach einer Freigabe ohne Frage weiter.
+- Im leeren Projekt legt die Einrichtung einen ersten, leeren Commit an.
+- `codecycle tasks` nennt die Haltepunkte „Entwurf“ und „Plan“.
+- `/codecycle:setup` richtet Mechanisches ohne Rückfrage ein und zeigt die Standards gesammelt; bei einem bestehenden Projekt fasst es zusammen, wie es das Projekt verstanden hat.
+- Planprüfer und Prüfer am Ende nutzen Opus in allen Profilen; der Prüfer am Ende prüft auch die Erfolgssätze.
+
+### Entfernt
+
+- `/codecycle:solo`, `/codecycle:ideas` und der Schalter `ideas-auto`; die Wegfrage. Angefangene Aufgaben im vollen Ablauf und im Solo-Weg laufen mit `/codecycle:continue` weiter. <!-- doku-ok -->
+
 ## [0.22.7 / Werkzeug 0.8.4] – 2026-10-24
 
 ### Geändert

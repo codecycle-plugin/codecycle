@@ -282,15 +282,3 @@ export function agentDetail(r: AgentRow, entry: AgentEntry | undefined, now: num
     listen: [list('Gelesen', entry?.gelesen ?? []), list('Geändert', entry?.geaendert ?? []), list('Erstellt', entry?.erstellt ?? [])],
   }
 }
-
-/**
- * Problem beim Kontextpaket als Satz für die Bautafel oder null: Paket nicht in PLAN.md gefunden,
- * sonst die nicht aufgelösten Fundstellen (`offen` aus buildPackage; „Datei fehlt“ = neu anzulegen zählt nicht).
- */
-export function packageProblem(paket: string, missing: boolean, offen: readonly string[]): string | null {
-  if (missing) return `Kontextpaket ${paket}: Paket nicht in PLAN.md gefunden`
-  const lost = offen.filter(o => /: (nicht gefunden|mehrdeutig)/.test(o)).map(o => o.replace(/: (nicht gefunden|mehrdeutig).*$/, ''))
-  if (lost.length === 0) return null
-  const shown = lost.slice(0, 3).join('; ')
-  return `Kontextpaket ${paket}: ${lost.length} ${lost.length === 1 ? 'Fundstelle' : 'Fundstellen'} nicht gefunden (${shown}${lost.length > 3 ? '; …' : ''})`
-}

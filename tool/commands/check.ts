@@ -2,7 +2,6 @@ import { ToolBroken } from '../errors.ts'
 import type { Ctx } from '../main.ts'
 import { findProjectRoot, findWorkTree, loadConfig } from '../project.ts'
 import { runAffected } from '../run-affected.ts'
-import { redMarkMatches } from '../red-tests.ts'
 import { runStep } from '../step.ts'
 
 /**
@@ -40,7 +39,7 @@ export function check(args: string[], ctx: Ctx): number {
       continue
     }
     if (label === 'test' && affected) {
-      const r = runAffected(root, work, config, staged, staged && redMarkMatches(work))
+      const r = runAffected(root, work, config, staged)
       r.lines.forEach(line => ctx.out(line))
       worst = Math.max(worst, r.code)
       continue

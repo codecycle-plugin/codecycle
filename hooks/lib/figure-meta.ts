@@ -2,25 +2,17 @@
 // Zeichen und Namen je Rolle. Die Zeichnung selbst steht in `figures.ts`.
 // Reiner Code ohne Node und ohne Mod-API, wie die übrigen Dateien in lib/.
 
-/** Die 18 Rollen laut `agents/` plus `other` für fremde Agenten. */
+import { ROLE_ALIASES, canonicalRole } from '../../lib/roles.ts'
+
+/** Alte Rollennamen aus Register und Kosten (Quelle: `lib/roles.ts`); sie zeigen Figur und Bezeichnung der heutigen Rolle. */
+export const ALIASES = ROLE_ALIASES
+
+/** Die Rollen laut `agents/` plus `other` für fremde Agenten. */
 export const FIGURE_ROLES: readonly string[] = [
-  'acceptance',
-  'architect',
-  'area-architect',
-  'browser-reviewer',
-  'builder-logic',
-  'builder-routine',
-  'debugger',
-  'doc-keeper',
-  'package-lead',
+  'builder',
+  'final-reviewer',
   'plan-reviewer',
-  'refuter',
-  'reviewer',
-  'security-reviewer',
   'setup',
-  'solo-reviewer',
-  'surveyor',
-  'test-author',
   'toolsmith',
   'other',
 ]
@@ -49,54 +41,27 @@ export function modelColor(model: string): string {
 }
 
 const LABELS: Record<string, string> = {
-  acceptance: 'Abnahme',
-  architect: 'Architekt',
-  'area-architect': 'Bereichs-Architekt',
-  'builder-logic': 'Logik-Handwerker',
-  'builder-routine': 'Routine-Handwerker',
-  debugger: 'Fehlersucher',
-  'doc-keeper': 'Doku-Pfleger',
-  'browser-reviewer': 'Browser-Prüfer',
-  'package-lead': 'Paketleiter',
+  builder: 'Bauender',
+  'final-reviewer': 'Schlussprüfer',
   'plan-reviewer': 'Plan-Prüfer',
-  refuter: 'Widerleger',
-  reviewer: 'Prüfer',
-  'security-reviewer': 'Sicherheitsprüfer',
   setup: 'Einrichter',
-  'solo-reviewer': 'Solo-Prüfer',
-  surveyor: 'Gutachter',
-  'test-author': 'Test-Autor',
   toolsmith: 'Werkzeugmeister',
   other: 'Fremder Agent',
 }
 
 // Einfache Zeichen aus Unicode-Blöcken, die gängige Terminalschriften kennen (keine Emoji)
 const GLYPHS: Record<string, string> = {
-  acceptance: '✓',
-  architect: '☰',
-  'area-architect': '▤',
-  'builder-logic': '⚙',
-  'builder-routine': '»',
-  debugger: '✱',
-  'doc-keeper': '✎',
-  'browser-reviewer': '☼',
-  'package-lead': '▣',
+  builder: '⚙',
+  'final-reviewer': '◉',
   'plan-reviewer': '✐',
-  refuter: '⚖',
-  reviewer: '◎',
-  'security-reviewer': '◈',
   setup: '▲',
-  'solo-reviewer': '◉',
-  surveyor: '△',
-  'test-author': '◆',
   toolsmith: '⚒',
   other: '·',
 }
 
-/** Alte Rollennamen aus früheren agents.json (inspector → browser-reviewer). */
-const ALIASES: Readonly<Record<string, string>> = { inspector: 'browser-reviewer' }
+/** Rolle mit eigener Figur (alte Namen über `ALIASES`), sonst `other` (fremde Agenten und unbekannte Rollen alter Register-Einträge). */
 export const known = (role: string): string => {
-  const r = ALIASES[role] ?? role
+  const r = canonicalRole(role)
   return FIGURE_ROLES.includes(r) ? r : 'other'
 }
 
@@ -105,7 +70,8 @@ export function roleGlyph(role: string): string {
   return GLYPHS[known(role)] ?? '·'
 }
 
-/** Kurzer deutscher Name der Rolle. */
+/** Kurzer deutscher Name der Rolle; eine Rolle ohne eigene Figur (alter Register-Eintrag) behält ihren Namen. */
 export function roleLabel(role: string): string {
+  if (known(role) === 'other' && role !== 'other' && /^[a-z][a-z-]*$/.test(role)) return role
   return LABELS[known(role)] ?? 'Fremder Agent'
 }

@@ -72,20 +72,18 @@ async function startWithDemo($: Engine, on: Ops) {
 }
 
 describe('STATE.md lesen', () => {
-  test('Kopf, Pakete und Abschnitte', () => {
+  test('Kopf und Abschnitte; eine alte STATE.md mit Block pakete: wird fehlerfrei gelesen, der Block bleibt unbeachtet', () => {
     const b = parseState(STATE, 'docs/codecycle/x/STATE.md')
     expect(b.aufgabe).toBe('einkaufsliste-teilen')
     expect(b.art).toBe('feature')
     expect(b.budget).toEqual({ geplant: 11, verbraucht: 7, nachlauf: 0 })
-    expect(b.planrunden).toBe(1)
-    expect(b.pakete.map(p => p.status)).toEqual(['fertig', 'in-arbeit', 'blockiert'])
-    expect(b.pakete[1]!.agent).toBe('d4e5f6')
-    expect(b.pakete[2]!.agent).toBe(null)
+    expect(b.zuletzt).toBe('tag-1')
+    expect('pakete' in b).toBe(false)
     expect(b.naechsterSchritt).toEqual(['P2 umsetzen.'])
     expect(b.offeneFragen).toEqual([])
     expect(b.blocker).toEqual(['P3 wartet auf P2.'])
     expect(statusText('sparsam', { fuenfStunden: 42, woche: 18 }, b)).toBe(
-      'sparsam · 5h 42% · einkaufsliste-teilen P2/3',
+      'sparsam · 5h 42% · einkaufsliste-teilen',
     )
   })
 
@@ -105,7 +103,7 @@ describe('STATE.md lesen', () => {
     expect(lim.resetFuenf).toBe('2026-10-07T18:00:00Z')
     expect(limitsFrom([]).fuenfStunden).toBe(null)
     const b = parseState(STATE, 'a')
-    expect(statusText('extrem', limitsFrom([]), b)).toBe('extrem · 5h – · einkaufsliste-teilen P2/3')
+    expect(statusText('extrem', limitsFrom([]), b)).toBe('extrem · 5h – · einkaufsliste-teilen')
     // Ohne offene Aufgabe nur Profil und 5-Stunden-Fenster
     expect(statusText('sparsam', { fuenfStunden: 26, woche: 3 }, EMPTY_BOARD)).toBe('sparsam · 5h 26%')
   })
@@ -145,7 +143,7 @@ describe('STATE.md lesen', () => {
 })
 
 describe('Mod', () => {
-  test('Bautafel zeigt Profil-Knöpfe und Pakete, Knopf wechselt das Profil', async ($, on) => {
+  test('Bautafel zeigt Profil-Knöpfe, Knopf wechselt das Profil', async ($, on) => {
     mock.store(on)
     const statuses: (string | undefined)[] = []
     on('ui.status', (_$, e) => {
@@ -223,7 +221,7 @@ describe('Mod', () => {
     expect(r.text).toBe(undefined)
   })
 
-  test('Seitenleiste zeigt Pakete, Budget, Kosten, Fragen und Blocker (Beispieldaten mit demo-data)', async ($, on) => {
+  test('Seitenleiste zeigt Budget, Kosten, Fragen und Blocker (Beispieldaten mit demo-data)', async ($, on) => {
     mock.store(on)
     on('ui.status', () => ({ value: undefined }))
     await startWithDemo($, on)
@@ -243,10 +241,9 @@ describe('Mod', () => {
         },
       })
       if (surface === 'terminal') {
-        // Spalten fester Breite, blockiert als ×, Blocker mit ▎ in Rot, kein Limit, kein „Schließen“
-        expect(JSON.stringify(await ui.find({ key: 'pkg-P1' }))).toMatch(/P1.*logik.*fertig/)
-        expect(JSON.stringify(await ui.find({ key: 'pkg-P4' }))).toMatch(/×.*blockiert/)
-        expect((await ui.find({ type: 'Text', text: /^▎ P4 wartet/ }))?.props.color).toBe('red')
+        // Blocker mit ▎ in Rot, kein Abschnitt Pakete, kein Limit, kein „Schließen“
+        expect(await ui.find({ type: 'Text', text: /^Pakete$/ })).toBeUndefined()
+        expect((await ui.find({ type: 'Text', text: /^▎ Teil Freigabe wartet/ }))?.props.color).toBe('red')
         expect((await ui.find({ type: 'Text', text: /^Kosten pro Rolle$/ }))?.props.color).toBe('cyan')
         expect(await ui.find({ type: 'Text', text: /^Limit$/ })).toBeUndefined()
         expect(await ui.find({ key: 'close' })).toBeUndefined()
@@ -254,18 +251,17 @@ describe('Mod', () => {
         expect(await ui.find({ type: 'Text', text: /Offene Fragen/ })).toBeDefined()
         expect(await ui.find({ type: 'Text', text: /Blocker/ })).toBeDefined()
       } else {
-        // Pakete mit Punkt und Etikett, jeder Abschnitt hat einen Kopfknopf `sec-<id>` „▾ Titel“; kein Abschnitt Limit
-        // Art groß geschrieben
-        expect(await ui.find({ type: 'Text', text: /P1\s+Logik/ })).toBeDefined()
-        // Zustand als Etikett mit Fläche und Theme-Farbe
-        expect((await ui.find({ type: 'Text', text: /^fertig$/ }))?.props.color).toBe('success')
+        // jeder Abschnitt hat einen Kopfknopf `sec-<id>` „▾ Titel“; kein Abschnitt Pakete, kein Abschnitt Limit
+        expect(await ui.find({ key: 'sec-pakete' })).toBeUndefined()
         // Kein eigener Knopf „Schließen“, das ✕ der App reicht
         expect(await ui.find({ key: 'close' })).toBeUndefined()
         // „Kosten pro Rolle“ beginnt zu; ein Druck öffnet ihn, die Rollen stehen auf Deutsch da
         expect(String((await ui.find({ key: 'sec-kosten' }))?.props.label ?? '')).toMatch(/^▸ Kosten pro Rolle/)
         await ui.press({ key: 'sec-kosten' })
         expect(String((await ui.find({ key: 'sec-kosten' }))?.props.label ?? '')).toMatch(/^▾ Kosten pro Rolle/)
-        expect(await ui.find({ type: 'Text', text: /^builder-logic$|^test-author$/ })).toBeUndefined()
+        expect(await ui.find({ type: 'Text', text: /^builder$|^final-reviewer$/ })).toBeUndefined()
+        expect(await ui.find({ type: 'Text', text: /^Bauender$/ })).toBeDefined()
+        expect(await ui.find({ type: 'Text', text: /^Schlussprüfer$/ })).toBeDefined()
         // Budget als Zeilen mit Balken und Prozent, kein doppelter Text
         expect(JSON.stringify(await ui.find({ key: 'budget-laeufe' }))).toMatch(/Läufe.*\d+ %/)
         expect(String((await ui.find({ key: 'sec-fragen' }))?.props.label ?? '')).toMatch(/^▾ Offene Fragen/)
@@ -278,7 +274,7 @@ describe('Mod', () => {
     }
   })
 
-  test('Seitenleiste Desktop: ein Druck auf `sec-pakete` klappt den Abschnitt zu und beim zweiten Druck wieder auf', async ($, on) => {
+  test('Seitenleiste Desktop: ein Druck auf `sec-budget` klappt den Abschnitt zu und beim zweiten Druck wieder auf', async ($, on) => {
     mock.store(on)
     // Engine ab 2.1.299 (Schriftstärke im Knopf)
     on('session.version', () => ({ value: { version: '2.1.299', base: '2.1.299' } }) as never)
@@ -293,26 +289,24 @@ describe('Mod', () => {
     })
     const label = async (id: string) => String((await ui.find({ key: `sec-${id}` }))?.props.label ?? '')
     // alle Abschnitte beginnen offen
-    expect(await label('pakete')).toMatch(/^▾ Pakete/)
-    expect(await ui.find({ key: 'pkg-P1' })).toBeDefined()
-    await ui.press({ key: 'sec-pakete' })
-    expect(await label('pakete')).toMatch(/^▸ Pakete/)
-    expect(await ui.find({ key: 'pkg-P1' })).toBeUndefined()
-    // andere Abschnitte bleiben offen
     expect(await label('budget')).toMatch(/^▾ Budget/)
-    await ui.press({ key: 'sec-pakete' })
-    expect(await label('pakete')).toMatch(/^▾ Pakete/)
-    expect(await ui.find({ key: 'pkg-P1' })).toBeDefined()
+    expect(await ui.find({ key: 'budget-laeufe' })).toBeDefined()
+    await ui.press({ key: 'sec-budget' })
+    expect(await label('budget')).toMatch(/^▸ Budget/)
+    expect(await ui.find({ key: 'budget-laeufe' })).toBeUndefined()
+    // andere Abschnitte bleiben offen
+    expect(await label('fragen')).toMatch(/^▾ Offene Fragen/)
+    await ui.press({ key: 'sec-budget' })
+    expect(await label('budget')).toMatch(/^▾ Budget/)
+    expect(await ui.find({ key: 'budget-laeufe' })).toBeDefined()
     // Titel als Text im Knopf, Stärke `medium`
-    const kopf = JSON.stringify(await ui.find({ key: 'sec-pakete' }))
+    const kopf = JSON.stringify(await ui.find({ key: 'sec-budget' }))
     expect(kopf).toMatch(/"weight":"medium"/)
-    // Abstände wie in der Seitenleiste, Etiketten grau (keine Farbe), Quelle ohne „Quelle:“
-    expect(JSON.stringify(await ui.find({ key: 'abschnitt-pakete' }))).toMatch(/"marginTop":"lg"/)
-    expect(JSON.stringify(await ui.find({ key: 'pkg-P1-zustand' }))).not.toMatch(/"color":/) // gitleaks:allow (Element-Schlüssel, kein Geheimnis)
+    // Abstände wie in der Seitenleiste, Quelle ohne „Quelle:“
+    expect(JSON.stringify(await ui.find({ key: 'abschnitt-budget' }))).toMatch(/"marginTop":"lg"/)
     expect(JSON.stringify(await ui.find({ key: 'foot' }))).not.toMatch(/Quelle:/)
-    // Kopfzeile lesbar, Agenten-ID ohne Agentenzeile entfällt
+    // Kopfzeile lesbar
     expect(JSON.stringify(await ui.find({ key: 'kopf' }))).toMatch(/Feature · groß/)
-    expect(JSON.stringify(await ui.find({ key: 'pkg-P1' }))).not.toMatch(/a1b2c3/)
     // Beispieldaten haben nur eine offene Frage und keine Kennzahlen: „+n weitere“ ist hier nicht zu sehen
     expect(await ui.find({ key: 'mehr-fragen' })).toBeUndefined()
     await ui.unmount()

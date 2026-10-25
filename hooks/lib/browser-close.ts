@@ -1,7 +1,9 @@
-// Browser nach dem Browser-Prüfer schließen (sonst läuft Chrome nach dem Lauf weiter, bis die Sitzung endet).
+// Browser nach einem prüfenden Agenten schließen (sonst läuft Chrome nach dem Lauf weiter, bis die Sitzung endet).
 // Der Browser gehört dem Playwright-Server der Hauptsitzung, nicht dem Agenten; der Mod kann keine MCP-Werkzeuge
 // aufrufen. Er merkt sich deshalb je Agent, ob der letzte Browser-Aufruf `browser_close` war, und meldet es sonst
 // dem Bauleiter. Rein, ohne Node und ohne Mod-API.
+
+import { canonicalRole } from '../../lib/roles.ts'
 
 /** Werkzeug, das den Browser des Playwright-Plugins schließt. */
 export const BROWSER_CLOSE_TOOL = 'mcp__plugin_playwright_playwright__browser_close'
@@ -15,9 +17,9 @@ const PLAYWRIGHT_PREFIX = 'mcp__plugin_playwright_playwright__'
  */
 export type BrowserUse = 'nie' | 'offen' | 'zu'
 
-/** Rollen, deren Browser der Mod verfolgt (alter Name `inspector` gilt gleich). */
+/** Rollen, deren Browser der Mod verfolgt: der Schlussprüfer probiert Oberflächen im Browser aus. */
 export function tracksBrowser(rolle: string): boolean {
-  return rolle === 'browser-reviewer' || rolle === 'inspector'
+  return canonicalRole(rolle) === 'final-reviewer'
 }
 
 /** Stand nach einem erfolgreichen Werkzeugaufruf; andere Werkzeuge ändern nichts. */
@@ -29,7 +31,7 @@ export function browserAfter(prev: BrowserUse, tool: string): BrowserUse {
 /** Zeile für die Bautafel, solange ein Browser offen geblieben ist; null, wenn keiner offen ist. */
 export function browserOpenHint(open: number): string | null {
   if (open <= 0) return null
-  return `Browser offen nach dem Browser-Prüfer: bitte schließen (${BROWSER_CLOSE_TOOL})`
+  return `Browser offen nach dem Prüfer: bitte schließen (${BROWSER_CLOSE_TOOL})`
 }
 
 /**
@@ -39,8 +41,8 @@ export function browserOpenHint(open: number): string | null {
 export function browserOpenContext(agentIds: readonly string[]): string | null {
   if (agentIds.length === 0) return null
   return (
-    `codecycle: Browser offen, bitte schließen. Der Browser-Prüfer (Agent ${agentIds.join(', ')}) endete, ohne zuletzt ` +
+    `codecycle: Browser offen, bitte schließen. Der Prüfer (Agent ${agentIds.join(', ')}) endete, ohne zuletzt ` +
     `${BROWSER_CLOSE_TOOL} aufzurufen; der Browser gehört dem Playwright-Server dieser Sitzung und läuft sonst weiter. ` +
-    `Rufe ${BROWSER_CLOSE_TOOL} selbst auf (Schritt 6, Punkt 2).`
+    `Rufe ${BROWSER_CLOSE_TOOL} selbst auf.`
   )
 }

@@ -22,7 +22,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     on('turn.complete', (_$, e) => ({ text: e.answer }))
     // Wie im Betrieb: der Sitzungsstart lädt die aktive Aufgabe, erst dann wird die Hauptsitzung verbucht.
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder')
     for (const agentId of ['ag1', undefined]) {
       for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, ...(agentId ? { agentId } : {}) })) {
         void chunk
@@ -35,7 +35,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect(costs.hauptsitzung.runden).toBe(1)
     // Bauleiter (Hauptsitzung) mit eigenem Modell
     expect(costs.hauptsitzung.modell).toBe('sonnet')
-    expect(costs.rollen['builder-logic'].input).toBe(10)
+    expect(costs.rollen['builder'].input).toBe(10)
   })
 
   test('Erste Anfrage eines Agenten vor seinem Eintrag im Register: beim Agenten gebucht, nicht „fremd“', async ($, on) => {
@@ -63,7 +63,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     const step = (async () => {
       for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, agentId: 'ag1' })) void chunk
     })()
-    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder')
     release()
     await step
     await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't', agentId: 'ag1', reason: 'answer' })
@@ -89,7 +89,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     })
     on('turn.complete', (_$, e) => ({ text: e.answer }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder')
     for (const agentId of ['noop1', 'noop1', undefined]) {
       for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, ...(agentId ? { agentId } : {}) })) {
         void chunk
@@ -101,7 +101,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect(costs.fremd.cacheRead).toBe(160)
     expect(costs.hauptsitzung.runden).toBe(1)
     expect(Object.keys(costs.agenten)).toEqual(['ag1'])
-    expect(Object.keys(costs.rollen)).toEqual(['builder-logic'])
+    expect(Object.keys(costs.rollen)).toEqual(['builder'])
   })
 
   test('Urteil aus der Quittung landet im Register, ohne Quittung kein Feld', async ($, on) => {
@@ -112,7 +112,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     on('turn.complete', (_$, e) => ({ text: e.answer }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
     await spawn($, `${DIR}/ Paket: alle`, 'codecycle:reviewer')
-    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder')
     await $.turn.complete({ answer: 'Bericht geschrieben.\nQUITTUNG\nstatus: rot\npaket: alle\n', durationMs: 1, isAborted: false, turnId: 't1', agentId: 'ag1', reason: 'answer' })
     await $.turn.complete({ answer: 'abgebrochen', durationMs: 1, isAborted: false, turnId: 't2', agentId: 'ag2', reason: 'answer' })
     const reg = JSON.parse(written[`${DIR}/agents.json`]!)
@@ -135,7 +135,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     await $.session.start({ cwd: '/proj', surface: null } as never)
     FIVE.percent = 10
     await step(0)
-    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder-logic')
+    await spawn($, `${DIR}/ Paket: P1`, 'codecycle:builder')
     await step(0, 'ag1')
     FIVE.percent = 11
     await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 'a', agentId: 'ag1', reason: 'answer' })
@@ -145,7 +145,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     const costs = JSON.parse(written[`${DIR}/costs.json`]!)
     expect(costs.hauptsitzung.modell).toBe('claude-opus-5-5')
     expect(costs.hauptsitzung.limitProzent).toBe(1)
-    expect(costs.rollen['builder-logic'].limitProzent).toBe(1)
+    expect(costs.rollen['builder'].limitProzent).toBe(1)
 
     const pane = await $.ui.mount({
       plugin: 'codecycle',
@@ -191,25 +191,6 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     }
   })
 
-  test('register-forwarding: codecycle_owner nennt den Agenten, der die Datei geändert hat', async ($, on) => {
-    mock.store(on)
-    const files = { ...FILES, '.claude/codecycle.md': `${FILES['.claude/codecycle.md']}- register-forwarding: an\n` }
-    fakeWorld(on, files)
-    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
-    on('tool.call', () => ({ result: {} }))
-    await $.session.start({ cwd: '/proj', surface: null } as never)
-    expect(TOOLS).toContain('codecycle_owner')
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
-    await $.tool.call({ tool: 'Edit', file_path: '/wt/P1/src/Group.php', old_string: 'a', new_string: 'b', agentId: 'ag1' } as never)
-    const owner = async (path: string) => {
-      const r = (await $.tool.call({ tool: 'mcp__codecycle__codecycle_owner', path } as never)).result
-      expect(typeof r).toBe('string')
-      return JSON.stringify(r)
-    }
-    expect(await owner('src/Group.php')).toMatch(/Agent ag1, Rolle builder-logic, Paket P1/)
-    expect(await owner('src/Neu.php')).toMatch(/kein Agent hat die Datei/)
-  })
-
   test('Register mit Pfaden relativ zum Projekt, Bash-Schreibziele, Git-Änderungen beim Ende', async ($, on) => {
     mock.store(on)
     // ohne Zaun: Bash-Schreibziele sollen trotzdem ins Register
@@ -249,7 +230,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect(paths(a.erstellt)).toEqual(['tests/neu.test.ts', 'tests/frisch.test.ts'])
     const costs = written[`${DIR}/costs.json`]!
     expect(`${JSON.stringify(reg)}${costs}`).not.toMatch(/jemand|proj--wt|\/proj\//)
-    expect(Object.keys(JSON.parse(costs).fehlenderKontext)).toContain('src/Other.php')
+    expect(costs).not.toMatch(/fehlenderKontext|zusaetzlichGelesen/)
   })
 
   test('Lauf ohne Aufgabe (Einrichter) wird in .codecycle/setup/ gebucht, die Hauptsitzung danach auch', async ($, on) => {
@@ -323,13 +304,12 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     expect(await ui.find({ type: 'Text', text: /Keine offene Aufgabe/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /aufgabe-t/ })).toBeDefined()
     await ui.unmount()
-    // Handwerker im Paket-Worktree neben dem Projekt: Bericht und Bücher trotzdem im Hauptordner
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic', '/proj--wt-t--P1')
-    expect(seen).toMatch(new RegExp(`Bericht: /proj/${DIR}/reports/P1-builder-logic\\.md`))
-    expect(seen).toMatch(/PHP: strict_types/) // Projektbeschreibung aus dem Hauptordner gelesen
+    // Bauender in einem Worktree neben dem Projekt: Bericht und Bücher trotzdem im Hauptordner (kein Paket aus dem Text)
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder', '/proj--wt-t--P1')
+    expect(seen).toMatch(new RegExp(`Bericht: /proj/${DIR}/reports/builder\\.md`))
     await $.tool.call({ tool: 'Edit', file_path: '/proj--wt-t--P1/src/Group.php', old_string: 'a', new_string: 'b', agentId: 'ag1' } as never)
     await $.session.end({ reason: 'other', sessionId: 's' } as never)
-    expect(JSON.parse(written[`${DIR}/agents.json`]!).agenten.ag1.rolle).toBe('builder-logic')
+    expect(JSON.parse(written[`${DIR}/agents.json`]!).agenten.ag1.rolle).toBe('builder')
     expect(written[`${DIR}/costs.json`]).toBeDefined()
     expect(Object.keys(written).filter(k => k.startsWith('AUSSEN:') || k.includes(`${DIR}/docs/`))).toEqual([])
   })
@@ -345,7 +325,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     })
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     await $.session.start({ cwd: `/proj/${DIR}`, surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     await $.session.end({ reason: 'other', sessionId: 's' } as never)
     expect(calls.some(c => c.includes('--git-common-dir'))).toBe(true)
     expect(written[`${DIR}/agents.json`]).toBeDefined()
@@ -396,12 +376,12 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     fakeWorld(on, { ...FILES, [`${DIR}/STATE.md`]: done })
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     await $.session.end({ reason: 'other', sessionId: 's' } as never)
     expect(WRITES.filter(w => w.includes(DIR))).toEqual([])
   })
 
-  test('Lesen per Bash/PowerShell im Register (ohne Lese-Budget), verweigerte Schreibversuche nicht', async ($, on) => {
+  test('Lesen per Bash/PowerShell im Register, verweigerte Schreibversuche nicht', async ($, on) => {
     mock.store(on)
     const files: Record<string, string> = {
       ...FILES,
@@ -412,16 +392,12 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     const written = fakeWorld(on, files)
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     on('tool.call', () => ({ result: {} }))
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const run = (tool: string, command: string) => $.tool.call({ tool, command, agentId: 'ag1' } as never)
     expect((await run('Bash', 'cat src/list.ts')).deny).toBeUndefined()
     expect((await run('Bash', "sed -n '1,5p' src/Zweite.php")).deny).toBeUndefined()
     expect((await run('PowerShell', 'Get-Content -Path src/list.ts -Tail 5')).deny).toBeUndefined()
     expect((await run('Bash', 'cat src/gibt-es-nicht.ts')).deny).toBeUndefined()
-    // Bash-Lesen verbraucht das Lese-Budget (1) nicht: ein Read einer fremden Datei geht noch, das zweite nicht
-    const read = (file_path: string) => $.tool.call({ tool: 'Read', file_path, agentId: 'ag1' } as never)
-    expect((await read('/proj/src/A.php')).deny).toBeUndefined()
-    expect((await read('/proj/src/B.php')).deny).toMatch(/Lese-Budget erschöpft/)
     // Zaun: verweigertes Schreiben (und Lesen im selben Befehl) kommt nicht ins Register
     expect((await run('Bash', 'cat src/Group.php > phpunit.xml')).deny).toMatch(/Kontrolldatei/)
     await $.session.end({ reason: 'other', sessionId: 's' } as never)
@@ -439,7 +415,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     const written = fakeWorld(on, FILES)
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     on('tool.call', () => ({ result: {} }))
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const run = (tool: string, command: string) => $.tool.call({ tool, command, agentId: 'ag1' } as never)
     await $.tool.call({ tool: 'Grep', pattern: 'x', agentId: 'ag1' } as never) // 1
     await $.tool.call({ tool: 'Glob', pattern: '*.php', agentId: 'ag1' } as never) // 2
@@ -466,7 +442,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
       return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     })
     // kein cwd im Spawn und kein Pfad in der Nachricht: erst der erste Werkzeugaufruf zeigt den Worktree
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P2`, 'codecycle:builder-routine')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P2`, 'codecycle:builder')
     expect(runs.some(r => r.argv.includes('rev-parse'))).toBe(false)
     const wt = 'C:\\Users\\jemand\\proj--wt-P2'
     await $.tool.call({ tool: 'Read', file_path: `${wt}\\src\\list.ts`, agentId: 'ag1' } as never)
@@ -486,7 +462,7 @@ describe('Token-Buch, Register, Hauptsitzung', () => {
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     on('tool.call', () => ({ result: {} }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const read = (file_path: string) => $.tool.call({ tool: 'Read', file_path, agentId: 'ag1' } as never)
     await read('C:\\Users\\jemand\\.claude\\CLAUDE.md')
     await read('C:\\Users\\jemand\\.claude\\plugins\\cache\\codecycle\\codecycle\\0.4.1\\skills\\workflow\\SKILL.md')
@@ -528,7 +504,7 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     // ohne session.measure: der Start des Agenten liest das Fenster neu
     FIVE.percent = 8
     await CLOCK.current!.advance(2_000)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     let ui = await pane($, 'desktop')
     let head = JSON.stringify(await ui.find({ type: 'Svg' }))
     // Keine Kennzahl „Limit 5 Std.“ mehr im Kopf; die Fußzeile der Desktop-App zeigt den Stand sofort
@@ -641,7 +617,7 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     await $.session.start({ cwd: '/proj', surface: null } as never)
     await submit($, '1a, 2a.')
     await step($)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-routine')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     await $.session.end({ reason: 'other', sessionId: 'test-sitzung' } as never)
     let main = JSON.parse(written[`${DIR}/costs.json`]!).hauptsitzung
     expect(main.runden).toBe(3)
@@ -664,7 +640,7 @@ describe('Limit-Kachel, Kosten je Aufgabe, Cache-Zeit, Läufe', () => {
     handlers(on)
     await $.session.start({ cwd: '/proj', surface: null } as never)
     await step($)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     await step($, undefined, 1)
     await done($)
     await CLOCK.current!.advance(10_000)

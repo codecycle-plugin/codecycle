@@ -1,41 +1,27 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { Plan } from '../../lib/plan-file.ts'
 import type { TaskState } from '../../types'
 import { agentHints, gitHints, mainBranch } from '../git-hints.ts'
-import { pathsLib, planFile, stateFile } from '../lib-path.ts'
+import { pathsLib, stateFile } from '../lib-path.ts'
 import type { Ctx } from '../main.ts'
 import { CONFIG_PATH, type ToolConfig, findProjectRoot, loadConfig } from '../project.ts'
 
-const { analyzeStartability, parsePlan } = planFile
-const { DONE_STATES, currentPackage, parseState } = stateFile
+const { parseState } = stateFile
 
 const { TASKS_DIR } = pathsLib
 
-/** Budgetangabe der Kopfzeile; Nachläufe erhöhen nur verbraucht und nachlauf, nie geplant. */
-function budgetText(b: TaskState['budget']): string {
-  let text = `Budget ${b.verbraucht}/${b.geplant}`
-  if (b.nachlauf > 0) text += ` (Nachlauf ${b.nachlauf})`
-  const over = b.verbraucht - b.geplant
-  if (over > 0) {
-    text += ` · über Plan +${over}`
-    if (over > b.nachlauf) text += `, davon ohne Nachlauf-Grund: ${over - b.nachlauf}`
-  }
-  return text
-}
-
-/** Namen der sechs Haltepunkte des Solo-Wegs (skills/solo/SKILL.md) */
+/** Namen der sechs Haltepunkte von /codecycle:new (skills/new/SKILL.md) */
 const SOLO_STOPS: Record<number, string> = {
-  1: 'Start',
-  2: 'Kurzplan',
+  1: 'Entwurf',
+  2: 'Plan',
   3: 'Eigene Kontrolle',
   4: 'Prüfung',
   5: 'Nachbesserung',
   6: 'Abschluss',
 }
 
-type Row = { folder: string; state?: TaskState; error?: string; plan?: Plan; planError?: string }
+type Row = { folder: string; state?: TaskState; error?: string }
 
 export function tasks(_args: string[], ctx: Ctx): number {
   const root = findProjectRoot(ctx.cwd)
@@ -61,17 +47,7 @@ export function tasks(_args: string[], ctx: Ctx): number {
     const path = `${TASKS_DIR}/${entry.name}/STATE.md`
     if (!existsSync(join(root, path))) continue
     try {
-      const row: Row = { folder: entry.name, state: parseState(readFileSync(join(root, path), 'utf8'), path) }
-      // PLAN.md ist optional (vor dem Planen gibt es keine); ein kaputter Plan stoppt die Übersicht nicht
-      const planPath = `${TASKS_DIR}/${entry.name}/PLAN.md`
-      if (existsSync(join(root, planPath))) {
-        try {
-          row.plan = parsePlan(readFileSync(join(root, planPath), 'utf8'), planPath)
-        } catch (err) {
-          row.planError = `${planPath}: ${(err as Error).message}`
-        }
-      }
-      rows.push(row)
+      rows.push({ folder: entry.name, state: parseState(readFileSync(join(root, path), 'utf8'), path) })
     } catch (err) {
       rows.push({ folder: entry.name, error: `${path}: ${(err as Error).message}` })
     }
@@ -79,7 +55,6 @@ export function tasks(_args: string[], ctx: Ctx): number {
   rows.sort((a, b) => (b.state?.zuletzt ?? '').localeCompare(a.state?.zuletzt ?? '') || b.folder.localeCompare(a.folder))
 
   if (rows.length === 0) ctx.out('keine Aufgaben')
-  let stuck = false
   for (const row of rows) {
     const s = row.state
     if (!s) {
@@ -87,13 +62,14 @@ export function tasks(_args: string[], ctx: Ctx): number {
       ctx.out(`  ! ${row.error}`)
       continue
     }
-    // Solo-Weg: kein Paket, sondern der Haltepunkt (1–6)
+    // Haltepunkt (1–6), bei großen Aufgaben dazu die Teile
     if (s.weg === 'solo') {
       const teile = s.teile ?? []
       const done = teile.filter(p => p.status === 'fertig').length
       const open = teile.find(p => p.status !== 'fertig')
-      // große Aufgabe: Zwischen-Haltepunkt 2.n nach jedem fertigen Teil
-      const parts = teile.length > 0 ? ` · Teile ${done}/${teile.length}${open ? ` (jetzt ${open.name})` : ''}` : ''
+      // große Aufgabe: Teile nacheinander, ein Teil in Arbeit mit seinem Branch
+      const now = open ? ` (jetzt ${open.name}${open.status === 'in-arbeit' ? `, in Arbeit auf ${open.branch ?? '?'}` : ''})` : ''
+      const parts = teile.length > 0 ? ` · Teile ${done}/${teile.length}${now}` : ''
       const halt = s.haltepunkt ? `Haltepunkt ${s.haltepunkt}${SOLO_STOPS[s.haltepunkt] ? ` (${SOLO_STOPS[s.haltepunkt]})` : ''}` : 'Haltepunkt ?'
       ctx.out(`${s.aufgabe} · ${s.zustand} · solo · ${halt}${parts}${s.geprueftAuf ? ` · geprüft auf ${s.geprueftAuf.slice(0, 7)}` : ''} · zuletzt ${s.zuletzt}`)
       if (s.naechsterSchritt[0]) ctx.out(`  nächster Schritt: ${s.naechsterSchritt[0]}`)
@@ -101,29 +77,9 @@ export function tasks(_args: string[], ctx: Ctx): number {
       for (const hint of agentHints(root, `${TASKS_DIR}/${row.folder}`, s, today)) ctx.out(`  ! ${hint}`)
       continue
     }
-    const done = s.pakete.filter(p => p.status === 'fertig').length
-    // "jetzt Pn" nur bei einem offenen Paket (currentPackage fällt sonst auf das letzte zurück)
-    const cur = DONE_STATES.includes(s.zustand) ? undefined : currentPackage(s)
-    const current = cur && cur.status !== 'fertig' ? cur : undefined
-    ctx.out(
-      `${s.aufgabe} · ${s.zustand} · Pakete ${done}/${s.pakete.length}` +
-        `${current ? ` (jetzt ${current.id})` : ''} · ${budgetText(s.budget)}` +
-        ` · zuletzt ${s.zuletzt}`,
-    )
-    if (s.naechsterSchritt[0]) ctx.out(`  nächster Schritt: ${s.naechsterSchritt[0]}`)
+    // weg: voll oder ohne weg: Aufgabe aus dem vollen Ablauf, nicht fortsetzbar
+    ctx.out(`${s.aufgabe} · ${s.zustand} · voller Ablauf, nicht fortsetzbar (neu mit /codecycle:new) · zuletzt ${s.zuletzt}`)
     for (const hint of gitHints(root, s, main, today)) ctx.out(`  ! ${hint}`)
-    for (const hint of agentHints(root, `${TASKS_DIR}/${row.folder}`, s, today)) ctx.out(`  ! ${hint}`)
-    if (row.planError) ctx.out(`  ! ${row.planError}`)
-    if (!DONE_STATES.includes(s.zustand)) {
-      const a = analyzeStartability(s.pakete, row.plan)
-      if (a.keinesStartbar) {
-        stuck = true
-        const waiting = a.wartend.map(w => `${w.id} wartet auf ${w.wartetAuf.join(', ')}`).join('; ')
-        ctx.out(`  ! kein Paket startbar: ${waiting}`)
-        if (a.zyklus) ctx.out(`  ! Abhängigkeitsschleife: ${[...a.zyklus, a.zyklus[0]].join(' -> ')}`)
-      }
-    }
   }
-  // Exit 1, wenn eine laufende Aufgabe festsitzt (Abschnitt 10a: 1 = rot); sonst wie bisher 0
-  return stuck ? 1 : 0
+  return 0
 }

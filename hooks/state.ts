@@ -1,17 +1,9 @@
 // Mod-Hilfen: Profile, Limits, Beispieldaten; STATE.md lesen kommt aus lib/.
 
-import type { Board, Limits, PackageStatus, Profile, RoleCost } from '../types'
-import { currentPackage, parseState as parseTaskState, pickActive, pickLatest } from '../lib/state-file.ts'
+import type { Board, Limits, Profile, RoleCost } from '../types'
+import { parseState as parseTaskState, pickActive, pickLatest } from '../lib/state-file.ts'
 
-export { currentPackage, pickActive, pickLatest }
-
-/** Zeichen, Farbe und Beschriftung je Paketstatus (Bautafel und Seitenleiste) */
-export const BOX: Record<PackageStatus, { glyph: string; color?: string; dim?: boolean; label: string }> = {
-  fertig: { glyph: '■', color: 'green', label: 'fertig' },
-  'in-arbeit': { glyph: '◧', color: 'yellow', label: 'in Arbeit' },
-  offen: { glyph: '□', dim: true, label: 'offen' },
-  blockiert: { glyph: '✖', color: 'red', label: 'blockiert' },
-}
+export { pickActive, pickLatest }
 
 export const PROFILES: Profile[] = ['sparsam', 'grosszuegig', 'extrem']
 
@@ -104,18 +96,10 @@ export const SAMPLE_BOARD: Board = {
   zustand: 'in-arbeit',
   branch: 'codecycle/einkaufsliste-teilen',
   budget: { geplant: 11, verbraucht: 6, nachlauf: 0 },
-  planrunden: 0,
   zuletzt: '2026-10-07',
-  pakete: [
-    { id: 'P1', rolle: 'logik', status: 'fertig', agent: 'a1b2c3', commit: '3f2e1aa', runden: 1 },
-    { id: 'P2', rolle: 'routine', status: 'in-arbeit', agent: 'd4e5f6', commit: null, runden: 0 },
-    { id: 'P3', rolle: 'logik', status: 'offen', agent: null, commit: null, runden: 0 },
-    { id: 'P4', rolle: 'routine', status: 'blockiert', agent: null, commit: null, runden: 0 },
-    { id: 'P5', rolle: 'logik', status: 'offen', agent: null, commit: null, runden: 0 },
-  ],
-  naechsterSchritt: ['P2 umsetzen (Handwerker Routine läuft).'],
+  naechsterSchritt: ['Teil Oberfläche bauen.'],
   offeneFragen: ['Sollen geteilte Listen auch offline bearbeitbar sein?'],
-  blocker: ['P4 wartet auf die Datenbank-Migration aus P3.'],
+  blocker: ['Teil Freigabe wartet auf die Datenbank-Migration.'],
   kosten: sampleCosts(),
 }
 
@@ -131,9 +115,7 @@ export const EMPTY_BOARD: Board = {
   zustand: '',
   branch: '',
   budget: { geplant: 0, verbraucht: 0, nachlauf: 0 },
-  planrunden: 0,
   zuletzt: '',
-  pakete: [],
   naechsterSchritt: [],
   offeneFragen: [],
   blocker: [],
@@ -142,10 +124,9 @@ export const EMPTY_BOARD: Board = {
 
 function sampleCosts(): RoleCost[] {
   return [
-    { rolle: 'architekt', prozent: 6.5 },
-    { rolle: 'logik', prozent: 4.1 },
-    { rolle: 'routine', prozent: 1.8 },
-    { rolle: 'pruefer', prozent: 3.2 },
+    { rolle: 'plan-reviewer', prozent: 1.8 },
+    { rolle: 'builder', prozent: 6.5 },
+    { rolle: 'final-reviewer', prozent: 3.2 },
   ]
 }
 
@@ -160,9 +141,7 @@ export function statusText(profile: Profile, limits: Limits, board: Board, alt?:
   else if (alt && limits.fuenfStunden !== null) five += ` (Stand ${alt.stand})`
   const head = `${PROFILE_LABEL[profile]} · 5h ${five}`
   if (board.quelle === 'leer') return head
-  const current = currentPackage(board)
-  const step = current ? ` ${current.id}/${board.pakete.length}` : ''
-  return `${head} · ${board.aufgabe}${step}`
+  return `${head} · ${board.aufgabe}`
 }
 
 export function bar(value: number | null, width = 10): string {

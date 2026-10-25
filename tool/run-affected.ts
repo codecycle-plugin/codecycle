@@ -37,8 +37,6 @@ export function runAffected(
   work: string,
   config: ToolConfig,
   staged: boolean,
-  /** rote Tests erlaubt (Markierung von `commit-tests` passt zum Index) */
-  allowRed = false,
 ): { code: 0 | 1 | 2; lines: string[] } {
   const base = diffBase(root, work, config)
   const changed = changedFiles(work, base, staged)
@@ -56,11 +54,5 @@ export function runAffected(
   }
   const shown = tests.length > 5 ? `${tests.slice(0, 5).join(', ')} … (${tests.length})` : tests.join(', ')
   const step = runStep(work, config, 'test', affectedCommand(config, tests))
-  if (allowRed && step.code === 1) {
-    return {
-      code: 0,
-      lines: [`betroffene Tests: ${shown}`, ...head, ...step.lines, 'test: rot, erlaubt (rote Tests des Test-Autors, codecycle commit-tests)'],
-    }
-  }
   return { code: step.code, lines: [`betroffene Tests: ${shown}`, ...head, ...step.lines] }
 }

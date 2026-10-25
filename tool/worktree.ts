@@ -1,5 +1,4 @@
-// Paket- und Teil-Worktrees neben dem Projekt: finden, Verweise auf die Pakete in node_modules, Merge mit Abbruch bei Konflikt, Entfernen
-// ohne `--force`. Gemeinsam für `codecycle paket` (voller Ablauf) und `codecycle solo teil` (Solo-Weg).
+// Prüf-Worktrees neben dem Projekt (`codecycle solo pruefung`): Verweise auf die Pakete in node_modules, Entfernen ohne `--force`.
 
 import { spawnSync } from 'node:child_process'
 import {
@@ -17,24 +16,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 
 import { ToolBroken } from './errors.ts'
-import { git } from './exec.ts'
-import { pathsLib } from './lib-path.ts'
 import { gitCommonDir } from './project.ts'
-
-const { GIT_QUIET } = pathsLib
-
-/** Worktree, in dem `branch` ausgecheckt ist, oder null. */
-export function worktreeOf(root: string, branch: string): string | null {
-  let path: string | null = null
-  for (const line of git(['worktree', 'list', '--porcelain'], root).out.split(/\r?\n/)) {
-    if (line.startsWith('worktree ')) path = line.slice('worktree '.length)
-    else if (line === `branch refs/heads/${branch}` && path) return resolve(path)
-  }
-  return null
-}
 
 const NODE_MODULES = 'node_modules'
 /** Eintrag in `info/exclude`: ohne Schrägstrich am Ende, trifft so den Ordner und einen älteren Verweis (`node_modules/` träfe keinen Verweis). */
@@ -197,49 +182,6 @@ export function gitFull(args: string[], cwd: string): { ok: boolean; text: strin
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
   if (r.error) throw new ToolBroken(`git nicht ausführbar: ${String(r.error)}`)
   return { ok: r.status === 0, text: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
-}
-
-/** Merge mit `--no-edit`; bei einem Konflikt abbrechen und die Dateien nennen. */
-export function merge(cwd: string, from: string): { ok: true } | { ok: false; files: string[]; text: string } {
-  const r = gitFull(['merge', '--no-edit', from], cwd)
-  if (r.ok) return { ok: true }
-  const files = git([...GIT_QUIET, 'diff', '--name-only', '--diff-filter=U'], cwd).out.split(/\r?\n/).filter(Boolean)
-  gitFull(['merge', '--abort'], cwd)
-  return { ok: false, files, text: r.text }
-}
-
-/**
- * Uncommittete Dateien im Ordner `cwd`, die ein Merge von `from` berühren würde (Git bräche vor dem Merge ab). Andere
- * uncommittete Dateien (z. B. das Token-Buch im Aufgabenordner) stören den Merge nicht und zählen nicht.
- */
-export function dirtyForMerge(cwd: string, from: string): string[] {
-  const list = (args: string[]): string[] => git([...GIT_QUIET, ...args], cwd).out.split(/\r?\n/).filter(Boolean)
-  const dirty = new Set([...list(['diff', '--name-only', '--no-renames', 'HEAD']), ...list(['ls-files', '--others', '--exclude-standard'])])
-  return list(['diff', '--name-only', '--no-renames', `HEAD...${from}`]).filter(p => dirty.has(p))
-}
-
-/**
- * Ordner eines Worktrees, den Git noch führt, fehlt (verschoben oder gelöscht)? Rückgabe: Zeilen der roten Meldung, sonst leer.
- * `was` sagt, was ausbleibt (z. B. „nichts übernommen“).
- */
-export function worktreeMissing(root: string, wt: string, branch: string, was: string): string[] {
-  if (existsSync(wt)) return []
-  return [
-    `rot: Worktree von ${branch} fehlt unter ${wt} (verschoben oder gelöscht?); ${was}`,
-    `  Verschoben: git worktree repair <neuer Ort> (im Hauptordner ${root}). Gelöscht: ansehen, ob Commits fehlen, dann git worktree prune im Hauptordner und erneut aufrufen.`,
-  ]
-}
-
-/**
- * Vor dem Übernehmen: Worktree-Ordner da (nicht verschoben oder gelöscht) und nichts Uncommittetes. Rückgabe: Zeilen der
- * roten Meldung, leer, wenn übernommen werden kann.
- */
-export function worktreeProblem(root: string, wt: string, branch: string): string[] {
-  const missing = worktreeMissing(root, wt, branch, 'nichts übernommen')
-  if (missing.length > 0) return missing
-  const dirt = git([...GIT_QUIET, 'status', '--porcelain'], wt).out.split(/\r?\n/).filter(Boolean)
-  if (dirt.length === 0) return []
-  return [`rot: Worktree ${wt} hat Uncommittetes; erst ansehen, nichts verwerfen`, ...dirt.slice(0, 8).map(l => `  ${l}`)]
 }
 
 /**

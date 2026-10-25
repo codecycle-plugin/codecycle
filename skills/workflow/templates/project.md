@@ -41,29 +41,14 @@ Vorlage für `.claude/codecycle.md`. Wird vom Agenten `setup` ausgefüllt, der N
 ## Schalter
 Standardwerte sind Vorschläge, noch nicht vom Nutzer bestätigt. Alle Schalter stehen hier; Wirkung bei „aus“ steht im Workflow-Skill.
 ```
-context-package: an
-sections: an
-reuse-agents: an
-half-blind: an
-test-author: an
-ideas-auto: an
-multi-planner: an
 conflict-check: an
 helper-scripts: an
-security-reviewer: an
-refuter: aus
 fence: aus
-escalation: aus
-haiku-simple: aus
-register-forwarding: aus
-package-lead: aus
-read-budget: aus
-plan-html: aus
 auto-resume: aus
 agent-progress: aus
 demo-data: aus   # Beispieldaten auf Bautafel und Seitenleiste, solange keine Aufgabe offen ist
+part-review: an   # Prüfer je Teil großer Aufgaben (nur Teile mit Merkmal „groß“ im Plan)
 notizen: aus   # Beobachtungen mit /codecycle:notiz bzw. codecycle notiz in notizen.md der Aufgabe
 assume-and-continue: an
 graph: an   # wenn vorhanden
-cache-ttl-builder: 5m
 ```

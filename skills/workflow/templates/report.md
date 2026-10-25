@@ -1,13 +1,13 @@
-# <P1> – <rolle>
+# <rolle>
 
-Ablage: `reports/<nr|paket>-<rolle>.md`. Nur Fakten und Offene Punkte gehen an den Prüfer.
+Ablage: Pfad aus der Startnachricht, immer im Aufgabenordner des Hauptordners.
 
 ## Fakten
 - Geänderte Dateien: <…>
 - Abweichungen vom Plan: <Datei, ein Satz Begründung> | keine
 - Tests: <Befehl> → <Ergebnis, Anzahl grün/rot/übersprungen>
 - Lint/Format: <Ergebnis> | nicht vorhanden
-- Geänderte bestehende Tests: <Datei, Kriterium als Begründung> | keine
+- Geänderte bestehende Tests: <Datei, Grund> | keine
 - Hilfsskripte: <was, wofür> | keine
 - Commit: <Hash>
 
@@ -15,7 +15,6 @@ Ablage: `reports/<nr|paket>-<rolle>.md`. Nur Fakten und Offene Punkte gehen an d
 - <…>
 
 ## Offene Punkte
-- Vorschläge (z. B. zusätzliche Stelle in einer Datei eines anderen offenen Pakets): <…> | keine
+- Vorschläge (z. B. eine Stelle außerhalb deines Teils): <…> | keine
 - Ähnliche Stellen (nur gemeldet, nicht geändert): <…> | keine
 - Annahmen (Schalter `assume-and-continue`): <ANNAHME: was angenommen wurde, warum, was bei falscher Annahme zu tun ist> | keine
-- Bitte gezielt ansehen (nur Abnahme): <Pakete in Risikobereichen, Dateien, Negativ-Tests> | keine

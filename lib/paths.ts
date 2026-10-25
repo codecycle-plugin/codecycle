@@ -1,7 +1,7 @@
 // Gemeinsame Pfad-Konstanten und die Regel für den Hauptzweig: Mod und Werkzeug
 // lesen dieselben Werte hier, damit es je Sache nur eine Stelle gibt. Reiner Code ohne Node und ohne Mod-API.
 
-/** Aufgabenordner des Plugins im Projekt (je Aufgabe ein Unterordner mit STATE.md, TASK.md, PLAN.md …). */
+/** Aufgabenordner des Plugins im Projekt (je Aufgabe ein Unterordner mit STATE.md, TASK.md, reports/ …). */
 export const TASKS_DIR = 'docs/codecycle'
 
 /** Werkzeug-Konfiguration des Projekts, relativ zum Hauptordner. */

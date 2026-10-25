@@ -7,7 +7,7 @@ export const DEFAULT_THRESHOLD = 92
 export const WARN_PERCENT = 80
 /** Kontext der Hauptsitzung in Tokens: ab hier neue Sitzung an der nächsten natürlichen Pause (vorläufig bis Messung) */
 export const CONTEXT_PAUSE = 400_000
-/** ab hier an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Paket (vorläufig bis Messung) */
+/** ab hier an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Teil (vorläufig bis Messung) */
 export const CONTEXT_STOP = 600_000
 
 export type ContextAdvice = 'keine' | 'pause' | 'jetzt'
@@ -88,7 +88,7 @@ export function warnings(i: WarningInput): string[] {
   ] as const
   for (const [label, v] of hot) {
     if (v !== null && v >= WARN_PERCENT) {
-      out.push(`Limit ${label} bei ${Math.round(v)} %: Profil auf sparsam stellen (neue Sitzung) und nur kleine Läufe starten.`)
+      out.push(`Limit ${label} bei ${Math.round(v)} %: nur kleine Läufe starten.`)
     }
   }
   if (i.profile === 'sparsam' && i.mainModel && /opus/i.test(i.mainModel)) {
@@ -106,18 +106,18 @@ function contextLine(tokens: number | null | undefined): string {
   const c = contextAdvice(tokens)
   const what =
     c === 'jetzt'
-      ? `jetzt (ab ${tokensText(CONTEXT_STOP)}): an der nächsten möglichen Stelle anhalten, auch nach einem Paket`
+      ? `jetzt (ab ${tokensText(CONTEXT_STOP)}): an der nächsten möglichen Stelle anhalten, auch nach einem einzelnen Teil`
       : c === 'pause'
-        ? `an der nächsten natürlichen Pause (ab ${tokensText(CONTEXT_PAUSE)}: nach Freigabe, paket fertig oder Merge)`
+        ? `an der nächsten natürlichen Pause (ab ${tokensText(CONTEXT_PAUSE)}: nach einer Freigabe, einem fertigen Teil oder dem Merge)`
         : `keine (unter ${tokensText(CONTEXT_PAUSE)})`
   return `Hauptsitzung: ${tokensText(tokens)} Kontext; neue Sitzung: ${what}`
 }
 
 /**
- * Kontext für die Hauptsitzung nach `codecycle paket start|fertig`, `solo teil start|fertig` und `solo check`: die Antwort
- * von `codecycle_budget`, ohne eigene Abfrage.
+ * Kontext für die Hauptsitzung nach `codecycle solo teil start|fertig`, `solo plan` und `solo check`: die Antwort
+ * von `codecycle_budget`, ohne eigene Abfrage. `after` nennt den Befehl.
  */
-export function packageBudgetNote(budget: string, after = 'codecycle paket start/fertig'): string {
+export function budgetNote(budget: string, after: string): string {
   return `codecycle_budget (vom Mod nach ${after} angehängt):\n${budget}`
 }
 

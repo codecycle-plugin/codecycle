@@ -1,6 +1,6 @@
 # codecycle
 
-Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl nach Abo-Profil (sparsam, großzügig, extrem), Rollen nach den Merkmalen der Aufgabe, Fortschritt in Dateien im Repo. Ausgelegt auf Genauigkeit statt auf möglichst wenig Limit-Verbrauch. Dazu ein optionaler Mod mit Bautafel und Seitenleiste.
+Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modelle je Rolle aus einer Tabelle (`profiles.json`), große Aufgaben in Teilen mit je einem frischen Bauenden, frische Prüfer gegen die Worte des Nutzers, Fortschritt in Dateien im Repo. Ausgelegt auf Genauigkeit statt auf möglichst wenig Limit-Verbrauch. Dazu ein optionaler Mod mit Bautafel und Seitenleiste.
 
 **Inhalt:** [Voraussetzungen](#voraussetzungen) · [Installation](#installation) · [Erste Schritte](#erste-schritte) · [Befehle](#befehle) · [Profile](#profile) · [Schalter](#schalter) · [Mod (optional)](#mod-optional) · [Aktualisieren](#aktualisieren) · [Abschalten und entfernen](#abschalten-und-entfernen) · [Lizenz und Beiträge](#lizenz-und-beiträge)
 
@@ -10,7 +10,7 @@ Claude-Code-Plugin für einen festen, wiederholbaren Arbeitsablauf: Modellwahl n
 - Python ist **nicht** nötig.
 - Optional: ctags (Universal Ctags) für die Outline der Dateien; ohne ctags ist die Outline leer.
 - Optional: ein Code-Graph, **entweder** code-review-graph (über uv: `uv tool install code-review-graph`) **oder** CodeGraph (`@colbymchenry/codegraph` über npm). Installiert wird nur nach Rückfrage. Ohne Graph gilt der Rückfall Outline und Suche. Der Anbieter steht in `.codecycle/tool.config.json` (`graph.provider`: `auto`, `code-review-graph`, `codegraph`, `none`; `auto` nimmt den Anbieter, dessen Index im Projekt liegt).
-- Für den Browser-Prüfer (Agent `browser-reviewer`; klickt sich durch die Oberfläche, prüft nur, ändert keinen Code): ein Browser-Werkzeug, z. B. in der Desktop-App oder über das Playwright-Plugin. Ohne Browser entfällt der Browser-Prüfer.
+- Für die Prüfung von Oberflächen (Sitzung und Prüfer am Ende): ein Browser-Werkzeug, z. B. in der Desktop-App oder über das Playwright-Plugin. Ohne Browser bleibt die Oberfläche ungeprüft.
 
 ## Installation
 
@@ -35,50 +35,48 @@ In einer Sitzung im Zielprojekt:
 
 ```
 /codecycle:setup
-/codecycle:solo <Beschreibung der Aufgabe>   # oder
 /codecycle:new <Beschreibung der Aufgabe>
 ```
 
-**Welcher Weg?**
+**Ein Weg für jede Aufgabe:**
 
-- **Solo-Weg** (`/codecycle:solo`) für fast alle Aufgaben, auch große und solche mit Risikobereichen: Die Sitzung baut selbst, ein frischer Prüfer prüft das Ergebnis gegen den Wortlaut der Aufgabe und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage. Große Aufgaben bekommen einen Plan in Teilen mit einem Haltepunkt je Teil; ab zwei berührten Risikobereichen prüft ein zweiter Prüfer nur die Sicherheit. Weicht die Sitzung bewusst vom Wortlaut ab, fragt sie dich im Abschluss. Verlangt die Aufgabe etwas schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen), fragt der Solo-Weg vorher, ob der volle Ablauf besser passt. <!-- doku-ok -->
-- **Voller Ablauf** (`/codecycle:new`) für schwer Rückgängiges (Datenmigration, Löschen, Veröffentlichen, Zahlungen): Ein Bauleiter verteilt Erkunden, Planen, Tests, Bauen und Prüfen auf eigene Agenten, je Paket in einem eigenen Worktree. Gründlicher, aber ein Vielfaches an Verbrauch.
-- `/codecycle:new` schlägt den passenden Weg zuerst vor (eine Frage mit Empfehlung) und wechselt auf Wunsch in den Solo-Weg.
-- Beide Wege legen einen Aufgabenordner mit Auftrag und Stand an; nach `/clear` setzt `/codecycle:continue` fort.
+- **Brainstorming:** Claude klärt im Gespräch, was du willst, eine Frage je Nachricht, mit eigenen Ideen und Kritik. Ist die Aufgabe klar, sagt Claude in einem Satz, was es verstanden hat, und legt los. Startet auch von selbst vor neuer, gestaltender Arbeit (`/codecycle:brainstorming`).
+- **Entwurf:** kurz im Chat, mit deinen Worten, Zielen, Grenzen und Erfolgssätzen; du gibst ihn frei.
+- **Plan:** schreibt die Sitzung selbst; ein Planprüfer gleicht ihn mit dem Entwurf ab, du gibst ihn frei. Danach schlägt Claude vor, ob es hier weitergeht oder in einer neuen Sitzung (`/clear`, dann `/codecycle:continue`).
+- **Bauen und Prüfen:** Kleine und mittlere Aufgaben baut die Sitzung selbst. Große bekommen einen Plan in Teilen; je Teil baut nacheinander ein frischer Bauender auf eigenem Branch im selben Ordner, jedes Teilende ist ein guter Punkt zum Aufhören. Geht das Limit mitten im Teil aus, baut `/codecycle:continue` dort weiter. Am Ende prüft ein frischer Prüfer das Ergebnis gegen deine Worte und probiert es aus, eine Runde Nachbesserung, dann die Merge-Frage; ab zwei berührten Risikobereichen prüft ein zweiter Prüfer nur die Sicherheit. Vor schwer Rückgängigem (Datenmigration, Löschen, Veröffentlichen, Zahlungen) hält Claude an und fragt.
+- Ältere angefangene Aufgaben ohne `weg: solo` in `STATE.md` setzt `/codecycle:continue` nicht fort; Branch und Dateien bleiben, `/codecycle:new` beginnt sie neu.
 
 `/codecycle:setup` legt `.claude/codecycle.md` an, ruft `codecycle install-tool` (Werkzeug-Kopie `.codecycle/tool/`) und `codecycle hooks install` (`.githooks/`) auf und fragt nach Sprache, Ablage, Profil und Schaltern. Danach führt `/codecycle:new` durch den Ablauf. Eine neue Sitzung empfiehlt der Bauleiter erst, wenn die Hauptsitzung groß wird; dann setzt `/codecycle:continue` nach `/clear` fort.
-**Gefragt wird nur vorn (Klären, Auftrag, Plan) und beim Wiedereinstieg;** läuft die Umsetzung, wird der Nutzer nicht gestört.
+**Gefragt wird nur vorn (Brainstorming, Entwurf, Plan), vor schwer Rückgängigem und beim Wiedereinstieg;** läuft die Umsetzung, wird der Nutzer nicht gestört.
 Der Merge in `main` kommt nie automatisch, sondern als Frage beim nächsten `/codecycle:continue` oder `/codecycle:status` („jetzt mergen und die Branches löschen?“, Standard Ja; gelöscht wird nur mit `git branch -d`). Setup fragt außerdem nach dem Hauptbranch (Vorgabe `main`, `master` nur auf Frage umbenennen), nach `.gitignore`-Einträgen (bei Ablage „teilen“ wird `.claude/codecycle.md` committet) und nach einer `.gitattributes` gegen CRLF-Warnungen. <!-- doku-ok -->
 
 **Kennzeichnung durch Claude in Commits:** Setup fragt einmal, was in Commits und Pull Requests stehen soll: Urheberzeile und Sitzungslink (Standard von Claude Code; der Link `Claude-Session: …` kommt nur in Cloud- und Remote-Control-Sitzungen und öffnet sich nur für das eigene Konto), nur der Sitzungslink, oder nichts. Die Antwort steht als `attribution` mit `commit`, `pr` und `sessionUrl` in `.claude/settings.json` des Projekts und lässt sich dort jederzeit ändern.
 
-Der Pre-Commit-Hook aus `hooks install` prüft bei jedem Commit im Projekt Lint, Format und die Tests zur Änderung (nicht die ganze Suite) und stoppt den Commit, wenn etwas rot ist; ohne Node wird die Prüfung übersprungen. Die ganze Suite läuft am Ende eines Pakets und vor dem Merge (`codecycle check --full`). Wer die Hooks nicht möchte, setzt `git config --unset core.hooksPath`; dann laufen keine codecycle-Hooks mehr, auch nicht die, die nach Commit, Checkout und Merge den Code-Graphen aktualisieren. Die Tests im Ordner `tests/` dieses Plugins prüfen nur den Mod selbst und laufen in Projekten nie mit.
+Der Pre-Commit-Hook aus `hooks install` prüft bei jedem Commit im Projekt Lint, Format und die Tests zur Änderung (nicht die ganze Suite) und stoppt den Commit, wenn etwas rot ist; ohne Node wird die Prüfung übersprungen. Die ganze Suite läuft mit `codecycle check --full`. Wer die Hooks nicht möchte, setzt `git config --unset core.hooksPath`; dann laufen keine codecycle-Hooks mehr, auch nicht die, die nach Commit, Checkout und Merge den Code-Graphen aktualisieren. Die Tests im Ordner `tests/` dieses Plugins prüfen nur den Mod selbst und laufen in Projekten nie mit.
 
-Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `info`, `selftest`, `tasks`, `test [--affected]`, `lint`, `format`, `check [--full]`, `server`, `locate`, `callers`, `tests-for`, `impact`, `hooks install|status`, `install-tool`, `guard`, `rework`, `solo check|funde`, `package-info`, `plan-html`, `update`.
+Das Werkzeug `codecycle` (Starter `bin/codecycle`) gibt es auch im Terminal: `info`, `selftest`, `tasks`, `test [--affected]`, `lint`, `format`, `check [--full]`, `server`, `locate`, `callers`, `hooks install|status`, `install-tool`, `guard`, `effort --record`, `solo check|funde|plan|teil|pruefung`, `notiz`, `update`.
 
 ## Befehle
 
 | Befehl | Zweck |
 |---|---|
 | `/codecycle:setup` | Projekt einrichten: `.claude/codecycle.md`, Doku-Aufbau, Werkzeug-Kopie (`install-tool`), Hooks (`hooks install`), Graph-Anbieter, Ablage, Profil |
-| `/codecycle:new <Beschreibung>` | neue Aufgabe: Klären, Planen, Umsetzen, Prüfen, Abnahme, Abschluss |
-| `/codecycle:solo <Beschreibung>` | Solo-Weg: die Sitzung baut selbst, ein frischer Prüfer (Opus) prüft gegen den Wortlaut und probiert aus, berührte Risikobereiche zusätzlich auf Sicherheit (ab zwei ein zweiter Prüfer nur dafür), große Aufgaben in Teilen mit Haltepunkt je Teil, eine Runde Nachbesserung, Merge-Frage; ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfberichte und Status je Fund kein Merge |
-| `/codecycle:continue [Ordner]` | Aufgabe fortsetzen; Git ist die Wahrheit, fragt zuerst nach ausstehenden Merges, schlägt die zuletzt bearbeitete vor |
+| `/codecycle:new <Beschreibung>` | neue Aufgabe: Brainstorming, Entwurf, Plan mit Planprüfer, dann baut die Sitzung selbst (große Aufgaben je Teil ein frischer Bauender), ein frischer Prüfer (Opus) prüft gegen deine Worte und probiert aus, berührte Risikobereiche zusätzlich auf Sicherheit (ab zwei ein zweiter Prüfer nur dafür), eine Runde Nachbesserung, Merge-Frage; ohne grünen `codecycle solo check` kein Prüfer, ohne Prüfberichte und Status je Fund kein Merge |
+| `/codecycle:continue [Ordner]` | Aufgabe fortsetzen, auch mitten in einem Teil; Git ist die Wahrheit, fragt zuerst nach ausstehenden Merges, schlägt die zuletzt bearbeitete vor |
 | `/codecycle:status` | Übersicht aller Aufgaben mit Git-Abgleich; fragt zuerst nach ausstehenden Merges |
-| `/codecycle:ideas [Stichwort]` | Brainstorming ohne Code, Ergebnis ist ein Auftrags-Entwurf |
+| `/codecycle:brainstorming [Stichwort]` | Brainstorming ohne Code: klärt im Gespräch, was du willst, und endet in einem freigegebenen Entwurf; startet auch von selbst vor neuer, gestaltender Arbeit |
 | `/codecycle:check [--full]` | Lint, Format und Tests über das Projekt-Werkzeug |
 | `/codecycle:update` | Neueste Version in einem Durchgang: Plugin aktualisieren, Werkzeug-Kopie, Konfiguration, Hooks und guard-Grundlage aus der neuen Version, danach Plugin neu laden; die Bautafel weist auf eine veraltete Kopie hin |
 | `/codecycle:notiz <Text>` | Beobachtung mit Uhrzeit in `notizen.md` der offenen Aufgabe festhalten, ohne KI (Schalter `notizen`, Standard aus) |
 
-Alle neun Befehle starten nur auf Aufruf des Nutzers (`disable-model-invocation: true`). Das automatische Brainstorming (`ideas-auto`) läuft über den Bauleiter in `/codecycle:new`.
+Alle Befehle außer `/codecycle:brainstorming` starten nur auf Aufruf des Nutzers (`disable-model-invocation: true`); das Brainstorming darf Claude auch selbst starten.
 
 ## Profile
 
 Das Profil ändert nur die Modelle (Tabelle in `profiles.json`, Schlüssel `sparsam`, `grosszuegig`, `extrem`); Ablauf und Agenten-Budget hängen nur von der Größe der Aufgabe ab (klein / mittel / groß).
 
-- **sparsam:** überwiegend Sonnet, Opus für Architekt und Bereichs-Architekt, Haiku für den Gutachter
-- **großzügig:** Opus auch für Fehlersucher, Logik-Handwerker, Prüfer und Abnahme
-- **extrem:** Fable für Architekt und Abnahme, Opus für Plan-Prüfer und Test-Autor
+- In allen Profilen Opus für Bauende, Schlussprüfer und Planprüfer, Sonnet für Einrichter, Werkzeugmeister und den Prüfer je Teil (Eintrag `part-reviewer`, wirkt nur mit Schalter `part-review`)
+- Die drei Profile haben damit dieselben Modelle; die Schlüssel bleiben, damit sich ein Profil wieder unterscheiden kann
 
 Mit Mod kommt das Profil aus dem Mod-Speicher (`/profile`), ohne Mod aus `~/.claude/codecycle/profile.json` im Format `{ "profil": "sparsam" }`.
 
@@ -88,30 +86,15 @@ Zusatzteile sind einzeln schaltbar, im Abschnitt „Schalter“ von `.claude/cod
 
 | Schalter | Standard | Wirkung |
 |---|---|---|
-| `context-package` | an | Kontextpaket mitgeben (sonst nur Fundstellen-Liste) |
-| `sections` | an | Abschnitte statt ganzer Dateien |
-| `reuse-agents` | an | Korrekturen per Nachricht an denselben Agenten |
-| `half-blind` | an | Prüfer sieht nur Fakten |
-| `test-author` | an | eigener Test-Autor bei Logik-Paketen |
-| `ideas-auto` | an | Brainstorming startet bei vager Beschreibung von selbst |
 | `assume-and-continue` | an | bei Unklarheit mit markierter Annahme weiterarbeiten (Eintrag unter „Offene Fragen“ in `STATE.md`), statt den Nutzer zu stören; Anhalten nur bei schwer Rückgängigem oder echtem Blocker |
-| `multi-planner` | an | Bereichs-Architekten bei großen Aufgaben mit mehreren Bereichen |
 | `conflict-check` | an | Warnung bei Überschneidung offener Aufgaben |
 | `helper-scripts` | an | Wegwerf-Skripte der Agenten erlaubt |
-| `security-reviewer` | an | Sicherheitsprüfer bei Paketen in Risikobereichen |
-| `refuter` | aus | Widerleger vor größeren Korrekturen |
 | `fence` | aus | technischer Zaun über den Mod |
-| `escalation` | aus | letzter Versuch mit stärkerem Modell |
-| `haiku-simple` | aus | Haiku für einfache Routine-Pakete |
-| `register-forwarding` | aus | Weiterleitung über das Agenten-Register |
-| `package-lead` | aus | Paketleiter führt Pakete selbst durch |
-| `read-budget` | aus | Grenze für zusätzliche Leserunden |
-| `plan-html` | aus | Plan zur Freigabe als HTML |
 | `auto-resume` | aus | nach Limit-Reset automatisch fortsetzen |
 | `agent-progress` | aus | Agenten melden Schritte an die Agenten-Leiste (`codecycle_step`) |
-| `notizen` | aus | Beobachtungen ohne KI festhalten: `/codecycle:notiz <Text>` hängt sie mit Uhrzeit an `notizen.md` der offenen Aufgabe (ohne Aufgabe `.codecycle/setup/notizen.md`); der Abschluss liest sie mit |
+| `part-review` | an | Prüfer je Teil großer Aufgaben: als groß markierte Teile prüft nach dem Bau ein frischer Prüfer je Teil (Modell `part-reviewer`), eine Fixrunde, Nachprüfung; erst dann gilt der Teil als fertig |
+| `notizen` | aus | Beobachtungen ohne KI festhalten: `/codecycle:notiz <Text>` hängt sie mit Uhrzeit an `notizen.md` der offenen Aufgabe (ohne Aufgabe `.codecycle/setup/notizen.md`); der Merge nimmt sie in den Abschluss-Commit |
 | `graph` | an, wenn vorhanden | Code-Graph nutzen (sonst Outline/Suche); Anbieter über `graph.provider` in `.codecycle/tool.config.json` |
-| `cache-ttl-builder` | 5m | Cache-Laufzeit der Agenten: Hauptsitzung im Abo automatisch 1h, Architekt 1h per Frontmatter (`experimental.cacheTtl`), alle anderen Agenten 5m |
 
 ## Mod (optional)
 

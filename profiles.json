@@ -1,65 +1,29 @@
 {
-  "_status": "Vorläufige Werte; die Zeilen der Rollen toolsmith, debugger, area-architect, refuter, security-reviewer, doc-keeper und package-lead sind offen bis Messung. Einzige Quelle für Rolle -> Modell; Werte sind Aliase von Claude Code. Schlüssel ASCII (grosszuegig); die Anzeige „großzügig“ ist Sache der Oberfläche. Im Profil sparsam läuft doc-keeper mit haiku.",
+  "_status": "Vorläufige Werte; die Zeile der Rolle toolsmith ist offen bis Messung. Einzige Quelle für Rolle -> Modell; Werte sind Aliase von Claude Code. Schlüssel ASCII (grosszuegig); die Anzeige „großzügig“ ist Sache der Oberfläche. part-reviewer: Modell des Schlussprüfers mit „Auftrag: Teil“ (Prüfer je Teil), ohne eigene Agentendatei.",
   "profiles": {
     "sparsam": {
       "setup": "sonnet",
       "toolsmith": "sonnet",
-      "surveyor": "haiku",
-      "debugger": "sonnet",
-      "architect": "opus",
-      "area-architect": "opus",
-      "plan-reviewer": "sonnet",
-      "test-author": "sonnet",
-      "builder-routine": "sonnet",
-      "builder-logic": "sonnet",
-      "reviewer": "sonnet",
-      "refuter": "sonnet",
-      "security-reviewer": "sonnet",
-      "acceptance": "sonnet",
-      "browser-reviewer": "sonnet",
-      "doc-keeper": "haiku",
-      "package-lead": "sonnet",
-      "solo-reviewer": "opus"
+      "plan-reviewer": "opus",
+      "builder": "opus",
+      "final-reviewer": "opus",
+      "part-reviewer": "sonnet"
     },
     "grosszuegig": {
       "setup": "sonnet",
       "toolsmith": "sonnet",
-      "surveyor": "haiku",
-      "debugger": "opus",
-      "architect": "opus",
-      "area-architect": "opus",
-      "plan-reviewer": "sonnet",
-      "test-author": "sonnet",
-      "builder-routine": "sonnet",
-      "builder-logic": "opus",
-      "reviewer": "opus",
-      "refuter": "opus",
-      "security-reviewer": "opus",
-      "acceptance": "opus",
-      "browser-reviewer": "sonnet",
-      "doc-keeper": "sonnet",
-      "package-lead": "sonnet",
-      "solo-reviewer": "opus"
+      "plan-reviewer": "opus",
+      "builder": "opus",
+      "final-reviewer": "opus",
+      "part-reviewer": "sonnet"
     },
     "extrem": {
       "setup": "sonnet",
       "toolsmith": "sonnet",
-      "surveyor": "sonnet",
-      "debugger": "opus",
-      "architect": "fable",
-      "area-architect": "fable",
       "plan-reviewer": "opus",
-      "test-author": "opus",
-      "builder-routine": "sonnet",
-      "builder-logic": "opus",
-      "reviewer": "opus",
-      "refuter": "opus",
-      "security-reviewer": "opus",
-      "acceptance": "fable",
-      "browser-reviewer": "sonnet",
-      "doc-keeper": "sonnet",
-      "package-lead": "sonnet",
-      "solo-reviewer": "opus"
+      "builder": "opus",
+      "final-reviewer": "opus",
+      "part-reviewer": "sonnet"
     }
   }
 }

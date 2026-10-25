@@ -19,10 +19,8 @@ export type TaskDirInput = {
   named?: string | undefined
   /** Offene Aufgabenordner (`docs/codecycle/x`); null = nicht lesbar, dann keine Prüfung (Verhalten wie vorher) */
   open: readonly string[] | null
-  /** Aufgabe, an der diese Sitzung oder der Eltern-Agent arbeitet; zählt nur, wenn sie offen ist */
+  /** Aufgabe, an der diese Sitzung arbeitet; zählt nur, wenn sie offen ist */
   expected?: string | null | undefined
-  /** `expected` stammt vom Eltern-Agenten (Paketleiter), nicht von der Hauptsitzung (nur für die Meldung) */
-  fromParent?: boolean
 }
 
 export type TaskDirResult =
@@ -51,7 +49,7 @@ export function expectedTaskDir(open: readonly string[], expected: string | null
   return open.length === 1 ? open[0]! : null
 }
 
-/** Aufgabenordner für Bericht, Quittung, Kontextpaket und Zaun eines neuen Agenten. */
+/** Aufgabenordner für Bericht, Quittung und Zaun eines neuen Agenten. */
 export function resolveTaskDir(i: TaskDirInput): TaskDirResult {
   if (i.open === null) return i.named ? { kind: 'ok', dir: trimDir(i.named) } : { kind: 'unnamed' }
   const expected = expectedTaskDir(i.open, i.expected)
@@ -59,18 +57,16 @@ export function resolveTaskDir(i: TaskDirInput): TaskDirResult {
   const named = trimDir(i.named)
   const hit = matchOpenDir(named, i.open)
   if (hit && (!expected || hit === expected)) return hit === named ? { kind: 'ok', dir: hit } : { kind: 'ok', dir: hit, corrected: named }
-  return { kind: 'deny', text: denyText(named, hit, expected, i.open, i.fromParent === true) }
+  return { kind: 'deny', text: denyText(named, hit, expected, i.open) }
 }
 
 /** Meldung an den Bauleiter: was falsch ist und welcher Pfad richtig ist. */
-export function denyText(named: string, hit: string | null, expected: string | null, open: readonly string[], fromParent: boolean): string {
+export function denyText(named: string, hit: string | null, expected: string | null, open: readonly string[]): string {
   // ohne angehängtes Satzzeichen anzeigen (aus „… web-oberflaeche. Bericht: …“ sonst „web-oberflaeche.;“)
   const shown = trimDir(named.replace(TRAILING, '')) || named
   const head = `codecycle: Agent nicht gestartet. Die Startnachricht nennt den Aufgabenordner ${shown}`
   if (hit && expected) {
-    const who = fromParent ? 'der startende Agent arbeitet' : 'diese Sitzung arbeitet'
-    const wechsel = fromParent ? '' : ` Ist wirklich ${hit} gemeint: zuerst die Aufgabe wechseln (/codecycle:continue).`
-    return `${head}, ${who} aber an ${expected}. Richtig: „Aufgabenordner: ${expected}“ (Bericht unter ${expected}/reports/).${wechsel}`
+    return `${head}, diese Sitzung arbeitet aber an ${expected}. Richtig: „Aufgabenordner: ${expected}“ (Bericht unter ${expected}/reports/). Ist wirklich ${hit} gemeint: zuerst die Aufgabe wechseln (/codecycle:continue).`
   }
   const why = `; das ist keine offene Aufgabe (Ordner unter ${TASKS_DIR}/ mit STATE.md, nicht fertig/verworfen)`
   if (expected) return `${head}${why}. Richtig: „Aufgabenordner: ${expected}“ (Bericht unter ${expected}/reports/). Startnachricht berichtigen und den Agenten neu starten.`

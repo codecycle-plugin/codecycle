@@ -2,7 +2,7 @@
 // Agenten-Leiste, Fortschritt, Bautafel, Statuszeile und Seitenleiste. Attrappen und Hilfen: ./helpers.
 
 import { describe, expect, mock, test } from 'claude-code/testing'
-import { BAND, CLOCK, DIR, PLAN, STATE, FILES, spawn, LOGS, TOOLS, fakeWorld, type Engine, type Ops } from './helpers'
+import { BAND, CLOCK, DIR, STATE, FILES, spawn, LOGS, TOOLS, fakeWorld, type Engine, type Ops } from './helpers'
 
 describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
   const STEP_USAGE = { model: 'claude-sonnet-5-5', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 248_500, cache_creation_input_tokens: 0 }
@@ -36,7 +36,7 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     })
     on('turn.complete', (_$, e) => ({ text: e.answer }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, agentId: 'ag1' })) void chunk
     const pane = (surface: 'terminal' | 'desktop') =>
       $.ui.mount({
@@ -48,24 +48,24 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
       })
     let ui = await pane('terminal')
     // Rolle und „›“ stehen im Knopf der Titelzeile (ganze Titelzeile anklickbar), das Statuszeichen daneben
-    expect(String((await ui.find({ key: 'agent-ag1' }))?.props.label)).toMatch(/Logik.* ›$/)
+    expect(String((await ui.find({ key: 'agent-ag1' }))?.props.label)).toMatch(/^Bauender ›$/)
     expect(await ui.find({ type: 'Text', text: /●/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /1 läuft · 0 fertig/ })).toBeDefined()
-    // Effort „high“ kommt aus dem Risiko-Aufschlag (P1 hat Risiko: ja)
-    expect(await ui.find({ type: 'Text', text: /Sonnet · high · Paket P1 · 1 Runden/ })).toBeDefined()
+    // Effort steht in der Agenten-Datei; ohne Angabe im Schritt keiner in der Zeile (kein Aufschlag bei Risiko)
+    expect(await ui.find({ type: 'Text', text: /Sonnet · 1 Runden/ })).toBeDefined()
     // Kontextfüllung und Verbrauch getrennt (Tokens nur bei breiter Leiste, ab 60 Spalten)
     expect(await ui.find({ type: 'Text', text: /Kontext 25 % · .*neu 1,5k · Cache 249k/ })).toBeDefined()
     // Modell in seiner Farbe (Sonnet #3A7BD5), Statusspalte, Balken ━/─ statt █░
     expect((await ui.find({ type: 'Text', text: /^Sonnet$/ }))?.props.color).toBe('#3A7BD5')
     expect(await ui.find({ type: 'Text', text: /[█░]/ })).toBeUndefined()
     // Rollenkosten laufend aus dem Buch im Speicher, noch bevor costs.json geschrieben ist (Spalten fester Breite)
-    expect(JSON.stringify(await ui.find({ key: 'kosten-builder-logic' }))).toMatch(/builder-logic.*neu 1,5k · Cache 249k/)
+    expect(JSON.stringify(await ui.find({ key: 'kosten-builder' }))).toMatch(/builder.*neu 1,5k · Cache 249k/)
     await ui.unmount()
     // schmale Leiste (unter 59 Spalten): ohne Tokens
     const narrow = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: { ...paneProps, bodyColumns: 50 } })
     expect(await narrow.find({ type: 'Text', text: /Kontext 25 %/ })).toBeDefined()
     expect(await narrow.find({ type: 'Text', text: /Kontext 25 % · .*neu 1,5k/ })).toBeUndefined()
-    expect(JSON.stringify(await narrow.find({ key: 'kosten-builder-logic' }))).not.toMatch(/neu 1,5k/)
+    expect(JSON.stringify(await narrow.find({ key: 'kosten-builder' }))).not.toMatch(/neu 1,5k/)
     await narrow.unmount()
     // mittlere Breite: gewichtete Tokens gleich nach dem Kontext, neu/Cache fallen weg statt abgeschnitten zu werden
     const mid = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: { ...paneProps, bodyColumns: 60 } })
@@ -80,7 +80,7 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
       await ui.press({ key: 'agent-ag1' })
       expect(await ui.find({ type: 'Text', text: surface === 'terminal' ? /Jetzt: Read src\/Group\.php/ : /Jetzt: Edit src\/Group\.php/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /Gelesen \(1\)/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /Logik-Handwerker · Paket P1/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /Bauender · Sonnet/ })).toBeDefined()
       await $.tool.call({ tool: 'Edit', file_path: '/proj/src/Group.php', old_string: 'a', new_string: 'b', agentId: 'ag1' } as never)
       expect(await ui.find({ type: 'Text', text: /Jetzt: Edit src\/Group\.php/ })).toBeDefined()
       await ui.press({ key: 'back' })
@@ -98,7 +98,29 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     await ui.unmount()
     ui = await pane('desktop')
     expect(await ui.find({ type: 'Svg' })).toBeDefined()
+    // Figur des Bauenden: Bezeichnung im Alternativtext, Kostüm der Rolle builder
+    const figur = JSON.stringify(await ui.find({ key: 'ag-ag1' }))
+    expect(figur).toMatch(/Bauender: /)
+    expect(figur).toMatch(/data-role=\\"builder\\"/)
     await ui.unmount()
+  })
+
+  test('Alte Kosten-Einträge (solo-reviewer, builder-logic) erscheinen als Schlussprüfer und Bauender', async ($, on) => {
+    mock.store(on)
+    const row = { input: 1000, output: 100, cacheRead: 0, cacheWrite: 0, runden: 1, laeufe: 1, limitProzent: 1 }
+    fakeWorld(on, { ...FILES, [`${DIR}/costs.json`]: JSON.stringify({ version: 1, aufgabe: 'aufgabe-t', aktualisiert: '', agenten: {}, rollen: { 'solo-reviewer': row, 'builder-logic': row }, hauptsitzung: { ...row, laeufe: undefined } }) })
+    await $.session.start({ cwd: '/proj', surface: null } as never)
+    const terminal = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
+    expect(await terminal.find({ type: 'Text', text: /^final-reviewer$/ })).toBeDefined()
+    expect(await terminal.find({ type: 'Text', text: /^builder$/ })).toBeDefined()
+    expect(await terminal.find({ type: 'Text', text: /solo-reviewer|builder-logic/ })).toBeUndefined()
+    await terminal.unmount()
+    const desktop = await $.ui.mount({ plugin: 'codecycle', surface: 'desktop', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
+    if (String((await desktop.find({ key: 'sec-kosten' }))?.props.label ?? '').startsWith('▸')) await desktop.press({ key: 'sec-kosten' })
+    expect(await desktop.find({ type: 'Text', text: /^Schlussprüfer$/ })).toBeDefined()
+    expect(await desktop.find({ type: 'Text', text: /^Bauender$/ })).toBeDefined()
+    expect(await desktop.find({ type: 'Text', text: /solo-reviewer|builder-logic|Solo-Prüfer|Handwerker/ })).toBeUndefined()
+    await desktop.unmount()
   })
 
   test('agent-progress: Werkzeug codecycle_step angemeldet, Hinweis in der Startnachricht, Schritte in der Leiste', async ($, on) => {
@@ -111,7 +133,7 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     })
     await $.session.start({ cwd: '/proj', surface: null } as never)
     expect(TOOLS).toContain('codecycle_step')
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     expect(seen).toMatch(/Fortschritt: Melde nach jedem größeren Schritt einmal mit dem Werkzeug codecycle_step/)
     const step = async (input: object) => {
       const r = (await $.tool.call({ tool: 'mcp__codecycle__codecycle_step', ...input } as never)).result
@@ -194,7 +216,7 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     })
     on('turn.complete', (_$, e) => ({ text: e.answer }))
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'sonnet', messageCount: 1, agentId: 'ag1' })) void chunk
     await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't', agentId: 'ag1', reason: 'answer' })
     const booked = written[`${DIR}/costs.json`]
@@ -240,47 +262,6 @@ describe('Bautafel, Seitenleiste, Agenten-Leiste', () => {
     await desk.unmount()
   })
 
-  test('Bautafel meldet fehlendes Paket und ungelöste Fundstellen, bis ein Agent ohne Problem startet', async ($, on) => {
-    mock.store(on)
-    const files: Record<string, string> = { ...FILES }
-    fakeWorld(on, files)
-    on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
-    on('turn.complete', (_$, e) => ({ text: e.answer }))
-    // Terminal: volle Hinweisliste oben in der Seitenleiste (die Bautafel zeigt nur den ersten)
-    const band = async () => {
-      const ui = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
-      const r = {
-        paket: await ui.find({ type: 'Text', text: /Kontextpaket P9: Paket nicht in PLAN\.md gefunden/ }),
-        stellen: await ui.find({ type: 'Text', text: /Kontextpaket P1: 1 Fundstelle nicht gefunden \(src\/Group\.php :: Group::fehlt\)/ }),
-      }
-      await ui.unmount()
-      return r
-    }
-    // Fundstelle ohne Treffer in P1; Paket P9 steht nicht im Plan
-    files[`${DIR}/PLAN.md`] = PLAN.replace('Group::remove', 'Group::fehlt')
-    await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/
-Paket: P9`, 'codecycle:builder-logic')
-    let r = await band()
-    expect(r.paket).toBeDefined()
-    expect(r.stellen).toBeUndefined()
-    // Gutachter (kein Paket) räumen nichts weg
-    await spawn($, `Aufgabenordner: ${DIR}/
-Paket: P1`, 'codecycle:surveyor')
-    expect((await band()).paket).toBeDefined()
-    await spawn($, `Aufgabenordner: ${DIR}/
-Paket: P1`, 'codecycle:builder-logic')
-    r = await band()
-    expect(r.paket).toBeDefined()
-    expect(r.stellen).toBeDefined()
-    // keine Aufgabe mehr aktiv: die Hinweise verschwinden
-    files[`${DIR}/STATE.md`] = STATE.replace('zustand: in-arbeit', 'zustand: fertig')
-    await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 'h', reason: 'answer' })
-    r = await band()
-    expect(r.paket).toBeUndefined()
-    expect(r.stellen).toBeUndefined()
-  })
-
   test('Hinweis auf ToolSearch; fertig = total/total ohne Notiz; Folgenachricht = läuft neu', async ($, on) => {
     mock.store(on)
     fakeWorld(on, { ...FILES, '.claude/codecycle.md': `${FILES['.claude/codecycle.md']}- agent-progress: an\n` })
@@ -291,7 +272,7 @@ Paket: P1`, 'codecycle:builder-logic')
     })
     stepHandlers(on)
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     expect(seen).toMatch(/aufgeschoben.*ToolSearch.*select:mcp__codecycle__codecycle_step/)
     const pane = () => $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
     await $.tool.call({ tool: 'mcp__codecycle__codecycle_step', done: 2, total: 5, note: 'Tests grün', agentId: 'ag1' } as never)
@@ -321,7 +302,7 @@ Paket: P1`, 'codecycle:builder-logic')
     fakeWorld(on, FILES)
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     stepHandlers(on)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const filled = async () => {
       const ui = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
       const n = await agentFill(ui)
@@ -340,7 +321,7 @@ Paket: P1`, 'codecycle:builder-logic')
     expect(seenFilled[2]).toBeGreaterThan(6)
   })
 
-  test('„jetzt Pn“ nur bei offenem Paket; Profil-Knöpfe als Gruppe, Bedienknöpfe schlicht und getrennt', async ($, on) => {
+  test('Bautafel ohne Paketanzeige; Profil-Knöpfe als Gruppe, Bedienknöpfe schlicht und getrennt', async ($, on) => {
     mock.store(on)
     const files: Record<string, string> = { ...FILES }
     fakeWorld(on, files)
@@ -351,7 +332,7 @@ Paket: P1`, 'codecycle:builder-logic')
     await $.session.start({ cwd: '/proj', surface: null } as never)
     const mount = (surface: 'terminal' | 'desktop' = 'desktop') => $.ui.mount({ plugin: 'codecycle', surface, ...BAND })
     let ui = await mount()
-    expect(await ui.find({ type: 'Text', text: /0\/2 fertig · jetzt P1/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\d+\/\d+ fertig|jetzt P/ })).toBeUndefined()
     // Desktop-Aussehen: Profil als Umschalter (Gruppe mit Fläche, aktives Profil primary); einklappen/Details schlicht (plain)
     expect(await ui.find({ key: 'profile-group' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^codecycle$/ })).toBeDefined()
@@ -368,8 +349,8 @@ Paket: P1`, 'codecycle:builder-logic')
     await ui.unmount()
     // Terminal: Rahmen mit Titel, Profil Stil 1 ohne Kürzel, „Details“ und [×] schlicht rechts
     ui = await mount('terminal')
-    expect(await ui.find({ type: 'Text', text: /^0 von 2 fertig$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^jetzt P1 · 1\/5 Läufe$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /von \d+ fertig|^Pakete/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /^1\/5 Läufe$/ })).toBeDefined()
     expect(await ui.find({ key: 'profile-group' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /^Profil$/ })).toBeDefined()
     expect(await ui.find({ key: 'profile-sparsam' })).toBeUndefined()
@@ -391,15 +372,6 @@ Paket: P1`, 'codecycle:builder-logic')
     expect(await ui.find({ key: 'profile-extrem' })).toBeUndefined()
     await ui.press({ key: 'expand' })
     await ui.unmount()
-    // alle Pakete fertig, Aufgabe noch offen: kein „jetzt“
-    files[`${DIR}/STATE.md`] = STATE.replace('status: in-arbeit', 'status: fertig').replace('status: offen', 'status: fertig')
-    await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 'h', reason: 'answer' })
-    for (const surface of ['terminal', 'desktop'] as const) {
-      ui = await mount(surface)
-      expect(await ui.find({ type: 'Text', text: surface === 'terminal' ? /2 von 2 fertig/ : /2\/2 fertig/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /jetzt P/ })).toBeUndefined()
-      await ui.unmount()
-    }
   })
 
   test('Zahlen als „1,5k“, Kennzahlen „Agenten neu“, Zeile „gesamt neu“, Knopf neben der Agentenzeile', async ($, on) => {
@@ -408,7 +380,7 @@ Paket: P1`, 'codecycle:builder-logic')
     on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'ag1' }))
     stepHandlers(on)
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     await stepOnce($, 'ag1')
     const terminal = await $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: 'codecycle-panel', props: paneProps })
     // Entscheidung 2a: gewichtete Tokens vor neu und Cache

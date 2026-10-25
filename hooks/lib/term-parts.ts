@@ -2,7 +2,7 @@
 // node:test prüfbar sind. Die Elemente (Text, Box, Button) bauen hooks/band.tsx und hooks/panel.tsx daraus.
 // Nur fürs Terminal; die Desktop-App bleibt unverändert.
 
-import type { AgentStatus, PackageStatus } from '../../types'
+import type { AgentStatus } from '../../types'
 
 // ---- Farben und Balken -----------------------------------------------------------------------------------------------
 
@@ -126,14 +126,6 @@ export const EXPAND_LABEL = '[▴]'
 
 /** Zeichen vor einem Hinweis (statt ⚠) */
 export const HINT_GLYPH = '▲'
-
-/** Paketzeichen im Terminal: wie hooks/state.ts :: BOX, aber „blockiert“ als × statt ✖ */
-export const TERM_BOX: Record<PackageStatus, { glyph: string; color?: string; dim?: boolean; label: string }> = {
-  fertig: { glyph: '■', color: 'green', label: 'fertig' },
-  'in-arbeit': { glyph: '◧', color: 'yellow', label: 'in Arbeit' },
-  offen: { glyph: '□', dim: true, label: 'offen' },
-  blockiert: { glyph: '×', color: 'red', label: 'blockiert' },
-}
 
 /** Statuszeichen eines Agenten im Terminal (Statusspalte der Seitenleiste; Farbe auch für seinen Balken) */
 export const TERM_STATUS: Record<AgentStatus, { glyph: string; color: 'yellow' | 'green' | 'red' }> = {

@@ -5,7 +5,7 @@ import { type Aufwand, writeAufwand } from './effort-file.ts'
 import { ToolBroken } from './errors.ts'
 import { git } from './exec.ts'
 import { mainBranch } from './git-hints.ts'
-import { pathsLib, stateFile, tokensLib } from './lib-path.ts'
+import { pathsLib, rolesLib, stateFile, tokensLib } from './lib-path.ts'
 import type { Ctx } from './main.ts'
 import { tryLoadConfig } from './project.ts'
 
@@ -67,7 +67,10 @@ export function recordMeasure(ctx: Ctx, root: string, rel: string, name: string,
   return 0
 }
 
-/** Gelaufene Rollen mit Zahl der Läufe aus `costs.json` (`rollen[].laeufe`), nach Name; ohne Lauf oder unlesbar: leer. */
+/**
+ * Gelaufene Rollen mit Zahl der Läufe aus `costs.json` (`rollen[].laeufe`), nach Name; alte Rollennamen zählen unter
+ * der heutigen Rolle (`lib/roles.ts`). Ohne Lauf oder unlesbar: leer.
+ */
 export function roleRuns(file: string): [string, number][] {
   let c: { rollen?: Record<string, { laeufe?: unknown }> }
   try {
@@ -76,9 +79,14 @@ export function roleRuns(file: string): [string, number][] {
     return []
   }
   const rollen = c && typeof c.rollen === 'object' && c.rollen ? c.rollen : {}
-  return Object.entries(rollen)
-    .map(([rolle, r]): [string, number] => [rolle, typeof r?.laeufe === 'number' ? r.laeufe : 0])
-    .filter(([, n]) => n > 0)
+  const runs = new Map<string, number>()
+  for (const [rolle, r] of Object.entries(rollen)) {
+    const n = typeof r?.laeufe === 'number' ? r.laeufe : 0
+    if (n <= 0) continue
+    const name = rolesLib.canonicalRole(rolle)
+    runs.set(name, (runs.get(name) ?? 0) + n)
+  }
+  return [...runs]
     .sort(([a], [b]) => a.localeCompare(b))
 }
 

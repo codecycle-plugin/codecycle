@@ -23,29 +23,13 @@ export const BAND = {
 
 const PROFILES_JSON = JSON.stringify({
   profiles: {
-    sparsam: { 'builder-logic': 'sonnet', 'builder-routine': 'sonnet', reviewer: 'sonnet', architect: 'opus', surveyor: 'haiku' },
-    grosszuegig: { 'builder-logic': 'opus', 'builder-routine': 'sonnet', reviewer: 'opus', architect: 'opus', surveyor: 'haiku' },
-    extrem: { 'builder-logic': 'opus', 'builder-routine': 'sonnet', reviewer: 'opus', architect: 'fable', surveyor: 'sonnet' },
+    sparsam: { builder: 'sonnet', 'final-reviewer': 'opus', 'part-reviewer': 'opus', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
+    grosszuegig: { builder: 'opus', 'final-reviewer': 'opus', 'part-reviewer': 'opus', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
+    extrem: { builder: 'opus', 'final-reviewer': 'opus', 'part-reviewer': 'opus', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
   },
 })
 
 export const DIR = 'docs/codecycle/aufgabe-t'
-
-export const PLAN = `## Pakete
-
-### P1 – Eins
-- Rolle: logik
-- Risiko: ja
-- Kriterien: K1
-- Neu: src/Neu.php
-- Ändern: src/Group.php
-- Tests: tests/GroupTest.php
-- Fundstellen: src/Group.php :: Group::remove
-
-### P2 – Zwei
-- Rolle: routine
-- Ändern: src/Other.php
-`
 
 export const STATE = `---
 aufgabe: aufgabe-t
@@ -54,11 +38,7 @@ groesse: gross
 zustand: in-arbeit
 branch: codecycle/t
 budget: { geplant: 5, verbraucht: 1 }
-planrunden: 0
 zuletzt: tag-1
-pakete:
-  - { id: P1, rolle: logik, status: in-arbeit, agent: null, commit: null, runden: 0 }
-  - { id: P2, rolle: routine, status: offen, agent: null, commit: null, runden: 0 }
 ---
 
 ## Nächster Schritt
@@ -78,7 +58,6 @@ class Group
 `
 
 export const FILES: Record<string, string> = {
-  [`${DIR}/PLAN.md`]: PLAN,
   [`${DIR}/TASK.md`]: '# T\n\n## Abnahmekriterien\n\n| ID | Kriterium | Prüfweg |\n|---|---|---|\n| K1 | Mitglied sieht Liste | Test |\n',
   [`${DIR}/STATE.md`]: STATE,
   'src/Group.php': GROUP_PHP,

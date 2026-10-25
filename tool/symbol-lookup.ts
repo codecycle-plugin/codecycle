@@ -1,4 +1,4 @@
-// Symbol über den Graphen finden (für callers und tests-for). Rät nie.
+// Symbol über den Graphen finden (für callers). Rät nie.
 
 import type { GSymbol } from './graph/index.ts'
 import type { OpenGraph } from './graph-use.ts'

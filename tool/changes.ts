@@ -8,7 +8,7 @@ import { pathsLib } from './lib-path.ts'
 const { GIT_QUIET } = pathsLib
 
 /**
- * Vergleichsstand: auf einem Aufgaben- oder Paket-Branch der Merge-Base mit dem Hauptbranch
+ * Vergleichsstand: auf einem Aufgaben- oder Teil-Branch der Merge-Base mit dem Hauptbranch
  * (alles, was die Aufgabe geändert hat), auf dem Hauptbranch `HEAD` (nur nicht Committetes).
  */
 export function diffBase(root: string, work: string, config?: ToolConfig | null): string {

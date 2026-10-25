@@ -1,4 +1,4 @@
-// Solo-Weg: Modell des Solo-Prüfers, Startsperre, Schreibrechte in Solo-Aufgaben, Merge-Sperre, Signal /codecycle:solo.
+// Solo-Weg: Modell des Schlussprüfers, Startsperre, Schreibrechte in Solo-Aufgaben, Merge-Sperre, Signal /codecycle:new.
 // Attrappen und Hilfen: ./helpers.
 
 import { describe, expect, mock, test } from 'claude-code/testing'
@@ -11,9 +11,9 @@ const soloState = (geprueftAuf = ''): string =>
 
 const PROFILES = JSON.stringify({
   profiles: {
-    sparsam: { 'builder-logic': 'sonnet', 'builder-routine': 'sonnet', reviewer: 'sonnet', 'solo-reviewer': 'opus', 'doc-keeper': 'haiku', surveyor: 'haiku' },
-    grosszuegig: { 'builder-logic': 'opus', 'builder-routine': 'sonnet', reviewer: 'opus', 'solo-reviewer': 'opus', 'doc-keeper': 'sonnet', surveyor: 'haiku' },
-    extrem: { 'builder-logic': 'opus', 'builder-routine': 'sonnet', reviewer: 'opus', 'solo-reviewer': 'opus', 'doc-keeper': 'sonnet', surveyor: 'sonnet' },
+    sparsam: { builder: 'sonnet', 'final-reviewer': 'opus', 'part-reviewer': 'sonnet', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
+    grosszuegig: { builder: 'opus', 'final-reviewer': 'opus', 'part-reviewer': 'opus', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
+    extrem: { builder: 'opus', 'final-reviewer': 'opus', 'part-reviewer': 'opus', 'plan-reviewer': 'opus', setup: 'sonnet', toolsmith: 'sonnet' },
   },
 })
 
@@ -27,7 +27,7 @@ function gitAnswers(on: Ops, answer: (args: string[]) => string | null): void {
 }
 
 describe('Solo-Weg im Mod', () => {
-  test('Solo-Prüfer: Opus aus dem Profil, Bericht reports/pruefung.md; Startsperre ohne grünen solo check', async ($, on) => {
+  test('Schlussprüfer: Opus aus dem Profil, Bericht reports/pruefung.md; Startsperre ohne grünen solo check', async ($, on) => {
     mock.store(on)
     const files: Record<string, string> = { ...FILES, 'profiles.json': PROFILES, [`${SDIR}/STATE.md`]: soloState() }
     fakeWorld(on, files)
@@ -41,25 +41,76 @@ describe('Solo-Weg im Mod', () => {
     })
     const prompt = `Aufgabenordner: ${SDIR}/\nWortlaut und Diff: …`
     // ohne geprueftAuf: kein Start
-    expect((await spawn($, prompt, 'codecycle:solo-reviewer')).deny).toMatch(/`codecycle solo check docs\/codecycle\/solo-s` grün/)
+    expect((await spawn($, prompt, 'codecycle:final-reviewer')).deny).toMatch(/`codecycle solo check docs\/codecycle\/solo-s` grün/)
     // nach solo check, seitdem eine Datei außerhalb des Aufgabenordners geändert: kein Start
     files[`${SDIR}/STATE.md`] = soloState('abc1234')
     changed = `src/a.ts\n${SDIR}/STATE.md\n`
-    expect((await spawn($, prompt, 'codecycle:solo-reviewer')).deny).toMatch(/seit `codecycle solo check` geändert \(src\/a\.ts\)/)
+    expect((await spawn($, prompt, 'codecycle:final-reviewer')).deny).toMatch(/seit `codecycle solo check` geändert \(src\/a\.ts\)/)
     // nur der Aufgabenordner geändert (STATE.md committet): Start mit Opus und festem Berichtsnamen
     changed = `${SDIR}/STATE.md\n`
-    const ok = await spawn($, prompt, 'codecycle:solo-reviewer')
+    const ok = await spawn($, prompt, 'codecycle:final-reviewer')
     expect(ok.deny).toBeUndefined()
     expect(ok.model).toBe('opus')
     expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/pruefung\.md/)
+    // Seitenleiste: Schlussprüfer mit seiner Figur (Desktop) und Bezeichnung (Terminal)
+    const pane = (surface: 'terminal' | 'desktop') =>
+      $.ui.mount({ plugin: 'codecycle', surface, component: 'Pane', requestId: 'codecycle-panel', props: { title: 'codecycle', isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} } })
+    const term = await pane('terminal')
+    expect(String((await term.find({ key: `agent-ag${n}` }))?.props.label)).toMatch(/^Schlussprüfer ›$/)
+    await term.unmount()
+    const desk = await pane('desktop')
+    const figur = JSON.stringify(await desk.find({ key: `ag-ag${n}` }))
+    expect(figur).toMatch(/Schlussprüfer: /)
+    expect(figur).toMatch(/data-role=\\"final-reviewer\\"/)
+    await desk.unmount()
     // zweiter Prüfer: Startnachricht mit „Auftrag: Sicherheit“ → eigener Bericht, gleiche Startsperre, gleiches Modell
-    const sec = await spawn($, `Aufgabenordner: ${SDIR}/\nAuftrag: Sicherheit\nRisikobereiche: …`, 'codecycle:solo-reviewer')
+    const sec = await spawn($, `Aufgabenordner: ${SDIR}/\nAuftrag: Sicherheit\nRisikobereiche: …`, 'codecycle:final-reviewer')
     expect(sec.deny).toBeUndefined()
     expect(sec.model).toBe('opus')
     expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/pruefung-sicherheit\.md/)
   })
 
-  test('Schreiben in der Solo-Aufgabe: Handwerker ja, andere Rollen nein, Prüfer nur Bericht, fremde Agenten nur lesen', async ($, on) => {
+  test('Prüfer je Teil: final-reviewer mit „Auftrag: Teil“ bekommt pruefung-teil-<name>.md und das Modell aus part-reviewer; Startsperre am Teil', async ($, on) => {
+    mock.store(on)
+    const partState = (status: string): string =>
+      soloState().replace('haltepunkt: 3', `haltepunkt: 2\nteile: { eins: ${status}, zwei: offen }`)
+    const files: Record<string, string> = { ...FILES, 'profiles.json': PROFILES, [`${SDIR}/STATE.md`]: partState('offen') }
+    fakeWorld(on, files)
+    let head = 'codecycle/s--eins'
+    let status = ''
+    gitAnswers(on, args => (args[0] === 'rev-parse' ? `${head}\n` : args[0] === 'status' ? status : ''))
+    let n = 0
+    let seen = ''
+    on('agent.spawn', (_$, e) => {
+      seen = e.prompt
+      return { model: e.model ?? 'inherit', agentId: `ag${++n}` }
+    })
+    const prompt = `Aufgabenordner: ${SDIR}/\nAuftrag: Teil\nTeil: eins · Liste und Filter\nWorktree: /proj--wt-solo-pruefung`
+    // Teil nicht in Arbeit: kein Start (auch ohne geprueftAuf geht es nur um den Teil)
+    expect((await spawn($, prompt, 'codecycle:final-reviewer')).deny).toMatch(/Teil eins ist nicht in Arbeit/)
+    files[`${SDIR}/STATE.md`] = partState('in-arbeit codecycle/s--eins')
+    // Uncommittetes außerhalb des Aufgabenordners: kein Start; im Aufgabenordner zählt es nicht
+    status = ` M src/a.ts\n M ${SDIR}/costs.json\n`
+    expect((await spawn($, prompt, 'codecycle:final-reviewer')).deny).toMatch(/Teil eins hat Uncommittetes \(src\/a\.ts\)/)
+    // Hauptordner auf einem anderen Branch: kein Start
+    status = ` M ${SDIR}/costs.json\n`
+    head = 'codecycle/s'
+    expect((await spawn($, prompt, 'codecycle:final-reviewer')).deny).toMatch(/steht auf codecycle\/s, Teil eins wird auf codecycle\/s--eins gebaut/)
+    head = 'codecycle/s--eins'
+    const ok = await spawn($, prompt, 'codecycle:final-reviewer')
+    expect(ok.deny).toBeUndefined()
+    expect(ok.model).toBe('sonnet')
+    expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/pruefung-teil-eins\.md/)
+    // Bauender eines Teils: eigener Bericht aus der Zeile „Bericht:“, keine Paket-Ableitung aus einer P-Nummer im Text
+    const b = await spawn($, `Aufgabenordner: ${SDIR}/\nBranch: codecycle/s--eins\nTeil: eins · Fehlercode P1 bei leerer Liste\nBericht: /proj/${SDIR}/reports/teil-eins-builder.md`, 'codecycle:builder')
+    expect(b.deny).toBeUndefined()
+    expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/teil-eins-builder\.md/)
+    expect(seen).not.toMatch(/P1-builder/)
+    // ohne „Auftrag: Teil“ gilt weiter die Sperre des Schlussprüfers (kein geprueftAuf)
+    expect((await spawn($, `Aufgabenordner: ${SDIR}/\nTeil: eins`, 'codecycle:final-reviewer')).deny).toMatch(/`codecycle solo check docs\/codecycle\/solo-s` grün/)
+  })
+
+  test('Schreiben in der Solo-Aufgabe: Bauender ja, andere Rollen nein, Prüfer nur Bericht, fremde Agenten nur lesen', async ($, on) => {
     mock.store(on)
     fakeWorld(on, { ...FILES, 'profiles.json': PROFILES, [`${SDIR}/STATE.md`]: soloState('abc1234'), '.claude/codecycle.md': '# Projekt\n' })
     gitAnswers(on, () => '')
@@ -72,7 +123,7 @@ describe('Solo-Weg im Mod', () => {
 
     // Agent ohne codecycle-Rolle: erst gesperrt, wenn die Sitzung an der Solo-Aufgabe arbeitet
     expect((await edit('fremd', '/proj/src/a.ts')).deny).toBeUndefined()
-    await $.skill.prompt({ skill: 'codecycle:solo', text: 'Ablauf …' })
+    await $.skill.prompt({ skill: 'codecycle:new', text: 'Ablauf …' })
     await $.tool.call({ tool: 'Edit', file_path: `/proj/${SDIR}/TASK.md`, old_string: 'a', new_string: 'b' } as never)
     expect((await edit('fremd', '/proj/src/a.ts')).deny).toMatch(/ohne codecycle-Rolle darf hier nicht schreiben/)
     expect((await bash('fremd', 'echo x > src/b.ts')).deny).toMatch(/Schreibziel im Bash-Befehl/)
@@ -81,17 +132,37 @@ describe('Solo-Weg im Mod', () => {
     expect((await $.tool.call({ tool: 'Edit', file_path: '/proj/src/a.ts', old_string: 'a', new_string: 'b' } as never)).deny).toBeUndefined()
 
     const prompt = `Aufgabenordner: ${SDIR}/`
-    await spawn($, prompt, 'codecycle:builder-logic') // ag1
-    await spawn($, prompt, 'codecycle:doc-keeper') // ag2
-    await spawn($, prompt, 'codecycle:solo-reviewer') // ag3
+    await spawn($, prompt, 'codecycle:builder') // ag1
+    await spawn($, prompt, 'codecycle:toolsmith') // ag2
+    await spawn($, prompt, 'codecycle:final-reviewer') // ag3
     expect((await edit('ag1', '/proj/src/a.ts')).deny).toBeUndefined()
-    expect((await edit('ag2', '/proj/README.md')).deny).toMatch(/Rolle doc-keeper darf hier nicht schreiben/)
+    expect((await edit('ag2', '/proj/README.md')).deny).toMatch(/Rolle toolsmith darf hier nicht schreiben/)
     expect((await edit('ag3', '/proj/src/a.ts')).deny).toMatch(/nicht dein Bericht/)
     expect((await $.tool.call({ tool: 'Write', file_path: `/proj/${SDIR}/reports/pruefung.md`, content: 'x', agentId: 'ag3' } as never)).deny).toBeUndefined()
     expect((await bash('ag3', 'node cli.js --wert 0 > /tmp/aus.txt')).deny).toBeUndefined()
   })
 
-  test('Fortgesetzter Solo-Prüfer: Bericht steht im Register und gilt nach einem Neuladen des Mods weiter', async ($, on) => {
+  test('Planprüfer im einen Weg: startet ohne PLAN.md, schreibt nur reports/plan-pruefung.md', async ($, on) => {
+    mock.store(on)
+    const state = soloState().replace('haltepunkt: 3', 'haltepunkt: 2\nentwurf: freigegeben 2026-10-24')
+    fakeWorld(on, { ...FILES, 'profiles.json': PROFILES, [`${SDIR}/STATE.md`]: state, '.claude/codecycle.md': '# Projekt\n' })
+    gitAnswers(on, () => '')
+    let seen = ''
+    on('agent.spawn', (_$, e) => {
+      seen = e.prompt
+      return { model: e.model ?? 'inherit', agentId: 'pr1' }
+    })
+    on('tool.call', () => ({ result: {} }))
+    const started = await spawn($, `Aufgabenordner: ${SDIR}/\nAuftrag: Abgleich\nBericht: /proj/${SDIR}/reports/plan-pruefung.md`, 'codecycle:plan-reviewer')
+    expect(started.deny).toBeUndefined()
+    expect(seen).toMatch(/Bericht: .*\/proj\/docs\/codecycle\/solo-s\/reports\/plan-pruefung\.md/)
+    expect(seen).not.toMatch(/nicht in PLAN\.md gefunden/)
+    const write = (file_path: string) => $.tool.call({ tool: 'Write', file_path, content: 'x', agentId: 'pr1' } as never)
+    expect((await write(`/proj/${SDIR}/reports/plan-pruefung.md`)).deny).toBeUndefined()
+    expect((await write('/proj/src/a.ts')).deny).toBeDefined()
+  })
+
+  test('Fortgesetzter Schlussprüfer: Bericht steht im Register und gilt nach einem Neuladen des Mods weiter', async ($, on) => {
     mock.store(on)
     const written = fakeWorld(on, {
       ...FILES,
@@ -102,7 +173,7 @@ describe('Solo-Weg im Mod', () => {
         version: 1,
         aufgabe: 'solo-s',
         agenten: {
-          alt1: { id: 'alt1', rolle: 'solo-reviewer', paket: null, modell: 'opus', gestartet: '2026-10-23T08:00:00.000Z', mitgeliefert: [], letzteAktivitaet: '2026-10-23T08:01:00.000Z', gelesen: [], geaendert: [], erstellt: [], suchen: 0, bericht: `${SDIR}/reports/pruefung-sicherheit.md` },
+          alt1: { id: 'alt1', rolle: 'final-reviewer', paket: null, modell: 'opus', gestartet: '2026-10-23T08:00:00.000Z', mitgeliefert: [], letzteAktivitaet: '2026-10-23T08:01:00.000Z', gelesen: [], geaendert: [], erstellt: [], suchen: 0, bericht: `${SDIR}/reports/pruefung-sicherheit.md` },
         },
       }),
     })
@@ -114,13 +185,13 @@ describe('Solo-Weg im Mod', () => {
     await $.session.start({ cwd: '/proj', surface: null } as never)
 
     // neuer Start: Bericht repo-relativ im Register
-    await spawn($, `Aufgabenordner: ${SDIR}/`, 'codecycle:solo-reviewer') // ag1
+    await spawn($, `Aufgabenordner: ${SDIR}/`, 'codecycle:final-reviewer') // ag1
     // Fortsetzen nach einem Neuladen: Laufzeit nur aus dem Register
     await $.agent.spawn({
       tool_use_id: 'tu2',
       prompt: 'Schreibe den Bericht fertig.',
       description: 'Test',
-      subagentType: 'codecycle:solo-reviewer',
+      subagentType: 'codecycle:final-reviewer',
       provider: { plugin: 'engine', tier: 'core' },
       parentModel: 'claude-sonnet-5-5',
       background: false,

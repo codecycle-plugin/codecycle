@@ -3,7 +3,7 @@
 // Die Aufgabe kommt aus docs/codecycle/*/STATE.md; ohne offene Aufgabe eine leere Ansicht mit der zuletzt
 // bearbeiteten (Beispieldaten nur mit Schalter demo-data).
 // Der Limit-Stand ist echt ($.session.usage, session.measure); Kosten pro Rolle kommen aus
-// costs.json (Token-Buch). Dazu die Engine (Abschnitt „Engine“ unten): Modellwahl, Kontextpaket,
+// costs.json (Token-Buch). Dazu die Engine (Abschnitt „Engine“ unten): Modellwahl, Berichtspfad,
 // Register, Zaun, --no-verify-Sperre, codecycle_budget. Alles in einer Datei, weil Claude Code
 // nur ein Hooks-Modul lädt und das Handle `$` nur an Funktionen derselben Datei weitergegeben werden darf.
 // Das Profil lässt sich nur bis zum ersten codecycle-Agenten einer Sitzung wechseln
@@ -17,50 +17,16 @@ import { type BandData, type FooterData, renderBand, renderFooter } from './band
 import { type PanelData, renderPanel } from './panel.tsx'
 import { renderFooterDesk } from './desk.tsx'
 import { supportsRichText } from './lib/desk-parts.ts'
-import { DEFAULT_THRESHOLD, budgetText, checkContextNote, contextAdvice, packageBudgetNote, warnings } from './lib/budget.ts'
+import { DEFAULT_THRESHOLD, budgetText, checkContextNote, budgetNote, contextAdvice, warnings } from './lib/budget.ts'
 import { BROWSER_CLOSE_TOOL, type BrowserUse, browserAfter, browserOpenContext, browserOpenHint, tracksBrowser } from './lib/browser-close.ts'
 import { type Hint, type HintKind, effortFromArgs, rankHints, savedChanged, savedEffortOf, savedMark, startEffortOf } from './lib/term-parts.ts'
-import {
-  buildPackage,
-  conventionBullets,
-  extractPackageBlock,
-  extractPackagesSection,
-  keywordsOf,
-  packageKind,
-  parseSpawnPrompt,
-  pickConventions,
-  reportPath,
-} from './lib/context-package.ts'
-import {
-  type Spawn,
-  appendNote,
-  builderModelOf,
-  callerLines,
-  progressNote,
-  readBudgetNote,
-  reportNote,
-  rewriteSpawn,
-  spawnFrom,
-  trimDiff,
-} from './lib/spawn-message.ts'
-import {
-  controlFileReason,
-  docKeeperCheck,
-  fenceDenyText,
-  hookCriticalReason,
-  isReaderRole,
-  otherPackageReason,
-  readBudgetDeny,
-  readerCheck,
-  testAuthorReason,
-  writeTargetsOf,
-} from './lib/fence.ts'
+import { type Spawn, appendNote, parseSpawnPrompt, progressNote, reportNote, reportPath, rewriteSpawn, spawnFrom } from './lib/spawn-message.ts'
+import { controlFileReason, fenceDenyText, hookCriticalReason, isReaderRole, readerCheck, writeTargetsOf } from './lib/fence.ts'
 import { bashReadTargets } from '../lib/bash-read-targets.ts'
 import { bashSearchCount } from '../lib/bash-search.ts'
 import { bashWriteTargets } from '../lib/bash-write-targets.ts'
 import { hookBypass } from '../lib/guard-bypass.ts'
-import { baselineCall, checkCall, commitTestsCall, commitTestsOutsidePackageCall, packageBookkeepingCall, pythonCall, soloCheckCall } from '../lib/guard-calls.ts'
-import { reviewDiffArgs } from '../lib/guard-rules.ts'
+import { baselineCall, checkCall, partBookkeepingCall, pythonCall, soloCheckCall } from '../lib/guard-calls.ts'
 import {
   type Costs,
   type MainEntry,
@@ -79,7 +45,6 @@ import {
   bookSnapshot,
   emptyCosts,
   metricsOf,
-  noteMissing,
   noteRun,
   parseCosts,
   roleCosts,
@@ -89,9 +54,7 @@ import {
   setWorkTime,
   mergeChanges,
   parseGitChanges,
-  parseReadBudget,
   parseReceiptStatus,
-  ownersOf,
   parseRegistry,
   recordTouch,
   registerAgent,
@@ -101,11 +64,8 @@ import {
   worktreeOf,
 } from './lib/ledger-registry.ts'
 import { chooseModel, parseProfiles, roleOf, type ProfilesFile } from './lib/models.ts'
-import { ALL_PACKAGES, mergePackages, parsePlan, type Plan, type PlanPackage } from '../lib/plan-file.ts'
-import { riskEffort } from '../lib/effort-plan.ts'
 import type { ProtectedConfig } from '../lib/protected.ts'
 import { inRoot, mainRootFromCommonDir } from '../lib/project-root.ts'
-import type { GraphHit } from '../lib/locate.ts'
 import {
   type AgentRow,
   type LiveAgent,
@@ -118,11 +78,10 @@ import {
   cacheText,
   cacheTtlFromAgentFile,
   finishedSteps,
-  packageProblem,
   parseStep,
   progressOf,
 } from './lib/agent-view.ts'
-import { TASKS_DIR, TOOL_CONFIG, mainBranchFrom } from '../lib/paths.ts'
+import { TASKS_DIR, TOOL_CONFIG } from '../lib/paths.ts'
 import {
   type ClaimSignal,
   type PendingSince,
@@ -138,16 +97,14 @@ import {
   withoutSavedClaim,
 } from './lib/main-claim.ts'
 import { correctedNote, resolveTaskDir } from './lib/task-dir.ts'
-import { SOLO_REVIEWER, mergedBranches, reviewerStartProblem, soloMergeProblem, soloWriteDeny } from './lib/solo.ts'
+import { SOLO_REVIEWER, mergedBranches, partReviewerStartProblem, reviewerStartProblem, soloMergeProblem, soloWriteDeny } from './lib/solo.ts'
 import type { CrewHead } from './lib/agent-svg.ts'
 import { type NodeState, type SetupState, copyStateFrom, nodeStateFrom, nodeWarning, setupHint, splitUpdateOutput, toolCopyHint } from './lib/setup-check.ts'
 import { TOOL_VERSION } from '../tool/version.ts'
-import type { Signatur } from '../lib/signatures.ts'
 import { bookWritable, parseState as parseTaskState } from '../lib/state-file.ts'
-import { parseTask, type Task } from '../lib/task-file.ts'
-import { requiredReports, soloReportFor } from '../lib/solo-findings.ts'
+import { canonicalRole } from '../lib/roles.ts'
+import { isPartReview, partNameOf, requiredReports, soloReportFor } from '../lib/solo-findings.ts'
 import {
-  type Effort,
   type Switches,
   defaultSwitches,
   isOn,
@@ -200,14 +157,10 @@ const STORE_LIMITS = 'lastLimits'
 const STORE_LOCKED = 'lockedSessions'
 /** Zuordnung der Hauptsitzung je Sitzungs-ID über das Prozessende hinaus (hooks/lib/main-claim.ts :: SavedClaim) */
 const STORE_CLAIMS = 'mainClaims'
-const COMMIT_TESTS_DENY =
-  'codecycle: rote Tests committet nur der Test-Autor bzw. Debugger (codecycle commit-tests). Melde den Stand im Bericht unter „Offene Punkte“; der Bauleiter entscheidet.'
-const COMMIT_TESTS_OUTSIDE_DENY =
-  'codecycle: Der Test-Autor committet rote Tests nur im Paket-Worktree (ohne --ohne-paket). Fehlt der Worktree, melde es im Bericht unter „Offene Punkte“; der Bauleiter legt ihn mit codecycle paket start P<n> --nur-worktree an.'
 const BASELINE_DENY =
   'codecycle: Grundlage für guard setzt nur der Bauleiter oder codecycle:toolsmith (codecycle guard --record, exclude, install-tool, hooks install). Melde den Bedarf im Bericht unter „Offene Punkte“.'
-const PACKAGE_DENY =
-  'codecycle: codecycle paket start|fertig und solo teil start|fertig (Worktree, Merge, STATE.md) ruft nur die Hauptsitzung auf. Prüfen darfst du mit codecycle paket pruefen bzw. codecycle check.'
+const PART_DENY =
+  'codecycle: codecycle solo teil start|fertig und solo plan (Teil-Branch, STATE.md) ruft nur die Hauptsitzung auf. Prüfen darfst du mit codecycle check.'
 const LOCK_HINT =
   'Das Profil lässt sich nur bis zum ersten codecycle-Agenten einer Sitzung wechseln (neue Sitzung oder /clear).'
 
@@ -408,14 +361,13 @@ async function togglePanel($: EngineInterface) {
 }
 
 // ---------------------------------------------------------------------------
-// Engine (Etappe 3): Modellwahl, Kontextpaket, Token-Buch, Register, Zaun, Budget
+// Engine: Modellwahl, Berichtspfad, Token-Buch, Register, Zaun, Budget
 
 const CODECYCLE_MD = '.claude/codecycle.md'
 /** Versionsvermerk der Werkzeug-Kopie (tool/copy.ts, COPY_DIR + COPY_INFO); Vergleich mit TOOL_VERSION des Plugins */
 const COPY_INFO = '.codecycle/tool/.copy-info.json'
 const STORE_ROLE_AVG = 'roleAvg'
 const BUDGET_TOOL = 'codecycle_budget'
-const OWNER_TOOL = 'codecycle_owner'
 const STEP_TOOL = 'codecycle_step'
 /** /codecycle:update lädt am Ende das Plugin neu */
 const RELOAD_TOOL = 'codecycle_reload'
@@ -457,17 +409,13 @@ type Runtime = {
   startCommit?: string
   /** Worktree-Pfad, für den schon ein Startstand gesucht wurde (aus Werkzeugaufruf oder Startnachricht abgeleitet) */
   wtTried?: string
-  /** Paket berührt einen Risikobereich (PLAN.md `Risiko: ja`; bei Paket alle: irgendein Paket); hebt Bau- und Prüfrollen auf high */
-  risiko?: boolean
-  /** Effort, den dieser Agent beim ersten Schritt bekam; bleibt für den ganzen Lauf */
-  effort?: Effort | null
   /** Stand des 5-Stunden-Fensters beim Beginn des laufenden Zuges */
   baseline?: number | null
   /** Berichtspfad aus der Startnachricht (absolut im Hauptordner); einziges Schreibziel einer Lese-Rolle */
   bericht?: string
   /** Verweigerungen des Lese-Zauns in Folge; ab READER_STOP_AFTER (hooks/lib/fence.ts) kommt der Stopp-Hinweis */
   verweigert?: number
-  /** Browser-Prüfer: war der letzte Browser-Aufruf `browser_close`? (hooks/lib/browser-close.ts) */
+  /** Rolle mit Browser: war der letzte Browser-Aufruf `browser_close`? (hooks/lib/browser-close.ts) */
   browser?: BrowserUse
 }
 
@@ -581,22 +529,12 @@ async function loadOutside($: EngineInterface): Promise<void> {
 const relPath = (p: string, roots: readonly (string | null | undefined)[]): string => toRepoRelative(p, roots, { plugin: pluginDir, home: homeDir })
 
 /**
- * Hinweise zum Kontextpaket: Paket nicht in PLAN.md gefunden oder Fundstellen ungelöst. Schlüssel
- * Aufgabenordner und Paket; gilt, bis für dasselbe Paket ein Agent ohne Problem startet oder keine Aufgabe aktiv ist.
- */
-const packageHints = new Map<string, { dir: string; text: string }>()
-
-/**
- * Browser-Prüfer, die ohne `browser_close` endeten (Agent-ID → Hinweis dem Bauleiter schon als Kontext gegeben).
+ * Agenten mit Browser, die ohne `browser_close` endeten (Agent-ID → Hinweis dem Bauleiter schon als Kontext gegeben).
  * Bleibt auf der Bautafel, bis die Hauptsitzung `browser_close` aufruft oder derselbe Agent ihn per Folgenachricht schließt.
  */
 const browserOpen = new Map<string, { gemeldet: boolean }>()
 
 const books = new Map<string, Book>()
-
-const plans = new Map<string, Cached<{ plan: Plan; text: string } | null>>()
-
-const tasks = new Map<string, Cached<Task | null>>()
 
 const states = new Map<string, Cached<ReturnType<typeof parseTaskState> | null>>()
 
@@ -611,8 +549,8 @@ async function readText($: EngineInterface, path: string): Promise<string | null
   }
 }
 
-/** Hinweis, solange der alte Schalter effort-by-size noch im Projekt steht (seit 0.5.0 wirkungslos). */
-const STALE_EFFORT_HINT = 'Schalter effort-by-size ist wirkungslos (seit 0.5.0 Effort je Rolle und Risiko); Zeile aus .claude/codecycle.md entfernen.'
+/** Hinweis, solange der alte Schalter effort-by-size im Projekt steht (wirkungslos). */
+const STALE_EFFORT_HINT = 'Schalter effort-by-size ist wirkungslos (Effort steht je Rolle in der Agenten-Datei); Zeile aus .claude/codecycle.md entfernen.'
 let staleEffortSwitch = false
 
 async function reloadConfig($: EngineInterface): Promise<void> {
@@ -637,30 +575,6 @@ async function fresh<T>(cache: Map<string, Cached<T>>, key: string, now: number,
   const value = await load()
   cache.set(key, { at: now, value })
   return value
-}
-
-async function planOf($: EngineInterface, dir: string) {
-  return fresh(plans, dir, await $.clock.now(), async () => {
-    const text = await readText($, `${dir}/PLAN.md`)
-    if (text === null) return null
-    try {
-      return { plan: parsePlan(text, `${dir}/PLAN.md`), text }
-    } catch {
-      return null
-    }
-  })
-}
-
-async function taskOf($: EngineInterface, dir: string) {
-  return fresh(tasks, dir, await $.clock.now(), async () => {
-    const text = await readText($, `${dir}/TASK.md`)
-    if (text === null) return null
-    try {
-      return parseTask(text, `${dir}/TASK.md`)
-    } catch {
-      return null
-    }
-  })
 }
 
 async function stateOf($: EngineInterface, dir: string) {
@@ -777,8 +691,8 @@ async function pullLimits($: EngineInterface): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Start eines Agenten: Modell, Kontextpaket
-// Der reine Teil (Typ Spawn, Textbausteine, Modell des Handwerkers, Diff kürzen) steht in hooks/lib/spawn-message.ts.
+// Start eines Agenten: Modell, Berichtspfad
+// Der reine Teil (Typ Spawn, Textbausteine) steht in hooks/lib/spawn-message.ts.
 
 async function runIn($: EngineInterface, argv: string[], cwd?: string): Promise<string | null> {
   try {
@@ -789,224 +703,42 @@ async function runIn($: EngineInterface, argv: string[], cwd?: string): Promise<
   }
 }
 
-/** Projekt-Werkzeug: die Kopie im Projekt, sonst die Plugin-Fassung. */
-async function toolCli($: EngineInterface): Promise<string> {
-  const own = await projectPath($, '.codecycle/tool/cli.ts')
-  return (await $.fs.exists(own)) ? own : `${$.plugin.root}/tool/cli.ts`
-}
+/** Eintrag in profiles.json für den Schlussprüfer mit `Auftrag: Teil` (Prüfer je Teil, ohne eigene Agentendatei) */
+const PART_REVIEWER = 'part-reviewer'
 
-/**
- * Hauptbranch für den Gesamtdiff der Abschlussprüfung: `mainBranch` aus der Werkzeug-Konfiguration; ohne Eintrag
- * `main`, wenn es `refs/heads/main` gibt, `master`, wenn es sicher fehlt (Regel: `mainBranchFrom` in `lib/paths.ts`,
- * wie im Werkzeug). Lässt sich das nicht prüfen, bleibt es bei `main`.
- */
-async function mainBranchOf($: EngineInterface): Promise<string> {
-  let value: unknown
-  try {
-    const cfg = await readText($, TOOL_CONFIG)
-    value = cfg ? (JSON.parse(cfg.replace(/^﻿/, '')) as { mainBranch?: unknown }).mainBranch : undefined
-  } catch {
-    value = undefined
-  }
-  if (typeof value === 'string' && value.trim() !== '') return mainBranchFrom(value, null)
-  let mainExists: boolean | null = null
-  try {
-    const cwd = (await rootOf($)) ?? undefined
-    // Exit 1 heißt: die Referenz gibt es nicht; jeder andere Ausgang (kein Git, Zeitüberschreitung) bleibt unbekannt
-    const r = await $.process.run(['git', 'rev-parse', '--verify', '--quiet', 'refs/heads/main'], { ...(cwd ? { cwd } : {}), timeoutMs: 20_000 })
-    mainExists = r.exitCode === 0 ? true : r.exitCode === 1 ? false : null
-  } catch {
-    mainExists = null
-  }
-  return mainBranchFrom(value, mainExists)
-}
-
-type PackageInfo = {
-  fundstellen?: { datei: string; symbol: string | null; graph: GraphHit[] | null }[]
-  signaturen?: Signatur[]
-}
-
-/**
- * Graph-Stufe und Signaturen fürs Kontextpaket: ein Aufruf von
- * `codecycle package-info` pro Agentenstart. Schlägt er fehl, bleibt es bei Outline/Suche ohne Signaturen.
- */
-async function packageInfo($: EngineInterface, loci: readonly { datei: string; symbol: string | null }[], cwd?: string) {
-  const refs = loci.filter(l => l.symbol).map(l => `${l.datei} :: ${l.symbol}`)
-  if (refs.length === 0) return null
-  const out = await runIn($, ['node', await toolCli($), 'package-info', ...refs], cwd ?? (await rootOf($)) ?? undefined)
-  if (out === null) return null
-  try {
-    const info = JSON.parse(out.trim().split('\n').at(-1) ?? '') as PackageInfo
-    const graph: Record<string, GraphHit[]> = {}
-    for (const f of info.fundstellen ?? []) if (f.symbol && f.graph && f.graph.length > 0) graph[`${f.datei}::${f.symbol}`] = f.graph
-    return { graph, signaturen: info.signaturen ?? [] }
-  } catch {
-    return null
-  }
-}
-
-/** Modell für den Agentenstart nach Profil, Rolle und Paket; ohne lesbares Profil keines */
-async function spawnModel(
-  $: EngineInterface,
-  role: string,
-  active: Profile,
-  dir: string | null,
-  paketId: string | null,
-  pkg: PlanPackage | undefined,
-  runden: number,
-): Promise<{ model: string | undefined; reason: string }> {
+/** Modell für den Agentenstart nach Profil und Rolle (Schlussprüfer mit `Auftrag: Teil`: `part-reviewer`); ohne lesbares Profil keines */
+function spawnModel(role: string, active: Profile, prompt = ''): { model: string | undefined; reason: string } {
   if (!profiles) return { model: undefined, reason: 'Profil nicht lesbar' }
-  let builderModel: string | undefined
-  if (role === 'reviewer' && dir && paketId) {
-    const reg = (await bookOf($, dir)).registry
-    // ohne Handwerker im Register zählt das Modell, das das Profil für die Rolle des Pakets vorsieht (nur mit Paket in PLAN.md)
-    builderModel = builderModelOf(reg, paketId, pkg?.rolle, profiles.profiles[active])
-  }
-  const choice = chooseModel({
-    role,
-    profile: active,
-    profiles,
-    switches,
-    ...(pkg ? { schwierigkeit: pkg.schwierigkeit } : {}),
-    paketRunden: runden,
-    ...(builderModel ? { builderModel } : {}),
-  })
-  return { model: choice.model, reason: choice.reason }
+  return chooseModel({ role: role === SOLO_REVIEWER && isPartReview(prompt) ? PART_REVIEWER : role, profile: active, profiles })
 }
 
-/** Aufgabe, in der ein Kontextpaket für einen Agentenstart gebaut wird */
-type SpawnScope = {
-  role: string
-  dir: string
-  paketId: string
-  pkg: PlanPackage | undefined
-  planned: NonNullable<Awaited<ReturnType<typeof planOf>>> | null
-  state: NonNullable<Awaited<ReturnType<typeof stateOf>>> | null
-  allMode: boolean
-  cwd: string | undefined
-}
-
-/** Konventionen fürs Paket: Projektbeschreibung und Bereichs-CLAUDE.md über den Fundstellen, gewählt nach Stichwörtern */
-async function spawnConventions($: EngineInterface, pkg: PlanPackage | undefined): Promise<string[]> {
-  const md = (await readText($, CODECYCLE_MD)) ?? ''
-  let bullets = conventionBullets(md)
-  if (pkg && pkg.fundstellen[0]) {
-    try {
-      const found = await $.fs.ancestors({ names: ['CLAUDE.md'], of: await projectPath($, pkg.fundstellen[0].datei), below: (await rootOf($)) ?? await $.session.root() })
-      for (const f of found) bullets = [...bullets, ...conventionBullets(f.content)]
-    } catch {
-      // Bereichs-CLAUDE.md nicht lesbar: nur die Projektbeschreibung
-    }
-  }
-  return pkg ? pickConventions(bullets, keywordsOf([...pkg.fundstellen, ...pkg.angeboten]), 3) : []
-}
-
-/** Material für Prüfer: Diff und Aufrufer der Fundstellen */
-async function spawnReviewMaterial($: EngineInterface, s: SpawnScope, pkg: PlanPackage, state: NonNullable<SpawnScope['state']>): Promise<{ diff: string | undefined; callers: string[] }> {
-  const branch = state.branch
-  // Abschlussprüfung: Gesamtdiff gegen den Hauptbranch; sonst Diff des Paket-Branches
-  const args = reviewDiffArgs(s.allMode ? await mainBranchOf($) : '', branch, s.paketId, s.allMode)
-  const out = args ? await runIn($, args, (await rootOf($)) ?? undefined) : null
-  const diff = trimDiff(out)
-  const callers: string[] = []
-  const cli = await toolCli($)
-  for (const l of pkg.fundstellen.filter(f => f.symbol).slice(0, 5)) {
-    const res = await runIn($, ['node', cli, 'callers', l.symbol!], (await rootOf($)) ?? undefined)
-    callers.push(...callerLines(l.symbol!, res))
-    if (callers.length >= 30) break
-  }
-  return { diff, callers }
-}
-
-/** Kontextpaket samt Hinweis auf der Bautafel, wenn das Paket fehlt oder Fundstellen nicht aufgelöst wurden */
-async function spawnPackage($: EngineInterface, s: SpawnScope): Promise<{ text: string; mitgeliefert: string[] }> {
-  const { role, dir, paketId, pkg, planned, state, allMode, cwd } = s
-  const readFile = async (path: string): Promise<string | null> => {
-    if (cwd) {
-      const own = await readText($, join(cwd, path))
-      if (own !== null) return own
-    }
-    return readText($, path)
-  }
-  const conventions = await spawnConventions($, pkg)
-
-  let diff: string | undefined
-  let callers: string[] | undefined
-  if (packageKind(role) === 'review' && pkg && state) ({ diff, callers } = await spawnReviewMaterial($, s, pkg, state))
-
-  const info =
-    packageKind(role) === 'full' && pkg && isOn(switches, 'context-package') ? await packageInfo($, pkg.fundstellen, cwd) : null
-  const task = dir ? await taskOf($, dir) : null
-  const block = planned
-    ? ((allMode ? extractPackagesSection(planned.text) : extractPackageBlock(planned.text, paketId)) ?? undefined)
-    : undefined
-  const built = await buildPackage({
-    role,
-    paket: paketId,
-    ...(pkg ? { plan: pkg } : {}),
-    ...(block ? { planBlock: block } : {}),
-    criteria: task?.kriterien ?? [],
-    readFile,
-    contextPackage: isOn(switches, 'context-package'),
-    sections: isOn(switches, 'sections'),
-    conventions,
-    ...(diff !== undefined ? { diff } : {}),
-    ...(callers ? { callers } : {}),
-    ...(info ? { graph: info.graph, signaturen: info.signaturen } : {}),
-  })
-  // Hinweis auf der Bautafel, wenn das Paket fehlt oder Fundstellen nicht aufgelöst wurden
-  const problem = packageProblem(paketId, !pkg || !block, built.offen)
-  const hintKey = `${dir}|${paketId}`
-  // Aufgabenmodus: kein Hinweis je Paket (der Abschnitt Pakete steht ganz im Kontextpaket)
-  if (problem && !allMode) packageHints.set(hintKey, { dir, text: problem })
-  else packageHints.delete(hintKey)
-  return { text: built.text, mitgeliefert: built.mitgeliefert }
-}
-
-async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; parentAgentId?: string }, role: string): Promise<Spawn | { deny: string }> {
+async function prepare($: EngineInterface, e: { prompt: string }, role: string): Promise<Spawn | { deny: string }> {
   await reloadConfig($)
   const parsed = parseSpawnPrompt(e.prompt, role)
-  // Start aus einem codecycle-Agenten heraus (Paketleiter): fehlende Angaben erbt er vom Eltern-Agenten
-  const parent = e.parentAgentId ? agents.get(e.parentAgentId) : undefined
   // Aufgabenordner aus der aktiven Aufgabe, nicht aus dem Text (spawnTaskDir); falscher Ordner → kein Start
-  const taskDir = await spawnTaskDir($, parsed.aufgabeDir, parent)
+  const taskDir = await spawnTaskDir($, parsed.aufgabeDir)
   if (taskDir.kind === 'deny') return { deny: taskDir.text }
-  const dir = taskDir.kind === 'ok' ? taskDir.dir : (parent?.dir ?? (await activeDir($)))
-  const paketId = parsed.paket ?? parent?.paket ?? null
-  const planned = dir ? await planOf($, dir) : null
+  const dir = taskDir.kind === 'ok' ? taskDir.dir : await activeDir($)
+  // Pakete gibt es nur in alten Register-Einträgen; neue Agenten haben keins
+  const paketId = null
   const state = dir ? await stateOf($, dir) : null
-  // Aufgabenmodus: Paket „alle“ = ein Paket über die ganze Aufgabe
-  const allMode = paketId === ALL_PACKAGES
-  const pkg = planned && paketId ? (allMode ? mergePackages(planned.plan) : planned.plan.pakete.find(p => p.id === paketId)) : undefined
-  const runden = state && paketId ? (state.pakete.find(p => p.id === paketId)?.runden ?? 0) : 0
-  const active = await shownProfile($)
 
   // Modell
-  const { model, reason } = await spawnModel($, role, active, dir, paketId, pkg, runden)
+  const { model, reason } = spawnModel(role, await shownProfile($), e.prompt)
 
-  // Kontextpaket
   let text = ''
-  let mitgeliefert: string[] = []
-  if (packageKind(role) !== 'none' && paketId && dir) {
-    ;({ text, mitgeliefert } = await spawnPackage($, { role, dir, paketId, pkg, planned, state, allMode, cwd: e.cwd }))
-  }
-  if (isOn(switches, 'read-budget') && packageKind(role) !== 'none' && text !== '') {
-    const limit = parseReadBudget(switchValue(switches, 'read-budget'))
-    text = appendNote(text, readBudgetNote(limit))
-  }
   // Hinweis nur, wenn das Werkzeug beim Sitzungsstart wirklich angemeldet wurde; Werkzeuge meldet der Mod
   // nur in session.start an, ein später gesetzter Schalter wirkt erst nach einem Neustart der Sitzung.
   if (isOn(switches, 'agent-progress') && registered.has(STEP_TOOL)) {
     text = appendNote(text, progressNote(STEP_TOOL))
   }
   warnRestart($, 'agent-progress', STEP_TOOL)
-  warnRestart($, 'register-forwarding', OWNER_TOOL)
   if (taskDir.kind === 'ok' && taskDir.corrected && dir) text = appendNote(text, correctedNote(dir, taskDir.corrected))
-  // Bericht in den Hauptordner, nicht in den Paket-Worktree
+  // Bericht in den Hauptordner, nicht in einen Worktree
   const root = await rootOf($)
   let bericht: string | undefined
   if (root) {
-    // Solo-Prüfer: fester Name, den Merge-Sperre und `codecycle solo funde` lesen (`Auftrag: Sicherheit`: zweiter Bericht)
+    // Schlussprüfer: fester Name, den Merge-Sperre und `codecycle solo funde` lesen (`Auftrag: Sicherheit`: zweiter Bericht)
     const named = role === SOLO_REVIEWER ? soloReportFor(e.prompt) : parsed.bericht
     bericht = reportPath({ root, dir, paket: paketId, rolle: role, ...(named ? { bericht: named } : {}) })
     // Pflicht ausdrücklich, weil allgemeine Vorgaben der Umgebung von Berichts-Dateien abraten
@@ -1017,12 +749,9 @@ async function prepare($: EngineInterface, e: { prompt: string; cwd?: string; pa
     dir,
     paket: paketId,
     groesse: state?.groesse ?? '',
-    risiko: pkg?.risiko === true,
     model,
     reason,
     text,
-    mitgeliefert,
-    eltern: parent?.id,
     explicitDir: !!parsed.aufgabeDir,
     bericht,
   })
@@ -1050,14 +779,14 @@ async function openTaskDirs($: EngineInterface): Promise<string[] | null> {
 
 /**
  * Aufgabenordner eines neuen Agenten aus der aktiven Aufgabe statt aus dem Text der Startnachricht (Regel in
- * hooks/lib/task-dir.ts): Aufgabe des Eltern-Agenten, sonst die dieser Sitzung (claimMain), sonst die einzige offene.
- * Davon leiten sich Bericht, Quittung, Kontextpaket und der Lese-Rollen-Zaun (Runtime.bericht) ab.
+ * hooks/lib/task-dir.ts): die Aufgabe dieser Sitzung (claimMain), sonst die einzige offene.
+ * Davon leiten sich Bericht, Quittung und der Lese-Rollen-Zaun (Runtime.bericht) ab.
  * Ein Netz gegen Versehen (vertippter Ordner, Satzpunkt), keine Sicherheitsgrenze.
  */
-async function spawnTaskDir($: EngineInterface, named: string | undefined, parent: Runtime | undefined) {
+async function spawnTaskDir($: EngineInterface, named: string | undefined) {
   const target = mainTarget(claim)
   const claimed = target.kind === 'dir' && target.dir.startsWith(`${TASKS_DIR}/`) ? target.dir : null
-  return resolveTaskDir({ named, open: await openTaskDirs($), expected: parent ? parent.dir : claimed, fromParent: !!parent })
+  return resolveTaskDir({ named, open: await openTaskDirs($), expected: claimed })
 }
 
 /** Schalter an, Werkzeug aber nicht angemeldet: einmal melden, dass ein Neustart der Sitzung nötig ist. */
@@ -1077,7 +806,6 @@ async function onSpawned($: EngineInterface, cwd: string | undefined, s: Spawn, 
     dir: s.dir,
     book: s.dir ?? SETUP_DIR,
     groesse: s.groesse,
-    risiko: s.risiko,
     ...(cwd ? { cwd } : {}),
     ...(s.bericht ? { bericht: s.bericht } : {}),
     baseline: null,
@@ -1099,7 +827,6 @@ async function onSpawned($: EngineInterface, cwd: string | undefined, s: Spawn, 
     laufStart: at,
     arbeitMs: 0,
     cacheTtlMs: await cacheTtlOf($, s.role),
-    ...(s.eltern ? { eltern: s.eltern } : {}),
   }
   await update($, crew, list => [...list.filter(a => a.id !== agentId), entry].slice(-MAX_CREW))
   await update($, crewNow, () => at)
@@ -1116,8 +843,6 @@ async function onSpawned($: EngineInterface, cwd: string | undefined, s: Spawn, 
       paket: s.paket,
       modell: model || s.model || '',
       gestartet: now,
-      mitgeliefert: s.mitgeliefert,
-      ...(s.eltern ? { eltern: s.eltern } : {}),
       ...(bericht ? { bericht } : {}),
     },
     now,
@@ -1148,7 +873,7 @@ async function cacheTtlOf($: EngineInterface, role: string): Promise<number> {
 
 /**
  * Hält den Startstand (HEAD) im Arbeitsordner des Agenten fest, wenn der ein anderer Ordner als der Hauptordner ist
- * (Paket-Worktree). Schlägt `git rev-parse` fehl (Pfad aus Text abgeleitet, existiert nicht), bleibt alles wie vorher.
+ * (Worktree). Schlägt `git rev-parse` fehl (Pfad aus Text abgeleitet, existiert nicht), bleibt alles wie vorher.
  */
 async function adoptWorktree($: EngineInterface, rt: Runtime, dir: string | undefined): Promise<void> {
   if (!dir || rt.startCommit || rt.wtTried === dir) return
@@ -1377,7 +1102,7 @@ async function complete($: EngineInterface, e: { agentId?: string; reason: strin
     return
   }
   if (rt) {
-    // Browser-Prüfer ohne browser_close am Ende: dem Bauleiter melden (Bautafel, Kontext beim nächsten Prompt)
+    // Agent mit Browser ohne browser_close am Ende: dem Bauleiter melden (Bautafel, Kontext beim nächsten Prompt)
     if (tracksBrowser(rt.rolle)) {
       if (rt.browser === 'offen') browserOpen.set(rt.id, { gemeldet: false })
       else browserOpen.delete(rt.id)
@@ -1458,19 +1183,6 @@ async function complete($: EngineInterface, e: { agentId?: string; reason: strin
   }
 }
 
-/** Zaun (Schalter `fence`) für einen Schreibpfad: lädt Plan, Register und STATE.md; die Regeln stehen in hooks/lib/fence.ts. */
-async function fenceReason($: EngineInterface, rt: Runtime, path: string): Promise<string | null> {
-  const control = controlFileReason(rt.rolle, path, protectedConfig)
-  if (control) return control
-  if (!rt.dir) return null
-  const planned = await planOf($, rt.dir)
-  if (!planned) return null
-  const reg = (await bookOf($, rt.dir)).registry
-  const tests = testAuthorReason(rt.rolle, path, planned.plan, reg)
-  if (tests) return tests
-  return otherPackageReason(rt.paket, path, planned.plan, await stateOf($, rt.dir))
-}
-
 // ---------------------------------------------------------------------------
 // Werkzeuge für Hauptsitzung und Agenten
 /**
@@ -1498,7 +1210,6 @@ async function start($: EngineInterface): Promise<void> {
     roleAvg = ((await $.store.get(STORE_ROLE_AVG)) as typeof roleAvg | undefined) ?? {}
     await rootOf($, true)
     await loadOutside($)
-    packageHints.clear()
     registered.clear()
     await $.tool.register({
       name: BUDGET_TOOL,
@@ -1506,7 +1217,7 @@ async function start($: EngineInterface): Promise<void> {
         'codecycle: Limit-Stand (5-Stunden- und Wochenfenster), Reset-Zeit, Durchschnittskosten pro Rolle und Empfehlung (starten / nur klein / anhalten). Vor jedem neuen Agentenlauf fragen.',
       inputSchema: {
         type: 'object',
-        properties: { role: { type: 'string', description: 'Rolle des geplanten Laufs, z. B. builder-logic' } },
+        properties: { role: { type: 'string', description: 'Rolle des geplanten Laufs, z. B. builder' } },
       },
     })
     registered.add(BUDGET_TOOL)
@@ -1517,19 +1228,6 @@ async function start($: EngineInterface): Promise<void> {
       inputSchema: { type: 'object', properties: {} },
     })
     registered.add(RELOAD_TOOL)
-    if (isOn(switches, 'register-forwarding')) {
-      await $.tool.register({
-        name: OWNER_TOOL,
-        description:
-          'codecycle: Wer hat diese Datei in dieser Aufgabe zuletzt geändert oder erstellt? Liefert Agent-ID, Rolle und Paket (Agenten-Register), damit Funde an den richtigen Agenten gehen.',
-        inputSchema: {
-          type: 'object',
-          properties: { path: { type: 'string', description: 'Datei, relativ zum Projekt' } },
-          required: ['path'],
-        },
-      })
-      registered.add(OWNER_TOOL)
-    }
     if (isOn(switches, 'agent-progress')) {
       await $.tool.register({
         name: STEP_TOOL,
@@ -1920,15 +1618,12 @@ async function currentWarnings($: EngineInterface, surface: string): Promise<Hin
   const setupText = setupHint(setup)
   const node = nodeWarning(setup.node)
   const copy = toolCopyHint(setup, TOOL_VERSION)
-  const dir = await activeDir($)
-  const hints = [...packageHints.values()].filter(h => dir !== null && h.dir === dir).map(h => h.text)
   const list = [
     ...(setupText ? [hint('setup', setupText)] : []),
     ...(node ? [hint('setup', node)] : []),
     ...(copy ? [hint('update', copy)] : []),
     ...(staleEffortSwitch ? [hint('sonstig', STALE_EFFORT_HINT)] : []),
     ...(browserOpen.size > 0 ? [hint('sonstig', browserOpenHint(browserOpen.size)!)] : []),
-    ...hints.map(t => hint('sonstig', t)),
     ...warnings({
       fuenf: terminal ? null : lim.fuenfStunden,
       woche: terminal ? null : lim.woche,
@@ -2102,7 +1797,7 @@ async function onPromptSubmit($: EngineInterface, e: Evt<'prompt.submit'>, next:
   const kind = skill ? skillKind(skill) : null
   if (kind === 'task') await claimMain($, { kind: 'skill', which: 'task' }, `befehl /${skill}`)
   if (kind === 'setup') await claimMain($, { kind: 'skill', which: 'setup', setupDir: SETUP_DIR }, `befehl /${skill}`)
-  // Browser offen nach dem Browser-Prüfer: einmal als Kontext, den nur das Modell liest (auch an der Benachrichtigung
+  // Browser offen nach einem Agenten: einmal als Kontext, den nur das Modell liest (auch an der Benachrichtigung
   // über das Agentenende, Herkunft task-notification); bei einem Slash-Befehl nicht, dort gilt nur der Befehl
   const offen = [...browserOpen].filter(([, v]) => !v.gemeldet).map(([id]) => id)
   const note = e.command ? null : browserOpenContext(offen)
@@ -2403,7 +2098,7 @@ async function resumeAgent($: EngineInterface, id: string): Promise<void> {
 }
 
 /**
- * Startsperre des Solo-Prüfers: STATE.md frisch gelesen (der Cache wüsste vom eben geschriebenen geprueftAuf nichts),
+ * Startsperre des Schlussprüfers: STATE.md frisch gelesen (der Cache wüsste vom eben geschriebenen geprueftAuf nichts),
  * geänderte Dateien zwischen geprueftAuf und dem Aufgaben-Branch ohne den Aufgabenordner. Regel: hooks/lib/solo.ts.
  */
 async function soloReviewerLock($: EngineInterface, dir: string | null): Promise<string | null> {
@@ -2424,6 +2119,36 @@ async function soloReviewerLock($: EngineInterface, dir: string | null): Promise
   return reviewerStartProblem(state, dir, changed)
 }
 
+/**
+ * Startsperre des Prüfers je Teil (`Auftrag: Teil`): STATE.md frisch gelesen, Branch und Uncommittetes des Hauptordners
+ * ohne den Aufgabenordner. Regel: hooks/lib/solo.ts :: partReviewerStartProblem.
+ */
+async function partReviewerLock($: EngineInterface, dir: string | null, name: string | null): Promise<string | null> {
+  const text = dir ? await readText($, `${dir}/STATE.md`) : null
+  let state: ReturnType<typeof parseTaskState> | null = null
+  try {
+    state = text === null ? null : parseTaskState(text, `${dir}/STATE.md`)
+  } catch {
+    state = null
+  }
+  let head: string | null = null
+  let dirty: string[] | null = null
+  if (state?.weg === 'solo' && dir) {
+    const root = (await rootOf($)) ?? undefined
+    head = (await runIn($, ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], root))?.trim() ?? null
+    const out = await runIn($, ['git', '-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all'], root)
+    dirty =
+      out === null
+        ? null
+        : out
+            .split(/\r?\n/)
+            .filter(l => l.length > 3)
+            .map(l => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''))
+            .filter(p => p !== dir && !p.startsWith(`${dir}/`))
+  }
+  return partReviewerStartProblem(state, dir, name, head, dirty)
+}
+
 async function onAgentSpawn($: EngineInterface, e: Evt<'agent.spawn'>, next: Nxt<'agent.spawn'>) {
   const role = roleOf(e.subagentType)
   if (!role) return next(e)
@@ -2440,9 +2165,11 @@ async function onAgentSpawn($: EngineInterface, e: Evt<'agent.spawn'>, next: Nxt
   } catch (err) {
     $.ui.log(`codecycle: agent.spawn ohne Änderung (${String(err)})`, { to: 'debug' })
   }
-  // Solo-Prüfer erst nach grünem codecycle solo check auf dem Stand des Aufgaben-Branchs (fail-closed)
+  // Schlussprüfer erst nach grünem codecycle solo check auf dem Stand des Aufgaben-Branchs, Prüfer je Teil nur auf einem
+  // sauberen Teil in Arbeit (fail-closed)
   if (role === SOLO_REVIEWER) {
-    const locked = await soloReviewerLock($, info?.dir ?? (await activeDir($)))
+    const dir = info?.dir ?? (await activeDir($))
+    const locked = isPartReview(e.prompt) ? await partReviewerLock($, dir, partNameOf(e.prompt)) : await soloReviewerLock($, dir)
     if (locked) return { deny: locked }
   }
   const result = await next(rewriteSpawn(e, info))
@@ -2468,20 +2195,6 @@ async function onAgentSpawn($: EngineInterface, e: Evt<'agent.spawn'>, next: Nxt
 
 type StepEvt = Evt<'turn.step'>
 type StepResult = EventResult<'turn.step'>
-
-/**
- * Effort je Rolle steht in der Agenten-Datei; bei Risikobereich hebt der Mod Bau- und Prüfrollen auf high.
- * Ein laufender Agent behält seinen Effort: der Wert gilt ab dem ersten Schritt unverändert.
- */
-function stepWithEffort(rt: Runtime | undefined, e: StepEvt): StepEvt {
-  try {
-    if (!rt) return e
-    if (rt.effort === undefined) rt.effort = riskEffort(rt.rolle, rt.risiko === true)
-    return rt.effort ? { ...e, effort: rt.effort } : e
-  } catch {
-    return e
-  }
-}
 
 /** Limit-Stand getrennt vom Effort: scheitert die Abfrage, bleibt der Effort des Schritts erhalten */
 async function noteStepBaseline($: EngineInterface, rt: Runtime | undefined, e: StepEvt): Promise<void> {
@@ -2578,12 +2291,12 @@ async function crewAfterStep($: EngineInterface, rt: Runtime, ev: StepEvt, resul
 }
 
 // ---------------------------------------------------------------------------
-// Token-Buch: jede Modell-Anfrage; Effort nach Rolle und Risiko
+// Token-Buch: jede Modell-Anfrage; Effort steht in der Agenten-Datei
 async function* onTurnStep($: EngineInterface, e: Evt<'turn.step'>, next: Nxt<'turn.step'>) {
   const rt = e.agentId ? agents.get(e.agentId) : undefined
   // Fußzeile: Effort der Hauptsitzung steht in jeder ihrer Anfragen (ohne agentId), maßgeblich
   if (!e.agentId && e.effort !== undefined) await setMainEffort($, e.effort).catch(() => undefined)
-  const ev = stepWithEffort(rt, e)
+  const ev = e
   await noteStepBaseline($, rt, e)
   const stepAt = await noteStepTime($, e)
   const result = yield* next(ev)
@@ -2614,21 +2327,8 @@ async function denyPython($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   return next(e)
 }
 
-// Roter Test-Commit (`codecycle commit-tests`) nur für Test-Autor und Fehlersucher; die Hauptsitzung (kein agentId)
-// darf (Notfall, P0). Auch Agenten, die der Mod nicht kennt, werden verweigert. `--ohne-paket` (außerhalb eines
-// Paket-Branchs) nicht für den Test-Autor.
-function denyCommitTests(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
-  const command = (e as unknown as { command?: unknown }).command
-  if (e.agentId && typeof command === 'string' && commitTestsCall(command)) {
-    const role = agents.get(e.agentId)?.rolle
-    if (role !== 'test-author' && role !== 'debugger') return { deny: COMMIT_TESTS_DENY }
-    if (role === 'test-author' && commitTestsOutsidePackageCall(command)) return { deny: COMMIT_TESTS_OUTSIDE_DENY }
-  }
-  return next(e)
-}
-
 // Befehle, die die Grundlage von codecycle guard neu setzen (guard --record, exclude,
-// install-tool, hooks install), nur für die Hauptsitzung (Bauleiter) und den toolsmith; unbekannte Agenten wie beim roten Test-Commit verweigert
+// install-tool, hooks install), nur für die Hauptsitzung (Bauleiter) und den toolsmith; unbekannte Agenten verweigert
 function denyBaseline(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
   if (e.agentId && typeof command === 'string' && baselineCall(command) && agents.get(e.agentId)?.rolle !== 'toolsmith') {
@@ -2637,12 +2337,12 @@ function denyBaseline(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   return next(e)
 }
 
-// paket start und paket fertig nur für die Hauptsitzung (Bauleiter), auch nicht für toolsmith oder unbekannte Agenten
+// solo teil start|fertig und solo plan nur für die Hauptsitzung, auch nicht für toolsmith oder unbekannte Agenten
 // Bauleiter: an das Ergebnis die Antwort von codecycle_budget als Kontext, damit jede Pause den Füllstand zeigt
-async function denyPackageBookkeeping($: EngineInterface, e: ToolEvt, next: ToolNxt) {
+async function denyPartBookkeeping($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
-  if (typeof command !== 'string' || !packageBookkeepingCall(command)) return next(e)
-  if (e.agentId) return { deny: PACKAGE_DENY }
+  if (typeof command !== 'string' || !partBookkeepingCall(command)) return next(e)
+  if (e.agentId) return { deny: PART_DENY }
   const result = await next(e)
   if (result.deny !== undefined) return result
   let budget: string
@@ -2651,7 +2351,7 @@ async function denyPackageBookkeeping($: EngineInterface, e: ToolEvt, next: Tool
   } catch {
     return result
   }
-  return { ...result, context: [...(result.context ?? []), packageBudgetNote(budget)] }
+  return { ...result, context: [...(result.context ?? []), budgetNote(budget, 'codecycle solo teil start/fertig')] }
 }
 
 // Füllstand ohne eigene Abfrage: nach `codecycle solo check` der Hauptsitzung die ganze Antwort von codecycle_budget,
@@ -2665,7 +2365,7 @@ async function budgetAfterCheck($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   if (result.deny !== undefined) return result
   let note: string
   try {
-    if (solo) note = packageBudgetNote(await budgetNow($), 'codecycle solo check')
+    if (solo) note = budgetNote(await budgetNow($), 'codecycle solo check')
     else if (mainTarget(claim).kind === 'dir') note = checkContextNote(await read($, context))
     else return result
   } catch {
@@ -2730,8 +2430,8 @@ function repoPath(c: ToolCtx, p: string, roots: readonly (string | null | undefi
 }
 
 /**
- * Verweigerungsgrund vor dem Aufruf, null = erlaubt: Lese-Rollen, Doku-Pfleger, Zaun (Schalter fence), Lese-Budget
- * (Schalter read-budget), in dieser Reihenfolge.
+ * Verweigerungsgrund vor dem Aufruf, null = erlaubt: Solo-Aufgabe, Lese-Rollen, Prüfungsdateien, Zaun (Schalter fence),
+ * in dieser Reihenfolge.
  */
 async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> {
   const { rt, input, path } = c
@@ -2739,26 +2439,19 @@ async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> 
   const call = { tool: input.tool, command: input.command, path }
   const fenceEnv = { root: c.rootNow, plugin: $.plugin.root || null, rel: (p: string): string => repoPath(c, p) }
 
-  // Solo-Aufgabe: schreiben dürfen nur die Sitzung, SOLO_WRITERS und jede Rolle ihren Bericht; der Solo-Prüfer mit Write
+  // Solo-Aufgabe: schreiben dürfen nur die Sitzung, SOLO_WRITERS und jede Rolle ihren Bericht; der Schlussprüfer mit Write
   // und Edit nur seinen Bericht (Regel: hooks/lib/solo.ts). Lese-Rollen hält ihr eigener Zaun darunter.
-  if (!isReaderRole(rt.rolle) && (rt.rolle === SOLO_REVIEWER || (rt.dir && (await stateOf($, rt.dir))?.weg === 'solo'))) {
+  if (!isReaderRole(rt.rolle) && (canonicalRole(rt.rolle) === SOLO_REVIEWER || (rt.dir && (await stateOf($, rt.dir))?.weg === 'solo'))) {
     const denied = soloWriteDeny(rt.rolle, call, { rel: fenceEnv.rel, bericht: rt.bericht })
     if (denied) return denied
   }
 
   // Lese-Rollen: Write nur auf den eigenen Bericht (setup zusätzlich .claude/codecycle.md), Bash nur
-  // nach Erlaubtliste, kein PowerShell. Gilt unabhängig vom Schalter fence wie beim Doku-Pfleger.
+  // nach Erlaubtliste, kein PowerShell. Gilt unabhängig vom Schalter fence.
   if (isReaderRole(rt.rolle)) {
     const verdict = readerCheck(rt, call, fenceEnv)
     rt.verweigert = verdict.verweigert
     if (verdict.deny) return verdict.deny
-  }
-
-  // Doku-Pfleger: Bash nur für git, codecycle und Lesen, Schreiben nur auf
-  // Doku-Pfade. Gilt unabhängig vom Schalter fence: seine Bash-Rechte sind nur unter dieser Grenze erteilt.
-  if (rt.rolle === 'doc-keeper') {
-    const denied = docKeeperCheck(call, fenceEnv)
-    if (denied) return denied
   }
 
   // Git-Hooks, Werkzeug und guard-Grundlage: nur der toolsmith, unabhängig vom Schalter fence
@@ -2767,25 +2460,9 @@ async function toolGate($: EngineInterface, c: ToolCtx): Promise<string | null> 
 
   if (isOn(switches, 'fence')) {
     // Edit/Write/NotebookEdit: die Datei; Bash: erkannte Schreibziele (Heuristik, lib/bash-write-targets.ts bashWriteTargets)
-    const targets = writeTargetsOf(call)
-    try {
-      for (const target of targets) {
-        const reason = await fenceReason($, rt, target)
-        if (reason) return fenceDenyText(reason, input.tool)
-      }
-    } catch (err) {
-      $.ui.log(`codecycle: Zaun-Prüfung fehlgeschlagen, Aufruf bleibt erlaubt (${String(err)})`, { to: 'debug' })
-    }
-  }
-  // Lese-Budget (Schalter read-budget): nur Rollen mit Kontextpaket; gezählt werden Aufrufe (hooks/lib/ledger-registry.ts isExtraRead)
-  if (isOn(switches, 'read-budget') && rt.dir && packageKind(rt.rolle) !== 'none') {
-    try {
-      const entry = (await bookOf($, rt.dir)).registry.agenten[rt.id]
-      const limit = parseReadBudget(switchValue(switches, 'read-budget'))
-      const budgetDeny = readBudgetDeny(entry, limit, input.tool, path, input.command)
-      if (budgetDeny) return budgetDeny
-    } catch (err) {
-      $.ui.log(`codecycle: Lese-Budget-Prüfung fehlgeschlagen, Aufruf bleibt erlaubt (${String(err)})`, { to: 'debug' })
+    for (const target of writeTargetsOf(call)) {
+      const reason = controlFileReason(rt.rolle, target, protectedConfig)
+      if (reason) return fenceDenyText(reason, input.tool)
     }
   }
   return null
@@ -2810,7 +2487,7 @@ async function adoptWorktreeOfCall($: EngineInterface, c: ToolCtx): Promise<void
 type Touches = {
   /** Schreibziele eines Bash-Befehls (Heuristik, lib/bash-write-targets.ts bashWriteTargets) auch ohne Zaun ins Register */
   bashTargets: string[]
-  /** Lesen per Bash/PowerShell ins Register (gelesen), ohne Wirkung auf das Lese-Budget */
+  /** Lesen per Bash/PowerShell ins Register (gelesen) */
   bashReads: string[]
   /** Suchstufen eines Bash-Befehls (grep/rg/find …, lib/bash-search.ts bashSearchCount): zählen wie Grep/Glob als `suche` */
   bashSearches: number
@@ -2864,7 +2541,7 @@ async function recordBashTouches(
     // nur Vorhandenes, und jede Datei einmal (kein Aufblähen durch wiederholtes `cat`)
     if (entry?.gelesen.some(g => g.bash && samePath(g.pfad, p))) continue
     if (!(await $.fs.exists(diskPath(c, r)).catch(() => false))) continue
-    if (recordTouch(b.registry, rt.id, 'gelesen', p, now, undefined, true)) noteMissing(b.costs, rt.id, p)
+    recordTouch(b.registry, rt.id, 'gelesen', p, now, undefined, true)
     n += 1
   }
   for (const t of touches.bashTargets) {
@@ -2888,7 +2565,7 @@ async function recordToolCall($: EngineInterface, c: ToolCtx, touches: Touches):
     const rel = (p: string): string => repoPath(c, p, roots)
     if (input.tool === 'Read' && path) {
       const range = input.limit !== undefined ? `${input.offset ?? 1}-${(input.offset ?? 1) + input.limit - 1}` : undefined
-      if (recordTouch(b.registry, rt.id, 'gelesen', rel(path), now, range)) noteMissing(b.costs, rt.id, rel(path))
+      recordTouch(b.registry, rt.id, 'gelesen', rel(path), now, range)
     } else if (input.tool === 'Edit' && path) recordTouch(b.registry, rt.id, 'geaendert', rel(path), now)
     else if (input.tool === 'NotebookEdit' && path) recordTouch(b.registry, rt.id, 'geaendert', rel(path), now)
     else if (input.tool === 'Write' && path) recordTouch(b.registry, rt.id, touches.existed ? 'geaendert' : 'erstellt', rel(path), now)
@@ -3009,21 +2686,6 @@ async function toolReload($: EngineInterface, e: ToolEvt) {
   return toolText('Neuladen eingeplant: /reload-plugins läuft, sobald diese Antwort fertig ist. Klappt das nicht, steht der Befehl im Eingabefeld.')
 }
 
-async function toolOwner($: EngineInterface, e: ToolEvt) {
-  const input = e as unknown as { path?: unknown }
-  const path = typeof input.path === 'string' ? input.path : ''
-  const dir = await activeDir($)
-  let text = 'keine Aufgabe aktiv'
-  if (dir && path) {
-    const owners = ownersOf((await bookOf($, dir)).registry, path)
-    text =
-      owners.length === 0
-        ? `${path}: kein Agent hat die Datei in dieser Aufgabe geändert`
-        : owners.map(a => `${path}: Agent ${a.id}, Rolle ${a.rolle}, Paket ${a.paket ?? '-'}, zuletzt ${a.letzteAktivitaet}`).join('\n')
-  }
-  return toolText(text)
-}
-
 // ---------------------------------------------------------------------------
 // Registrierung: nur die Liste der Handler. Reihenfolge = Verhalten (die `tool.call`-Sperren stehen vor dem Zaun).
 export const register: Register = on => {
@@ -3049,15 +2711,13 @@ export const register: Register = on => {
   on('agent.spawn', onAgentSpawn)
   on('turn.step', onTurnStep)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPython)
-  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyCommitTests)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyBaseline)
-  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPackageBookkeeping)
+  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyPartBookkeeping)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, budgetAfterCheck)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denyHookBypass)
   on('tool.call', { tool: /^(Bash|PowerShell)$/ }, denySoloMerge)
   on('tool.call', onToolCall)
   on('tool.call', { tool: /^mcp__codecycle__codecycle_budget$/ }, toolBudget)
   on('tool.call', { tool: /^mcp__codecycle__codecycle_step$/ }, toolStep)
-  on('tool.call', { tool: /^mcp__codecycle__codecycle_owner$/ }, toolOwner)
   on('tool.call', { tool: /^mcp__codecycle__codecycle_reload$/ }, toolReload)
 }

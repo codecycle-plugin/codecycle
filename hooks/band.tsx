@@ -6,9 +6,9 @@
 import type { ElementTable, RenderChildren } from 'claude-code'
 
 import type { Board, Limits, Profile } from '../types'
-import { BOX, PROFILES, PROFILE_LABEL, bar, currentPackage, percent, resetText, type ShownLimits } from './state'
+import { PROFILES, PROFILE_LABEL, bar, percent, resetText, type ShownLimits } from './state'
 import { runsText } from './lib/budget.ts'
-import { DOT, deskChip, deskNote } from './desk.tsx'
+import { deskChip, deskNote } from './desk.tsx'
 import { modelColor } from './lib/figure-meta.ts'
 import {
   COLLAPSE_LABEL,
@@ -16,7 +16,6 @@ import {
   FRAME_LEFT,
   FRAME_RIGHT,
   HINT_GLYPH,
-  TERM_BOX,
   type Hint,
   bandSpacing,
   bandWidth,
@@ -83,22 +82,8 @@ function renderBandTerminal(ui: ElementTable, d: BandData, act: BandActions) {
   const { active, board: b, isLocked, isCollapsed, notes, running } = d
   const W = bandWidth(d.bodyColumns)
   const empty = b.quelle === 'leer'
-  const current = currentPackage(b)
-  const done = b.pakete.filter(p => p.status === 'fertig').length
-  const blocked = b.pakete.filter(p => p.status === 'blockiert').length
   const dim = (s: string) => <Text dimColor>{s}</Text>
   const sep = dim('│')
-  const glyphs = (
-    <Text>
-      <Text dimColor>Pakete </Text>
-      {b.pakete.map(p => (
-        <Text color={TERM_BOX[p.status].color} dimColor={TERM_BOX[p.status].dim}>
-          {TERM_BOX[p.status].glyph}
-        </Text>
-      ))}
-    </Text>
-  )
-  const blockText = blocked > 0 ? <Text color="red">{`${blocked} blockiert`}</Text> : null
 
   // Bedienknöpfe rechtsbündig in der ersten Zeile im Rahmen, nur per Klick: keine Tasten-Kürzel im Terminal
   const controls = (
@@ -151,8 +136,6 @@ function renderBandTerminal(ui: ElementTable, d: BandData, act: BandActions) {
           activeText,
           sep,
           <Text bold>{empty ? 'Keine offene Aufgabe' : b.aufgabe}</Text>,
-          empty ? null : glyphs,
-          blockText,
           ...(notes.length > 0 ? [sep, <Text color="yellow">{hintCountText(notes.length)}</Text>] : []),
           controls,
         ])}
@@ -168,7 +151,6 @@ function renderBandTerminal(ui: ElementTable, d: BandData, act: BandActions) {
         p === active ? activeText : <Button key={`profile-${p}`} label={PROFILE_LABEL[p]} plain onPress={() => act.onSetProfile(p)} />,
       )
   const facts = [
-    current && current.status !== 'fertig' ? `jetzt ${current.id}` : '',
     runsText(b.budget),
     running > 0 ? `${running} ${running === 1 ? 'Agent läuft' : 'Agenten laufen'}` : '',
   ].filter(Boolean)
@@ -180,9 +162,6 @@ function renderBandTerminal(ui: ElementTable, d: BandData, act: BandActions) {
       ]
     : [
         <Text bold>{b.aufgabe}</Text>,
-        glyphs,
-        dim(`${done} von ${b.pakete.length} fertig`),
-        blockText,
         dim(facts.join(' · ')),
         b.quelle === 'beispiel' ? dim('(Beispieldaten)') : null,
       ]
@@ -310,20 +289,7 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
   const { Box, Button, Text } = ui
   const { active, board: b, isLocked, isCollapsed, running } = d
   const notes = d.notes.map(n => n.text)
-  const current = currentPackage(b)
-  const done = b.pakete.filter(p => p.status === 'fertig').length
   const empty = b.quelle === 'leer'
-  // Paket-Punkte: ● fertig, ◐ in Arbeit, ○ offen, rot blockiert (Theme-Farben)
-  const dots = (
-    <Text key="punkte">
-      {b.pakete.map((p, i) => (
-        <Text key={`punkt-${p.id}`} color={DOT[p.status].color}>
-          {i > 0 ? ' ' : ''}
-          {DOT[p.status].glyph}
-        </Text>
-      ))}
-    </Text>
-  )
   const sep = (key: string) => (
     <Text key={key} dimColor>
       ·
@@ -336,19 +302,13 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
   // Bedienknöpfe (Details, ein-/ausklappen) schlicht und rechtsbündig, getrennt von den Profil-Knöpfen
   const panelButton = <Button key="panel" label="Details" hotkey="d" plain onPress={() => act.onTogglePanel()} />
 
-  // Eingeklappt: eine Zeile mit Profil, Aufgabe und Paket-Punkten, Hinweise als Etikett; kein Limit
+  // Eingeklappt: eine Zeile mit Profil und Aufgabe, Hinweise als Etikett; kein Limit
   if (isCollapsed) {
     return (
       <Box flexWrap="wrap" columnGap={2} paddingX={1} alignItems="center">
         {d.rich ? <Text weight="semibold">codecycle</Text> : <Text bold>codecycle</Text>}
         <Text dimColor>{PROFILE_LABEL[active]}</Text>
         {!empty && <Text>{b.aufgabe}</Text>}
-        {!empty && b.pakete.length > 0 && dots}
-        {!empty && current && (
-          <Text dimColor>
-            {current.id}/{b.pakete.length}
-          </Text>
-        )}
         {notes.length > 0 && deskChip(ui, 'hinweise', notes.length === 1 ? '1 Hinweis' : `${notes.length} Hinweise`, 'warning')}
         <Box key="controls" flexGrow={1} justifyContent="flex-end" columnGap={2}>
           {d.newSession && act.onNewSession ? <Button key="new-session" label={NEW_SESSION_LABEL} variant="primary" onPress={() => act.onNewSession!()} /> : null}
@@ -395,19 +355,13 @@ export function renderBand(ui: ElementTable, d: BandData, act: BandActions) {
       </Box>
       <Box key="row-task" flexWrap="wrap" columnGap={2} alignItems="center">
         {empty ? (
-          // Keine offene Aufgabe: keine Pakete und kein Budget, nur die zuletzt bearbeitete
+          // Keine offene Aufgabe: kein Budget, nur die zuletzt bearbeitete
           <Text>
             Keine offene Aufgabe
             {b.letzte && <Text dimColor>{` · zuletzt: ${b.letzte.aufgabe} (${b.letzte.zustand})`}</Text>}
           </Text>
         ) : (
           d.rich ? <Text weight="medium">{b.aufgabe}</Text> : <Text>{b.aufgabe}</Text>
-        )}
-        {!empty && b.pakete.length > 0 && dots}
-        {!empty && (
-          <Text dimColor>
-            {done}/{b.pakete.length} fertig{current && current.status !== 'fertig' ? ` · jetzt ${current.id}` : ''}
-          </Text>
         )}
         {!empty && sep('sep-budget')}
         {!empty && (

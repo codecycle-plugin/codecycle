@@ -9,6 +9,7 @@
 import type { Metrics, RoleCost } from '../../types'
 import { weightedMain, weightedRole, weightedTokens } from '../../lib/tokens.ts'
 import type { Registry } from './ledger-registry.ts'
+import { canonicalRole } from '../../lib/roles.ts'
 
 // Gewichtete Tokens (Hauptmaß, Entscheidung 2a) und Kurzform stehen im Kern, weil auch das Werkzeug sie braucht.
 export { TOKEN_WEIGHTS, shortTokens, weightedMain, weightedRole, weightedTokens } from '../../lib/tokens.ts'
@@ -27,8 +28,8 @@ export type RoleEntry = CostEntry & { laeufe: number; limitProzent: number }
 
 /**
  * Ein Lauf eines Agenten: vom Start bzw. von einer Folgenachricht bis zum Ende
- * (`turn.complete`), mit den Tokens nur dieses Laufs. `pauseMs`: Abstand seit dem Ende des vorigen Laufs (z. B. Architekt:
- * Lösungswege bis Plan-Nachricht); daran und am Cache-Schreiben des Laufs sieht man, ob der Cache noch warm war.
+ * (`turn.complete`), mit den Tokens nur dieses Laufs. `pauseMs`: Abstand seit dem Ende des vorigen Laufs (z. B. Bauender:
+ * Bau bis Folgenachricht); daran und am Cache-Schreiben des Laufs sieht man, ob der Cache noch warm war.
  */
 export type Run = Usage & { start: string; ende?: string; pauseMs?: number; runden: number }
 
@@ -36,8 +37,6 @@ export type AgentCost = CostEntry & {
   rolle: string
   paket: string | null
   modell: string
-  /** Dateien, die der Agent las, ohne dass sie mitgeliefert waren */
-  zusaetzlichGelesen: number
   /**
    * gemessene Prozentpunkte des 5-Stunden-Fensters über seine Züge. Konto-Näherung: das Fenster gehört dem ganzen
    * Konto, andere Sitzungen zählen mit; bei parallelen Läufen unscharf. Hauptmaß sind die gewichteten Tokens.
@@ -76,14 +75,12 @@ export type Costs = {
   fremd?: CostEntry & { modell?: string }
   rollen: Record<string, RoleEntry>
   agenten: Record<string, AgentCost>
-  /** Datei → wie oft sie zusätzlich gelesen wurde (Kennzahl „fehlender Kontext“, 9a) */
-  fehlenderKontext: Record<string, number>
 }
 
 const zero = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
 
 export function emptyCosts(aufgabe: string): Costs {
-  return { version: 1, aufgabe, aktualisiert: '', hauptsitzung: { ...zero(), runden: 0 }, rollen: {}, agenten: {}, fehlenderKontext: {} }
+  return { version: 1, aufgabe, aktualisiert: '', hauptsitzung: { ...zero(), runden: 0 }, rollen: {}, agenten: {} }
 }
 
 /** Liest costs.json; bei Unbrauchbarem eine leere Struktur. */
@@ -141,7 +138,6 @@ function agentCost(costs: Costs, who: Who & { agentId: string; rolle: string }):
     rolle: who.rolle,
     paket: who.paket ?? null,
     modell: who.modell ?? '',
-    zusaetzlichGelesen: 0,
   })
 }
 
@@ -234,12 +230,6 @@ export function addMainLimit(costs: Costs, prozentpunkte: number): void {
   costs.hauptsitzung.limitProzent = Math.round(((costs.hauptsitzung.limitProzent ?? 0) + prozentpunkte) * 100) / 100
 }
 
-export function noteMissing(costs: Costs, agentId: string, datei: string): void {
-  costs.fehlenderKontext[datei] = (costs.fehlenderKontext[datei] ?? 0) + 1
-  const a = costs.agenten[agentId]
-  if (a) a.zusaetzlichGelesen += 1
-}
-
 /** Cache-Trefferquote: Cache-Lesen ÷ gesamte Eingabe (unzwischengespeichert + Lesen + Schreiben); null ohne Eingabe. */
 export function hitRate(u: Usage): number | null {
   const total = u.input + u.cacheRead + u.cacheWrite
@@ -289,7 +279,6 @@ export function metricsOf(costs: Costs): Metrics {
       : {}),
     runden: sum.runden,
     trefferquote: hitRate(sum),
-    fehlenderKontext: Object.keys(costs.fehlenderKontext).length,
     hauptsitzung: totalTokens(costs.hauptsitzung),
     ...(costs.hauptsitzung.modell ? { bauleiterModell: costs.hauptsitzung.modell } : {}),
     bauleiterFrisch: freshTokens(costs.hauptsitzung),
@@ -302,22 +291,39 @@ export function metricsOf(costs: Costs): Metrics {
 
 /**
  * Kosten pro Rolle für die Anzeige: gewichtete Tokens (Hauptmaß, Sortierung), daneben die gemessenen Prozentpunkte
- * des 5h-Fensters (Konto-Näherung) und der Anteil an den Tokens.
+ * des 5h-Fensters (Konto-Näherung) und der Anteil an den Tokens. Alte Rollennamen (`lib/roles.ts :: ROLE_ALIASES`)
+ * zählen zur heutigen Rolle: eine Zeile je Rolle.
  */
 export function roleCosts(costs: Costs): RoleCost[] {
   const roles = Object.entries(costs.rollen)
   const grand = roles.reduce((n, [, r]) => n + totalTokens(r), 0)
-  return roles
-    .map(([rolle, r]) => ({
+  type Row = Required<Pick<RoleCost, 'rolle' | 'prozent' | 'gewichtet' | 'tokens' | 'laeufe' | 'frisch' | 'cache' | 'anteil'>>
+  const rows = new Map<string, Row>()
+  for (const [name, r] of roles) {
+    const rolle = canonicalRole(name)
+    const row: Row = {
       rolle,
       prozent: r.limitProzent ?? 0,
-      gewichtet: weightedRole(rolle, r, costs.agenten),
+      gewichtet: weightedRole(name, r, costs.agenten),
       tokens: totalTokens(r),
       laeufe: r.laeufe,
       frisch: freshTokens(r),
       cache: r.cacheRead,
       anteil: grand > 0 ? (totalTokens(r) / grand) * 100 : 0,
-    }))
+    }
+    const prev = rows.get(rolle)
+    rows.set(rolle, !prev ? row : {
+      rolle,
+      prozent: prev.prozent + row.prozent,
+      gewichtet: prev.gewichtet + row.gewichtet,
+      tokens: prev.tokens + row.tokens,
+      laeufe: prev.laeufe + row.laeufe,
+      frisch: prev.frisch + row.frisch,
+      cache: prev.cache + row.cache,
+      anteil: prev.anteil + row.anteil,
+    })
+  }
+  return [...rows.values()]
     .sort((a, b) => b.gewichtet - a.gewichtet || b.tokens - a.tokens)
 }
 

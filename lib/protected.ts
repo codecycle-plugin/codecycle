@@ -1,4 +1,4 @@
-// Kontrolldateien: Dateien, an denen ein Paket
+// Kontrolldateien: Dateien, an denen ein Agent
 // nichts ändern darf, weil sie die Prüfung selbst steuern (Werkzeug-Konfiguration, Hooks, CI,
 // Test- und Lint-Konfiguration). Reiner Code ohne Node und ohne Mod-API; eine Funktion für
 // Werkzeug (`codecycle guard`) und Mod (Zaun, Schalter `fence`).
@@ -171,29 +171,4 @@ export function classifyAll(paths: readonly string[], config?: ProtectedConfig |
     else if (k === 'dependency') out.dependency.push(p)
   }
   return out
-}
-
-/**
- * Doku-Pfad für den Doku-Pfleger: Er schreibt nur Doku und seinen Bericht.
- * Erlaubt: Markdown und andere Doku-Formate (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.adoc`) überall im Projekt,
- * also auch Wurzel- und Bereichs-`CLAUDE.md`; in den Ordnern `docs` und `doc` zusätzlich `*.txt` und Bilder (`png jpg jpeg
- * gif svg webp`), aber keine Code- oder Skriptdateien (sonst ließe sich dort etwa ein
- * `tool/cli.ts` oder Skript anlegen und starten); `README`, `CHANGELOG`, `CHANGES`, `HISTORY` ohne Endung oder mit
- * Doku-Endung; Berichte ohne Aufgabe unter `.codecycle/tmp/reports/`. Nicht erlaubt: Pfade außerhalb des Projekts
- * (absolut, `..`, `~/…`, `<plugin>/…`), `node_modules/`, `vendor/` und die Ordner `.claude/`, `.codecycle/` (außer
- * den Berichten), `.git/`, `.githooks/` (Konfiguration, auch wenn sie Markdown ist). `path` ist relativ zum Projekt.
- */
-const DOC_EXT = /\.(md|mdx|markdown|rst|adoc)$/i
-/** in den Ordnern docs und doc zusätzlich Text und Bilder */
-const DOCS_DIR_EXT = /\.(md|mdx|markdown|rst|adoc|txt|png|jpe?g|gif|svg|webp)$/i
-
-export function isDocPath(path: string): boolean {
-  const p = normalizePath(path.trim())
-  if (p === '' || /^([\/]|[A-Za-z]:|~|<)/.test(p) || p.split('/').includes('..')) return false
-  if (/^\.codecycle\/tmp\/reports\/[^/]+\.md$/i.test(p)) return true
-  if (/(^|\/)(node_modules|vendor)\//i.test(p) || /^\.(claude|codecycle|git|githooks)(\/|$)/i.test(p)) return false
-  const name = p.split('/').at(-1)!
-  if (DOC_EXT.test(name)) return true
-  if (/^(readme|changelog|changes|history)(\.txt)?$/i.test(name)) return true
-  return /^docs?\//i.test(p) && DOCS_DIR_EXT.test(name)
 }

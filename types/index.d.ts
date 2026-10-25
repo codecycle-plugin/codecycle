@@ -2,17 +2,6 @@
 
 export type Profile = 'sparsam' | 'grosszuegig' | 'extrem'
 
-export type PackageStatus = 'offen' | 'in-arbeit' | 'fertig' | 'blockiert'
-
-export type Package = {
-  id: string
-  rolle: string
-  status: PackageStatus
-  agent: string | null
-  commit: string | null
-  runden: number
-}
-
 export type RoleCost = {
   rolle: string
   /** gemessene Prozentpunkte des 5-Stunden-Fensters (Summe der Läufe dieser Aufgabe); Konto-Näherung, andere Sitzungen zählen mit */
@@ -41,19 +30,17 @@ export type TaskState = {
   branch: string
   /** nachlauf: ungeplante Läufe; fehlt in alten STATE.md = 0 */
   budget: { geplant: number; verbraucht: number; nachlauf: number }
-  planrunden: number
   zuletzt: string
-  /** Weg der Aufgabe: `solo` (Sitzung baut, ein Prüfer am Ende) oder `voll` (Pakete); fehlt in alten STATE.md = voll */
+  /** Weg der Aufgabe: `solo` (Sitzung baut, ein Prüfer am Ende) oder `voll` (Aufgabe aus dem alten Ablauf); fehlt in alten STATE.md = voll */
   weg?: 'solo' | 'voll'
   /** Solo-Weg: Commit, auf dem `codecycle solo check` zuletzt grün war; leer = noch nie */
   geprueftAuf?: string
   /** Solo-Weg: Haltepunkt 1–6, an dem die Aufgabe steht; 0 = nicht gesetzt */
   haltepunkt?: number
-  /** Solo-Weg, große Aufgabe: Teile aus dem Plan mit Status (`offen` | `fertig`), in der Reihenfolge des Plans; leer = ohne Teile */
-  teile?: { name: string; status: string }[]
+  /** Große Aufgabe: Teile aus dem Plan mit Status (`offen` | `in-arbeit` | `fertig`), in der Reihenfolge des Plans; `branch` nur bei `in-arbeit`; leer = ohne Teile */
+  teile?: { name: string; status: string; branch?: string }[]
   /** Solo-Weg: `sicherheit`, wenn `codecycle solo check` mindestens zwei Risikobereiche fand (zweiter Prüfer Pflicht); sonst leer oder `nein` */
   zweitpruefung?: string
-  pakete: Package[]
   naechsterSchritt: string[]
   offeneFragen: string[]
   blocker: string[]
@@ -87,8 +74,6 @@ export type Metrics = {
   runden: number
   /** Cache-Lesen ÷ gesamte Eingabe, 0 bis 1 */
   trefferquote: number | null
-  /** Anzahl Dateien, die Agenten zusätzlich zum Kontextpaket lasen */
-  fehlenderKontext: number
   /** Tokens der Hauptsitzung */
   hauptsitzung: number
   /** Bauleiter (Hauptsitzung) getrennt von den Agenten: Modell, neu, Cache, Prozentpunkte des 5h-Fensters (Konto-Näherung) */
@@ -133,8 +118,6 @@ export type LiveAgent = {
   balken?: number
   /** Runden des Agenten bei Beginn des laufenden Abschnitts (nach einer Folgenachricht), Grundlage der Schätzung */
   rundenAb?: number
-  /** Eltern-Agent (Paketleiter) */
-  eltern?: string
   /** Aktuelle Tätigkeit: letztes Werkzeug mit Ziel (Pfad relativ zum Projekt, Befehl gekürzt) */
   taetigkeit?: { werkzeug: string; ziel: string; zeit: number }
   /** Zeit (ms) der letzten Modell-Anfrage des Agenten: Grundlage der Cache-Restzeit */

@@ -2,11 +2,9 @@
 // geladen vom Mod (hooks/) und vom Projekt-Werkzeug (tool/).
 // Bewusst ein kleiner Leser nur für dieses Format, ohne Fremdbibliothek.
 
-import type { Package, PackageStatus, TaskState } from '../types'
+import type { TaskState } from '../types'
 
 export const DONE_STATES: readonly string[] = ['fertig', 'verworfen']
-
-const STATUSES: PackageStatus[] = ['offen', 'in-arbeit', 'fertig', 'blockiert']
 
 type Scalar = string | number | null
 
@@ -88,6 +86,18 @@ function sectionItems(lines: string[]): string[] {
   return (bullets.length > 0 ? bullets : kept).map(l => l.replace(/^[-*]\s+/, '')).filter(l => !/^(keine|keiner|-|…)$/i.test(l))
 }
 
+/** Stand eines Teils aus `teile:`: `offen`, `fertig` oder `in-arbeit <branch>` (der Branch, auf dem der Teil gebaut wird). */
+function partOf(name: string, raw: string): { name: string; status: string; branch?: string } {
+  const [status = 'offen', ...rest] = raw.trim().split(/\s+/)
+  const branch = rest.join(' ')
+  return branch ? { name, status, branch } : { name, status }
+}
+
+/** Wert für `teile:` im Kopf von STATE.md: `{ a: fertig, b: in-arbeit codecycle/x--b, c: offen }`; der Branch nur bei `in-arbeit`. */
+export function partsField(parts: readonly { name: string; status: string; branch?: string | undefined }[]): string {
+  return `{ ${parts.map(p => `${p.name}: ${p.status}${p.status === 'in-arbeit' && p.branch ? ` ${p.branch}` : ''}`).join(', ')} }`
+}
+
 /** Liest eine STATE.md; wirft, wenn der YAML-Kopf fehlt oder `aufgabe` leer ist. */
 export function parseState(text: string, quelle: string): TaskState {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
@@ -95,40 +105,12 @@ export function parseState(text: string, quelle: string): TaskState {
   const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
   if (end < 0) throw new Error('STATE.md: YAML-Kopf nicht geschlossen')
 
+  // Nur Schlüssel ohne Einrückung; eingerückte Zeilen (etwa Listen unter `pakete:` in alten STATE.md) bleiben unbeachtet
   const head: Record<string, string> = {}
-  // Pakete im Format der Vorlage (`- { id: P1, … }`) oder im Blockstil
-  // (`- id: P1` und darunter eingerückt `rolle: …`), falls ein Agent so schreibt
-  const items: Record<string, Scalar>[] = []
-  let inList = ''
   for (const rawLine of lines.slice(1, end)) {
-    const line = stripComment(rawLine)
-    if (line.trim() === '') continue
-    if (inList === 'pakete' && /^\s/.test(line)) {
-      const flow = line.match(/^\s+-\s+(\{.*\})\s*$/)
-      const blockStart = line.match(/^\s+-\s+([A-Za-z_][\w-]*):\s*(.*)$/)
-      const blockMore = line.match(/^\s+([A-Za-z_][\w-]*):\s*(.*)$/)
-      if (flow) items.push(flowMap(flow[1]!))
-      else if (blockStart) items.push({ [blockStart[1]!]: scalar(blockStart[2]!) })
-      else if (blockMore && items.length > 0) items.at(-1)![blockMore[1]!] = scalar(blockMore[2]!)
-      continue
-    }
-    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/)
-    if (kv) {
-      inList = kv[2]!.trim() === '' ? kv[1]! : ''
-      head[kv[1]!] = kv[2]!.trim()
-    }
+    const kv = stripComment(rawLine).match(/^([A-Za-z_][\w-]*):\s*(.*)$/)
+    if (kv) head[kv[1]!] = kv[2]!.trim()
   }
-  const pakete: Package[] = items.map((m, i) => {
-    const status = str(m.status, 'offen') as PackageStatus
-    return {
-      id: str(m.id, `P${i + 1}`),
-      rolle: str(m.rolle, '?'),
-      status: STATUSES.includes(status) ? status : 'offen',
-      agent: m.agent === null || m.agent === undefined ? null : String(m.agent),
-      commit: m.commit === null || m.commit === undefined ? null : String(m.commit),
-      runden: num(m.runden),
-    }
-  })
 
   const sections: Record<string, string[]> = {}
   let current = ''
@@ -154,15 +136,13 @@ export function parseState(text: string, quelle: string): TaskState {
     zustand: str(scalar(head.zustand ?? '')),
     branch: str(scalar(head.branch ?? '')),
     budget: { geplant: num(budget.geplant), verbraucht: num(budget.verbraucht), nachlauf: num(budget.nachlauf) },
-    planrunden: num(scalar(head.planrunden ?? '0')),
     zuletzt: str(scalar(head.zuletzt ?? '')),
-    // Solo-Weg: `weg: solo`; fehlt oder anderer Wert = voller Ablauf
+    // `weg: solo`; fehlt oder anderer Wert = Aufgabe aus dem alten Ablauf
     weg: str(scalar(head.weg ?? '')) === 'solo' ? 'solo' : 'voll',
     geprueftAuf: str(scalar(head.geprueftAuf ?? '')),
     haltepunkt: num(scalar(head.haltepunkt ?? '0')),
     zweitpruefung: str(scalar(head.zweitpruefung ?? '')),
-    teile: Object.entries(flowMap(head.teile ?? '{}')).map(([name, v]) => ({ name, status: str(v, 'offen') })),
-    pakete,
+    teile: Object.entries(flowMap(head.teile ?? '{}')).map(([name, v]) => partOf(name, str(v, 'offen'))),
     naechsterSchritt: sectionItems(sections['nächster schritt'] ?? []),
     offeneFragen: sectionItems(sections['offene fragen'] ?? []),
     blocker: sectionItems(sections['blocker'] ?? []),
@@ -171,7 +151,7 @@ export function parseState(text: string, quelle: string): TaskState {
 
 /**
  * Setzt ein einfaches Feld im YAML-Kopf (`schluessel: wert`): ersetzt die vorhandene Zeile, sonst steht die neue
- * Zeile vor `pakete:` bzw. am Ende des Kopfs. Kommentar und Rest der Datei bleiben unverändert; wirft ohne YAML-Kopf.
+ * Zeile am Ende des Kopfs. Kommentar und Rest der Datei bleiben unverändert; wirft ohne YAML-Kopf.
  */
 export function withHeadField(text: string, key: string, value: string): string {
   const nl = text.includes('\r\n') ? '\r\n' : '\n'
@@ -182,96 +162,8 @@ export function withHeadField(text: string, key: string, value: string): string 
   const line = `${key}: ${value}`
   const at = lines.findIndex((l, i) => i > 0 && i < end && l.startsWith(`${key}:`))
   if (at >= 0) lines[at] = line
-  else {
-    const pakete = lines.findIndex((l, i) => i > 0 && i < end && /^pakete:/.test(l))
-    lines.splice(pakete >= 0 ? pakete : end, 0, line)
-  }
+  else lines.splice(end, 0, line)
   return lines.join(nl)
-}
-
-/**
- * Setzt ein Feld eines Pakets in der Liste `pakete:` (Blockstil der Vorlage oder `- { id: P1, … }`): ersetzt den Wert
- * und behält einen Kommentar dahinter, sonst kommt das Feld als letzte Zeile des Pakets dazu. Wirft, wenn das Paket fehlt.
- */
-export function withPackageField(text: string, id: string, key: string, value: string): string {
-  const nl = text.includes('\r\n') ? '\r\n' : '\n'
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
-  if (lines[0]?.trim() !== '---') throw new Error('STATE.md ohne YAML-Kopf')
-  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---')
-  if (end < 0) throw new Error('STATE.md: YAML-Kopf nicht geschlossen')
-  const list = lines.findIndex((l, i) => i > 0 && i < end && /^pakete:\s*$/.test(stripComment(l)))
-  if (list < 0) throw new Error('STATE.md: keine Liste `pakete:`')
-  const idOf = (l: string): string | null => {
-    const flow = stripComment(l).match(/^\s+-\s+\{(.*)\}\s*$/)
-    if (flow) return str(flowMap(`{${flow[1]}}`).id) || null
-    const block = stripComment(l).match(/^\s+-\s+id:\s*(.*)$/)
-    return block ? str(scalar(block[1]!)) : null
-  }
-  let i = list + 1
-  for (; i < end; i++) {
-    if (!/^\s/.test(lines[i]!) && lines[i]!.trim() !== '') break
-    if (idOf(lines[i]!) === id) break
-  }
-  if (i >= end || idOf(lines[i]!) !== id) throw new Error(`STATE.md: Paket ${id} fehlt`)
-  const flow = lines[i]!.match(/^(\s+-\s+)\{(.*)\}(\s*(?:#.*)?)$/)
-  if (flow) {
-    const parts = splitTopLevel(flow[2]!).map(x => x.trim()).filter(Boolean)
-    const at = parts.findIndex(x => x.slice(0, x.indexOf(':')).trim() === key)
-    if (at >= 0) parts[at] = `${key}: ${value}`
-    else parts.push(`${key}: ${value}`)
-    lines[i] = `${flow[1]}{ ${parts.join(', ')} }${flow[3]}`
-    return lines.join(nl)
-  }
-  // Blockstil: Felder bis zum nächsten Listenpunkt bzw. bis zum Ende der Liste
-  let last = i
-  let indent = ''
-  for (let j = i + 1; j < end; j++) {
-    const l = lines[j]!
-    if (l.trim() === '') continue
-    if (!/^\s/.test(l) || /^\s+-\s/.test(l)) break
-    last = j
-    indent = l.match(/^(\s+)/)![1]!
-    const m = l.match(/^(\s+)([A-Za-z_][\w-]*):(\s*)(.*)$/)
-    if (m && m[2] === key) {
-      const comment = stripComment(m[4]!).length < m[4]!.length ? m[4]!.slice(stripComment(m[4]!).trimEnd().length) : ''
-      lines[j] = `${m[1]}${key}: ${value}${comment}`
-      return lines.join(nl)
-    }
-  }
-  if (indent === '') indent = `${lines[i]!.match(/^(\s+)-/)![1]}  `
-  lines.splice(last + 1, 0, `${indent}${key}: ${value}`)
-  return lines.join(nl)
-}
-
-/**
- * Hängt eine Zeile an einen Abschnitt `## <name>` an (legt ihn am Ende an, wenn er fehlt); ein Platzhalter
- * `- keine` im Abschnitt fällt dabei weg.
- */
-export function withSectionLine(text: string, name: string, line: string): string {
-  const nl = text.includes('\r\n') ? '\r\n' : '\n'
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
-  const h = lines.findIndex(l => l.match(/^##\s+(.*?)\s*$/)?.[1] === name)
-  if (h < 0) {
-    while (lines.length > 0 && lines.at(-1)!.trim() === '') lines.pop()
-    lines.push('', `## ${name}`, line, '')
-    return lines.join(nl)
-  }
-  let next = lines.findIndex((l, i) => i > h && /^##\s/.test(l))
-  if (next < 0) next = lines.length
-  const empty = lines.findIndex((l, i) => i > h && i < next && /^[-*]\s+(keine|keiner)\s*$/i.test(l.trim()))
-  if (empty >= 0) {
-    lines.splice(empty, 1)
-    next--
-  }
-  let at = next
-  while (at > h + 1 && lines[at - 1]!.trim() === '') at--
-  lines.splice(at, 0, line)
-  return lines.join(nl)
-}
-
-/** Hängt eine Zeile an den Abschnitt „Verlauf“ an. */
-export function withHistoryLine(text: string, line: string): string {
-  return withSectionLine(text, 'Verlauf', line)
 }
 
 /** Wählt die aktive Aufgabe: nicht fertig/verworfen, zuletzt geändert zuerst. */
@@ -279,15 +171,6 @@ export function pickActive<T extends TaskState>(states: T[]): T | undefined {
   return states
     .filter(s => !DONE_STATES.includes(s.zustand))
     .sort((a, b) => b.zuletzt.localeCompare(a.zuletzt) || b.quelle.localeCompare(a.quelle))[0]
-}
-
-/** Das Paket, an dem gerade gearbeitet wird (für „P2/5“). */
-export function currentPackage(state: TaskState): Package | undefined {
-  return (
-    state.pakete.find(p => p.status === 'in-arbeit') ??
-    state.pakete.find(p => p.status === 'offen') ??
-    state.pakete.at(-1)
-  )
 }
 
 /** Die zuletzt bearbeitete Aufgabe, auch fertige oder verworfene (Anzeige „zuletzt: …“, wenn keine offen ist). */

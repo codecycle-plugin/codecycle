@@ -1,6 +1,6 @@
 // Ablage von `codecycle guard` im Hauptordner: festgehaltene Testzahlen mit Commit
 // und Prüfsummen der von Git ignorierten Kontrolldateien je Arbeitsordner. Liegt in `.codecycle/tmp/` des Hauptordners,
-// damit der Hauptordner auch die Einträge eines inzwischen entfernten Paket-Worktrees findet.
+// damit der Hauptordner auch die Einträge eines inzwischen entfernten Worktrees findet.
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -20,11 +20,9 @@ export const CONTROL_DIRS = ['.codecycle', '.githooks', '.husky']
 
 export type CountRecord = { branch: string; head: string; work: string; total: number; skipped: number; recordedAt: string }
 /** `control`: je Arbeitsordner (Schlüssel `workKey`) Prüfsummen der ignorierten Kontrolldateien */
-/** `pruefungen`: je Paket-Branch das letzte Ergebnis von `paket pruefen` (Stand, grün), für `paket fertig` */
 export type Records = {
   counts: CountRecord[]
   control: Record<string, { recordedAt: string; files: Record<string, string> }>
-  pruefungen?: Record<string, { head: string; ok: boolean; at: string }>
 }
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -55,16 +53,7 @@ export function loadRecords(root: string): Records {
       : []
     const raw = j.control
     const control = raw === undefined ? {} : isPlainObject(raw) && Object.values(raw).every(validControlEntry) ? (raw as Records['control']) : {}
-    const p = j.pruefungen
-    const pruefungen = isPlainObject(p)
-      ? Object.fromEntries(
-          Object.entries(p).filter(
-            (e): e is [string, { head: string; ok: boolean; at: string }] =>
-              isPlainObject(e[1]) && typeof e[1].head === 'string' && typeof e[1].ok === 'boolean' && typeof e[1].at === 'string',
-          ),
-        )
-      : {}
-    return { counts, control, pruefungen }
+    return { counts, control }
   } catch {
     return empty()
   }
@@ -107,7 +96,7 @@ export function changedHidden(now: Record<string, string>, before: Record<string
 }
 
 /**
- * Grundlage der ignorierten Kontrolldateien für die Ordner neu festhalten. Aufrufer: `guard --record` (vor dem Paket)
+ * Grundlage der ignorierten Kontrolldateien für die Ordner neu festhalten. Aufrufer: `guard --record` (vor dem Bau)
  * und die Befehle, die Kontrolldateien rechtmäßig schreiben (`install-tool`, `hooks install`, `exclude`).
  */
 export function refreshControl(root: string, dirs: string[], records = loadRecords(root)): Records {

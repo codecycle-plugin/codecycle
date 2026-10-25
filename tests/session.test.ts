@@ -9,32 +9,32 @@ describe('Sitzungsstart und Profil', () => {
   test('codecycle_budget: Empfehlung, Reset und Schwelle', async ($, on) => {
     mock.store(on)
     fakeWorld(on, FILES)
-    const r = await $.tool.call({ tool: 'mcp__codecycle__codecycle_budget', role: 'builder-logic' } as never)
+    const r = await $.tool.call({ tool: 'mcp__codecycle__codecycle_budget', role: 'builder' } as never)
     expect(r.deny).toBeUndefined()
     // Claude Code verlangt String, Array oder undefined als Ergebnis eines Mod-Werkzeugs
     expect(typeof r.result).toBe('string')
     const text = JSON.stringify(r.result)
-    expect(text).toMatch(/Empfehlung: starten \(Rolle builder-logic\)/)
+    expect(text).toMatch(/Empfehlung: starten \(Rolle builder\)/)
     expect(text).toMatch(/5-Stunden-Fenster: 42 %/)
     expect(text).toMatch(/Schwelle: 92 %/)
     expect(text).toMatch(/auto-resume: aus/)
   })
 
-  test('paket start/fertig der Hauptsitzung: Antwort von codecycle_budget als Kontext', async ($, on) => {
+  test('solo teil start/fertig der Hauptsitzung: Antwort von codecycle_budget als Kontext', async ($, on) => {
     mock.store(on)
     fakeWorld(on, FILES)
-    on('tool.call', () => ({ result: 'grün: P1 fertig' }))
-    for (const command of ['codecycle paket start P1', 'codecycle paket fertig P1 --runden 0']) {
+    on('tool.call', () => ({ result: 'grün: Teil fertig' }))
+    for (const command of ['codecycle solo teil start docs/codecycle/x a', 'codecycle solo teil fertig docs/codecycle/x a']) {
       const r = await $.tool.call({ tool: 'Bash', command } as never)
       expect(r.deny).toBeUndefined()
-      expect(r.result).toBe('grün: P1 fertig')
+      expect(r.result).toBe('grün: Teil fertig')
       const ctx = (r.context ?? []).join('\n')
-      expect(ctx).toMatch(/codecycle_budget \(vom Mod nach codecycle paket start\/fertig angehängt\)/)
+      expect(ctx).toMatch(/codecycle_budget \(vom Mod nach codecycle solo teil start\/fertig angehängt\)/)
       expect(ctx).toMatch(/Hauptsitzung: /)
       expect(ctx).toMatch(/5-Stunden-Fenster: 42 %/)
     }
-    // paket pruefen und andere Befehle: kein Anhang
-    for (const command of ['codecycle paket pruefen P1', 'git status']) {
+    // paket (gibt es nicht) und andere Befehle: kein Anhang
+    for (const command of ['codecycle paket start P1', 'git status']) {
       expect((await $.tool.call({ tool: 'Bash', command } as never)).context ?? []).toEqual([])
     }
   })
@@ -53,7 +53,7 @@ describe('Sitzungsstart und Profil', () => {
     // check ohne Aufgabe der Sitzung: nichts
     expect(await ctxOf('codecycle check')).toBe('')
     // Sitzung an die Aufgabe gebunden (Agentenstart mit Aufgabenordner): eine Zeile
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const check = await ctxOf('cd ../wt && codecycle check --affected')
     expect(check).toMatch(/^codecycle_budget \(vom Mod nach codecycle check angehängt\): Hauptsitzung: /)
     expect(check).not.toMatch(/5-Stunden-Fenster|\n/)
@@ -83,11 +83,12 @@ describe('Sitzungsstart und Profil', () => {
     await $.session.start({ cwd: '/proj', surface: null } as never)
     expect(TOOLS).not.toContain('codecycle_step')
     files['.claude/codecycle.md'] = `${FILES['.claude/codecycle.md']}- agent-progress: an\n- register-forwarding: an\n`
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     expect(seen).not.toMatch(/codecycle_step/)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     expect(TOASTS.filter(t => /agent-progress.*Neustart/.test(t)).length).toBe(1)
-    expect(TOASTS.filter(t => /register-forwarding.*Neustart/.test(t)).length).toBe(1)
+    // entfallener Schalter register-forwarding: kein Hinweis
+    expect(TOASTS.filter(t => /register-forwarding/.test(t)).length).toBe(0)
   })
 
   test('Bautafel zeigt das gespeicherte Profil auch ohne session.start; Sperre erst mit dem ersten codecycle-Agenten', async ($, on) => {
@@ -110,7 +111,7 @@ describe('Sitzungsstart und Profil', () => {
     expect((await band()).knopf).toBeUndefined()
     await $.turn.start({ text: 'los', turnId: 't1' })
     expect((await band()).gesperrt).toBeUndefined()
-    const first = await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    const first = await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     // Profil extrem aus dem Speicher wirkt auf die Modellwahl
     expect(first.model).toBe('opus')
     expect((await band()).gesperrt).toBeDefined()
@@ -286,7 +287,7 @@ describe('Limit-Stand und Laufzeit', () => {
     fakeWorld(on, FILES)
     noMeasure()
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    const r = await $.tool.call({ tool: 'mcp__codecycle__codecycle_budget', role: 'builder-logic' } as never)
+    const r = await $.tool.call({ tool: 'mcp__codecycle__codecycle_budget', role: 'builder' } as never)
     expect(JSON.stringify(r.result)).not.toMatch(/91 %/)
     expect(JSON.stringify(r.result)).toMatch(/Empfehlung: starten/)
     for (const surface of SURFACES) {
@@ -320,7 +321,7 @@ describe('Limit-Stand und Laufzeit', () => {
       on('ui.panes', () => ({ value: panes.current }) as never)
       on('turn.complete', (_$, e) => ({ text: e.answer }))
       await $.session.start({ cwd: '/proj', surface: null } as never)
-      await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+      await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
       return $.ui.mount({ plugin: 'codecycle', surface: 'terminal', component: 'Pane', requestId: PANE, props: paneProps })
     }
     const finish = ($: Engine) => $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't', agentId: 'ag1', reason: 'answer' })
@@ -376,7 +377,7 @@ describe('Profil-Sperre übersteht Neustart', () => {
   test('1: der erste codecycle-Agent trägt die Sitzungs-ID im Store ein', async ($, on) => {
     const mem = world(on, {})
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     expect(Object.keys((mem[KEY] ?? {}) as object)).toEqual([SID])
   })
 
@@ -425,7 +426,7 @@ describe('Profil-Sperre übersteht Neustart', () => {
     for (let i = 0; i < 50; i++) seed[`alt-${i}`] = 1000 + i
     const mem = world(on, { [KEY]: seed })
     await $.session.start({ cwd: '/proj', surface: null } as never)
-    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder-logic')
+    await spawn($, `Aufgabenordner: ${DIR}/\nPaket: P1`, 'codecycle:builder')
     const keys = Object.keys(mem[KEY] as object)
     expect(keys).toHaveLength(50)
     expect(keys).toContain(SID)

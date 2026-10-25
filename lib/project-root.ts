@@ -1,6 +1,6 @@
 // Hauptordner des Projekts: Bücher, `.claude/codecycle.md`, `docs/codecycle/` und
 // `.codecycle/` liegen immer im Git-Hauptordner, auch wenn die Sitzung per `cd` in einem Unterordner oder
-// einem Paket-Worktree (`…--wt-…`) steht. Reiner Code ohne Node und ohne Mod-API.
+// einem Worktree neben dem Projekt (`…--wt-…`) steht. Reiner Code ohne Node und ohne Mod-API.
 
 const slashes = (p: string): string => p.replace(/\\/g, '/')
 

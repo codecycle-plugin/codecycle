@@ -5,7 +5,8 @@
 // Arbeit ohne Bezug (Vorarbeit vor /codecycle:new, Tester-Arbeit, Entwicklungssitzungen in diesem Repo in die Beispielaufgabe).
 // „Aktiv“ heißt nur „es gibt eine offene STATE.md“, nicht „diese Sitzung arbeitet daran“. Jetzt bucht sie nur, wenn sie in
 // dieser Sitzung selbst ein Signal gab, an der Aufgabe zu arbeiten:
-//   1. Skill /codecycle:new, /codecycle:continue oder /codecycle:solo → Vorlauf (Aufgabe noch offen; bei new gibt es den Ordner noch nicht).
+//   1. Skill /codecycle:new, /codecycle:continue oder /codecycle:brainstorming → Vorlauf (Aufgabe noch offen; bei new und
+//      brainstorming gibt es den Ordner noch nicht).
 //      Was im Vorlauf anfällt, geht beim ersten eindeutigen Signal in diese Aufgabe; ohne ein solches nirgends hin.
 //   2. Start eines codecycle-Agenten aus der Hauptsitzung mit `Aufgabenordner: docs/codecycle/X` → Aufgabe X.
 //   3. Schreibzugriff der Hauptsitzung in `docs/codecycle/X/` (STATE.md, TASK.md, …) → Aufgabe X.
@@ -27,9 +28,9 @@ export type ClaimSignal = { kind: 'skill'; which: 'task' } | { kind: 'skill'; wh
 
 export type MainTarget = { kind: 'none' } | { kind: 'pending' } | { kind: 'dir'; dir: string }
 
-const TASK_SKILLS = new Set(['codecycle:new', 'codecycle:continue', 'codecycle:solo'])
+const TASK_SKILLS = new Set(['codecycle:new', 'codecycle:continue', 'codecycle:brainstorming'])
 
-/** Welche Art Signal ist dieser Skill? `task` (new, continue, solo), `setup`, sonst null (status, ideas, check, workflow …). */
+/** Welche Art Signal ist dieser Skill? `task` (new, continue, brainstorming), `setup`, sonst null (status, check, workflow …). */
 export function skillKind(name: string): 'task' | 'setup' | null {
   const n = name.trim().toLowerCase()
   if (TASK_SKILLS.has(n)) return 'task'
@@ -39,7 +40,7 @@ export function skillKind(name: string): 'task' | 'setup' | null {
 
 /** Skill aus einem getippten Prompt (`/codecycle:new …` am Anfang); null sonst. */
 export function promptSkill(text: string): string | null {
-  const m = text.match(/^\s*\/(codecycle:(?:new|continue|solo|setup))(?=\s|$)/i)
+  const m = text.match(/^\s*\/(codecycle:(?:new|continue|brainstorming|setup))(?=\s|$)/i)
   return m ? m[1]!.toLowerCase() : null
 }
 

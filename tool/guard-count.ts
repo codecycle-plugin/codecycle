@@ -12,7 +12,7 @@ import { runStep } from './step.ts'
  * Festgehaltene Testzahl für den aktuellen Stand: der Eintrag, dessen Commit der nächstgelegene Vorfahr von HEAD ist
  * (kleinste Zahl `git rev-list --count <commit>..HEAD`; bei Gleichstand der jüngere), auch aus einem inzwischen
  * entfernten Worktree. Nicht der jüngste Zeitstempel: ein späteres `--record` auf einem älteren Stand
- * darf die Zahl des Pakets nicht ersetzen. Die alte Ablage `.codecycle/tmp/test-counts.json` je Arbeitsordner
+ * darf die Zahl des späteren Stands nicht ersetzen. Die alte Ablage `.codecycle/tmp/test-counts.json` je Arbeitsordner
  * wird nicht mehr gelesen: Sie ist nicht geschützt, ein Agent könnte dort niedrige Zahlen ablegen.
  */
 export function storedCounts(work: string, records: Records): { total: number; skipped: number } | null {

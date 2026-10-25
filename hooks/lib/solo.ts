@@ -3,28 +3,31 @@
 // Ein Netz gegen Versehen, keine Sicherheitsgrenze (wie der Zaun).
 
 import { commandName, positionals, walkSegments } from '../../lib/bash-shell.ts'
+import { canonicalRole } from '../../lib/roles.ts'
 import { SOLO_REPORT, SOLO_SECURITY_REPORT, checkFindings } from '../../lib/solo-findings.ts'
 import { samePath } from './ledger-registry.ts'
 import { isWriteTool, writeTargetsOf, type ToolCall } from './fence.ts'
 
-/** Rolle des Prüfers auf dem Solo-Weg */
-export const SOLO_REVIEWER = 'solo-reviewer'
+/** Rolle des Schlussprüfers einer Aufgabe */
+export const SOLO_REVIEWER = 'final-reviewer'
 
 /**
  * Agenten, die in einer Solo-Aufgabe schreiben dürfen (neben der Sitzung); der Prüfer nur seinen Bericht.
  * Einzige Stelle dieser Liste: Ändert sich das Rollen-Set, nur hier anpassen.
  */
-export const SOLO_WRITERS: ReadonlySet<string> = new Set(['builder-logic', 'builder-routine'])
+export const SOLO_WRITERS: ReadonlySet<string> = new Set(['builder'])
 
-const WHO_WRITES = 'Schreiben dürfen die Sitzung, builder-logic und builder-routine; der Solo-Prüfer nur seinen Bericht'
+const WHO_WRITES = 'Schreiben dürfen die Sitzung und builder; der Schlussprüfer nur seinen Bericht'
 
 /**
  * Darf dieser Aufruf in einer Solo-Aufgabe schreiben? `role` null = Agent ohne codecycle-Rolle. `SOLO_WRITERS` dürfen alles,
- * jede codecycle-Rolle ihren eigenen Bericht (`bericht` aus der Startnachricht). Der Solo-Prüfer darf mit Write, Edit und
+ * jede codecycle-Rolle ihren eigenen Bericht (`bericht` aus der Startnachricht). Der Schlussprüfer darf mit Write, Edit und
  * NotebookEdit nur seinen Bericht schreiben, Bash bleibt ihm frei (er probiert Kommandozeile und Schnittstelle aus).
- * Alle anderen: keine Schreibziele (Datei des Aufrufs, erkannte Ziele in Bash). Rückgabe: Meldung bei Verweigerung, sonst null.
+ * Alle anderen: keine Schreibziele (Datei des Aufrufs, erkannte Ziele in Bash). Alte Rollennamen fortgesetzter Agenten
+ * gelten als ihre heutige Rolle (`lib/roles.ts`). Rückgabe: Meldung bei Verweigerung, sonst null.
  */
-export function soloWriteDeny(role: string | null, call: ToolCall, env: { rel: (p: string) => string; bericht?: string | undefined }): string | null {
+export function soloWriteDeny(name: string | null, call: ToolCall, env: { rel: (p: string) => string; bericht?: string | undefined }): string | null {
+  const role = name === null ? null : canonicalRole(name)
   if (role !== null && SOLO_WRITERS.has(role)) return null
   if (role === SOLO_REVIEWER && !isWriteTool(call.tool)) return null
   const own = env.bericht ? env.rel(env.bericht) : null
@@ -35,10 +38,10 @@ export function soloWriteDeny(role: string | null, call: ToolCall, env: { rel: (
   const target = writeTargetsOf(call).find(t => !mine(t))
   if (target === undefined) return null
   if (role === SOLO_REVIEWER) {
-    return `codecycle (Solo-Prüfer): ${env.rel(target)} ist nicht dein Bericht. Schreibe nur ${own ?? `<Aufgabenordner>/${SOLO_REPORT}`}; Funde gehören in den Bericht, nicht in den Code.`
+    return `codecycle (Schlussprüfer): ${env.rel(target)} ist nicht dein Bericht. Schreibe nur ${own ?? `<Aufgabenordner>/${SOLO_REPORT}`}; Funde gehören in den Bericht, nicht in den Code.`
   }
   const who = role === null ? 'Ein Agent ohne codecycle-Rolle' : `Die Rolle ${role}`
-  return `codecycle (Solo-Aufgabe): ${who} darf hier nicht schreiben (${env.rel(target)}${call.tool === 'Bash' ? ', Schreibziel im Bash-Befehl' : ''}). ${WHO_WRITES}. Lesen und Suchen bleiben frei; gib dein Ergebnis als Antwort zurück.`
+  return `codecycle (Aufgabe aus /codecycle:new): ${who} darf hier nicht schreiben (${env.rel(target)}${call.tool === 'Bash' ? ', Schreibziel im Bash-Befehl' : ''}). ${WHO_WRITES}. Lesen und Suchen bleiben frei; gib dein Ergebnis als Antwort zurück.`
 }
 
 /**
@@ -52,7 +55,7 @@ export function reviewerStartProblem(
   changed: readonly string[] | null,
 ): string | null {
   const folder = dir ?? '<aufgabenordner>'
-  if (!state || state.weg !== 'solo') return `codecycle: ${SOLO_REVIEWER} prüft nur Solo-Aufgaben (STATE.md mit „weg: solo“); im vollen Ablauf prüft reviewer.`
+  if (!state || state.weg !== 'solo') return `codecycle: ${SOLO_REVIEWER} prüft nur Aufgaben aus /codecycle:new (STATE.md mit „weg: solo“).`
   if (!state.geprueftAuf) return `codecycle: kein Prüfer ohne eigene Kontrolle. Erst \`codecycle solo check ${folder}\` grün, dann den Prüfer starten.`
   if (changed === null) return `codecycle: Stand von geprueftAuf ${state.geprueftAuf.slice(0, 7)} nicht prüfbar. \`codecycle solo check ${folder}\` erneut ausführen.`
   if (changed.length > 0) {
@@ -62,7 +65,33 @@ export function reviewerStartProblem(
   return null
 }
 
-const GIT_VALUED = ['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--config-env']
+/**
+ * Startsperre des Prüfers je Teil (`Auftrag: Teil`): Teil `name` steht in `STATE.md` auf `in-arbeit`, der Hauptordner steht
+ * auf seinem Branch (`head`), und außerhalb des Aufgabenordners ist nichts uncommittet (`dirty`; null, wenn Git das nicht
+ * beantworten konnte). Den Wegwerf-Worktree prüft der Skill (`codecycle solo pruefung start --teil`).
+ */
+export function partReviewerStartProblem(
+  state: { weg?: string | undefined; teile?: readonly { name: string; status: string; branch?: string | undefined }[] | undefined } | null,
+  dir: string | null,
+  name: string | null,
+  head: string | null,
+  dirty: readonly string[] | null,
+): string | null {
+  const folder = dir ?? '<aufgabenordner>'
+  if (!state || state.weg !== 'solo') return `codecycle: ${SOLO_REVIEWER} prüft nur Aufgaben aus /codecycle:new (STATE.md mit „weg: solo“).`
+  if (!name) return 'codecycle: Prüfer je Teil ohne Zeile „Teil: <name>“ in der Startnachricht.'
+  const part = (state.teile ?? []).find(p => p.name === name)
+  if (!part || part.status !== 'in-arbeit' || !part.branch) return `codecycle: Teil ${name} ist nicht in Arbeit; kein Prüfer je Teil. Erst \`codecycle solo teil start ${folder} ${name}\`.`
+  if (head === null || dirty === null) return `codecycle: Stand von Teil ${name} nicht prüfbar (Git). Erneut versuchen.`
+  if (head !== part.branch) return `codecycle: Hauptordner steht auf ${head}, Teil ${name} wird auf ${part.branch} gebaut; kein Prüfer je Teil.`
+  if (dirty.length > 0) {
+    const list = `${dirty.slice(0, 5).join(', ')}${dirty.length > 5 ? ' …' : ''}`
+    return `codecycle: Teil ${name} hat Uncommittetes (${list}); der Prüfer sieht nur Commits. Erst committen, dann \`codecycle solo pruefung start ${folder} --teil ${name}\` und den Prüfer starten.`
+  }
+  return null
+}
+
+const GIT_VALUED =['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--config-env']
 const MERGE_VALUED = ['-m', '-F', '-s', '-X', '--message', '--file', '--strategy', '--strategy-option', '--into-name', '--cleanup', '-S', '--gpg-sign']
 
 /** Branches, die ein Befehl per `git merge` einholt (auch in `sh -c`, nach `&&`); andere Git-Befehle zählen nicht. */

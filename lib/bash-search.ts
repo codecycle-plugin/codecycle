@@ -1,4 +1,4 @@
-// Suchen in Bash-Befehlen (Register, Lese-Budget). Rein: kein Node, keine Mod-API.
+// Suchen in Bash-Befehlen (Register: Zahl der Suchen). Rein: kein Node, keine Mod-API.
 //
 // Hintergrund: In den nativen Builds von Claude Code für Linux und macOS fehlen die Werkzeuge Grep und Glob; gesucht
 // wird über Bash mit `grep` (ugrep), `find` (bfs) und `rg` (ripgrep). Unter Windows gibt es Grep und Glob weiter.

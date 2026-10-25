@@ -1,6 +1,6 @@
 // Eigener Symbol-Scanner (PHP, JS/TS, Python, Go): Sprache, Maskierung von Strings und Kommentaren, Outline.
-// Rein: kein Node, keine Mod-API, kein Dateizugriff. Grundlage von `locate` (Symbolsuche) und `context-section`
-// (Abschnitt fürs Kontextpaket). Zeilennummern sind 1-basiert, `start`/`ende` einschließlich.
+// Rein: kein Node, keine Mod-API, kein Dateizugriff. Grundlage von `locate` (Symbolsuche).
+// Zeilennummern sind 1-basiert, `start`/`ende` einschließlich.
 
 export type SymbolKind = 'class' | 'interface' | 'trait' | 'enum' | 'type' | 'function' | 'method' | 'const'
 

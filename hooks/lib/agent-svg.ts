@@ -54,12 +54,11 @@ export function statsText(r: AgentRow, now: number): string {
   return parts.join(' · ')
 }
 
-/** Details neben dem Status: Modell, Effort, Paket, Runden, Eltern-Agent. */
+/** Details neben dem Status: Modell, Effort, Paket, Runden. */
 export function metaText(r: AgentRow): string {
   const parts = [r.effort ? `${modelName(r.modell)} · ${r.effort}` : modelName(r.modell)]
   if (r.paket) parts.push(`Paket ${r.paket}`)
   if (r.runden > 0) parts.push(`${r.runden} Runden`)
-  if (r.eltern) parts.push(`über ${r.eltern}`)
   if (r.status === 'abgebrochen') parts.push('abgebrochen')
   return parts.join(' · ')
 }

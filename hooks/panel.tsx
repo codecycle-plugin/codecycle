@@ -5,20 +5,20 @@
 
 import type { ElementTable, RenderChildren } from 'claude-code'
 
-import type { Board, Limits, Metrics, Package, Profile } from '../types'
+import type { Board, Limits, Metrics, Profile } from '../types'
 import { TASKS_DIR } from '../lib/paths.ts'
-import { BOX, PROFILE_LABEL, bar, percent, resetText, type ShownLimits } from './state'
+import { canonicalRole } from '../lib/roles.ts'
+import { PROFILE_LABEL, bar, percent, resetText, type ShownLimits } from './state'
 import { runsText } from './lib/budget.ts'
 import { type AgentRow, type agentDetail, cacheState, cacheText, crewSummary, kontoText, modelName, progressLabel, timeText, usageText, weightedText } from './lib/agent-view.ts'
 import { type CrewHead, HEAD_H, ROW_H, agentRowSvg, crewHeadSvg, metaText, shareText, statsText } from './lib/agent-svg.ts'
 import { modelColor, modelFamily, roleGlyph, roleLabel } from './lib/figure-meta.ts'
 import { shortTokens } from './lib/ledger-costs.ts'
 import { termBar } from './band.tsx'
-import { CHIP_COLOR, DOT, deskBar, deskChip, deskNote, deskRule } from './desk.tsx'
+import { deskBar, deskChip, deskNote, deskRule } from './desk.tsx'
 import { taskMetaText } from './lib/desk-parts.ts'
 import {
   HINT_GLYPH,
-  TERM_BOX,
   TERM_STATUS,
   type Hint,
   comma,
@@ -256,58 +256,6 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
     ]
   })()
 
-  const count = (status: Package['status']) => b.pakete.filter(p => p.status === status).length
-  const pkgSummary = [
-    count('fertig') > 0 ? `${count('fertig')} fertig` : '',
-    count('in-arbeit') > 0 ? `${count('in-arbeit')} in Arbeit` : '',
-    count('offen') > 0 ? `${count('offen')} offen` : '',
-    count('blockiert') > 0 ? `${count('blockiert')} blockiert` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
-  // Rechts die Rolle des Agenten statt seiner langen ID (Rückfall: ID auf 7 Zeichen gekürzt); ab 2.1.299 entfällt
-  // eine ID ohne Agentenzeile ganz („a1b2c3“ sagt nichts)
-  const agentName = (id: string | null) => {
-    if (!id) return ''
-    const r = rows.find(x => x.id === id)
-    return r ? roleLabel(r.rolle) : rich ? '' : id.slice(0, 7)
-  }
-  const kind = (rolle: string) => rolle.charAt(0).toUpperCase() + rolle.slice(1)
-  // Links Punkt, Nummer und Art; rechts gedimmt Agent und Runden, ganz rechts der Zustand als Etikett
-  const pkgRow = (p: Package) => (
-    <Box key={`pkg-${p.id}`} columnGap={2} alignItems="center">
-      {rich ? (
-        // Punkt, Nummer gedimmt und Art in eigenen Spalten
-        <Box key="name" flexShrink={0} columnGap="md">
-          <Text key="punkt" color={DOT[p.status].color}>
-            {DOT[p.status].glyph}
-          </Text>
-          <Box key="nr" width={3} flexShrink={0}>
-            <Text dimColor tabular>
-              {p.id}
-            </Text>
-          </Box>
-          <Text key="art">{kind(p.rolle)}</Text>
-        </Box>
-      ) : (
-        <Box key="name" flexShrink={0}>
-          <Text>
-            <Text color={DOT[p.status].color}>{DOT[p.status].glyph}</Text> {p.id.padEnd(4)}
-            {kind(p.rolle)}
-          </Text>
-        </Box>
-      )}
-      <Box key="rest" flexGrow={1} justifyContent="flex-end">
-        <Text dimColor wrap="truncate-end">
-          {agentName(p.agent)}
-          {agentName(p.agent) && p.runden > 0 ? ' · ' : ''}
-          {p.runden > 0 ? `${p.runden} Runde${p.runden === 1 ? '' : 'n'}` : ''}
-        </Text>
-      </Box>
-      {/* Zustand als Etikett mit Fläche; vor 2.1.299 Farbe bei fertig, in Arbeit und blockiert, ab 2.1.299 grau (Farbe nur am Punkt) */}
-      {deskChip(ui, `pkg-${p.id}-zustand`, BOX[p.status].label, rich ? undefined : CHIP_COLOR[p.status])}
-    </Box>
-  )
   // Zeile „Name ▬▬▬ 35 %“ mit dünnem grauem Balken in der Mitte
   const barRow = (key: string, name: string, value: number) => (
     <Box key={key} columnGap={2} alignItems="center">
@@ -355,8 +303,7 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
       <Text key="gesamt" dimColor>
         gesamt {kennzahlen.gewichtet !== undefined ? `${weightedText(kennzahlen.gewichtet)} · ` : ''}
         {usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0)} · {kennzahlen.runden} Runden · Cache-Treffer{' '}
-        {kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`} · fehlender Kontext in{' '}
-        {kennzahlen.fehlenderKontext} Dateien
+        {kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`}
       </Text>
     ) : null,
     ...(kennzahlen && more('kosten')
@@ -374,7 +321,7 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
   return (
     <Box flexDirection="column">
       {empty ? (
-        // Keine offene Aufgabe: die zuletzt bearbeitete mit ihren Zahlen, keine Pakete und kein Budget
+        // Keine offene Aufgabe: die zuletzt bearbeitete mit ihren Zahlen, kein Budget
         <Box key="kopf" flexDirection="column" paddingBottom={1}>
           {rich ? (
             <Text weight="semibold" size="heading">
@@ -422,13 +369,7 @@ export function renderPanel(ui: ElementTable, d: PanelData, act: PanelActions) {
         crewBody,
       )}
 
-      {!empty && section('pakete', 'Pakete', pkgSummary, b.pakete.map(pkgRow))}
-
-      {!empty &&
-        section('budget', 'Budget', `${runsText(b.budget)} · Planrunden ${b.planrunden}/2`, [
-          barRow('budget-laeufe', 'Läufe', pct),
-          barRow('budget-plan', 'Planrunden', (b.planrunden / 2) * 100),
-        ])}
+      {!empty && section('budget', 'Budget', runsText(b.budget), [barRow('budget-laeufe', 'Läufe', pct)])}
 
       {section('kosten', kostenTitle, kostenSummary, kostenBody, true)}
 
@@ -572,7 +513,6 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
             r.effort ?? '',
             r.paket ? `Paket ${r.paket}` : '',
             r.runden > 0 ? `${r.runden} Runden` : '',
-            r.eltern ? `über ${r.eltern}` : '',
             progress ? `${progress}${r.schritte?.note ? ` ${r.schritte.note}` : ''}` : '',
           ].filter(Boolean)
           const cache = cacheText(cacheState(r, now))
@@ -610,32 +550,8 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
         })),
   ]
 
-  const done = b.pakete.filter(p => p.status === 'fertig').length
-  const pakete = [
-    heading('pakete', 'Pakete', `${done} von ${b.pakete.length} fertig`),
-    ...b.pakete.map(p => {
-      const bx = TERM_BOX[p.status]
-      return (
-        <Box key={`pkg-${p.id}`}>
-          {cell(2, <Text color={bx.color} dimColor={bx.dim}>{bx.glyph}</Text>)}
-          {cell(4, <Text bold={p.status === 'in-arbeit'}>{p.id}</Text>)}
-          {cell(10, <Text wrap="truncate-end">{p.rolle}</Text>)}
-          {cell(11, <Text color={bx.color} dimColor={bx.dim}>{bx.label}</Text>)}
-          {cell(9, <Text dimColor wrap="truncate-end">{p.agent ?? '–'}</Text>)}
-          {p.runden > 0 ? <Text dimColor>{`${p.runden} Rd.`}</Text> : null}
-        </Box>
-      )
-    }),
-  ]
-
   const pct = b.budget.geplant > 0 ? (b.budget.verbraucht / b.budget.geplant) * 100 : 0
-  const budget = [
-    heading('budget', 'Budget', runsText(b.budget)),
-    <Text>
-      {termBar(ui, pct, 16, levelColor(pct))}
-      <Text dimColor>{`  Planrunden ${b.planrunden} von 2`}</Text>
-    </Text>,
-  ]
+  const budget = [heading('budget', 'Budget', runsText(b.budget)), <Text>{termBar(ui, pct, 16, levelColor(pct))}</Text>]
 
   // Hauptmaß gewichtete Tokens; Beispieldaten haben nur Prozent des 5-Std.-Fensters
   const value = (k: Board['kosten'][number]) => k.gewichtet ?? k.prozent
@@ -652,7 +568,7 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
     ...(kosten.length === 0 ? [<Text dimColor>– noch keine Läufe gebucht</Text>] : []),
     ...kosten.map(k => (
       <Box key={`kosten-${k.rolle}`}>
-        {cell(18, <Text wrap="truncate-end">{k.rolle}</Text>)}
+        {cell(18, <Text wrap="truncate-end">{canonicalRole(k.rolle)}</Text>)}
         {cell(12, <Text>{'━'.repeat(costBarLength(value(k), maxK, 12))}</Text>)}
         {cell(7, <Text>{k.gewichtet !== undefined ? shortTokens(k.gewichtet) : comma(k.prozent)}</Text>, true)}
         {wide && k.tokens !== undefined ? (
@@ -669,7 +585,6 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
                 { text: usageText(kennzahlen.frisch ?? kennzahlen.tokens, kennzahlen.cache ?? 0), prio: 2 },
                 { text: `Treffer ${kennzahlen.trefferquote === null ? '–' : `${Math.round(kennzahlen.trefferquote * 100)} %`}`, prio: 3 },
                 { text: `${kennzahlen.runden} Runden`, prio: 4 },
-                { text: `fehlender Kontext in ${kennzahlen.fehlenderKontext} Dateien`, prio: 5 },
               ],
               W - 7,
             )}`}
@@ -686,7 +601,6 @@ function renderPanelTerminal(ui: ElementTable, d: PanelData, act: PanelActions) 
       {kopf}
       {hinweise}
       {agenten}
-      {empty ? null : pakete}
       {empty ? null : budget}
       {kostenBlock}
       {/* Text aus der freien Zeile „Nächster Schritt“ der STATE.md (schreibt der Bauleiter), keine eigene Ableitung */}

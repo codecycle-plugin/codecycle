@@ -1,14 +1,13 @@
 // Auflösung „Datei :: Symbol“ aus dem Dateiinhalt.
-// Rein: kein Node, keine Mod-API, kein Dateizugriff. Der Aufrufer (Werkzeug oder Mod)
+// Rein: kein Node, keine Mod-API, kein Dateizugriff. Der Aufrufer (Werkzeug)
 // liest die Datei und übergibt den Inhalt, bei Bedarf das Ergebnis des Code-Graphen.
 //
-// STABILE API (Werkzeug und Mod bauen darauf auf):
+// STABILE API (das Werkzeug baut darauf auf):
 //   parseRef(text)                         "Datei :: Symbol" → { datei, symbol } | null
 //   locateSymbol(datei, symbol, inhalt, opt?) → Treffer | { kandidaten: Treffer[] }
 //       Rückfall-Stufen: Graph (opt.graph) → Outline (opt.outline, sonst eigener Scanner) → Suche.
 //       Rät nie: mehrere Möglichkeiten → { kandidaten }, nichts gefunden → { kandidaten: [] }.
 //   outline(inhalt, datei)                 eigener Symbol-Scanner (PHP, JS/TS, Python, Go), in `outline.ts`
-//   buildContextSection(inhalt, treffer, umfeldZeilen) → Text für das Kontextpaket, in `context-section.ts`
 // Zeilennummern sind 1-basiert, `start`/`ende` einschließlich.
 
 import { braceEnd, languageOf, maskCode, outline, pyEnd, sig, splitLines } from './outline.ts'
