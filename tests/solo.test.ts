@@ -216,8 +216,9 @@ describe('Solo-Weg im Mod', () => {
       [`codecycle/s:${SDIR}/reports/pruefung.md`]: null,
     }
     gitAnswers(on, args => {
-      if (args[0] === 'ls-tree') return args.at(-1) === 'codecycle/s:docs/codecycle' ? 'solo-s\nalt\n' : null
-      if (args[0] === 'show') return branch[args[1]!] ?? null
+      if (args[0] === 'ls-tree') return /^codecycle\/s(--kern)?:docs\/codecycle$/.test(args.at(-1)!) ? 'solo-s\nalt\n' : null
+      // Teil-Branch: derselbe Aufgabenordner wie auf dem Aufgaben-Branch
+      if (args[0] === 'show') return branch[args[1]!.replace('codecycle/s--kern:', 'codecycle/s:')] ?? null
       return ''
     })
     on('tool.call', () => ({ result: {} }))
@@ -236,5 +237,7 @@ describe('Solo-Weg im Mod', () => {
     expect((await bash('git merge codecycle/s')).deny).toMatch(/offenen Funden \(Z1\)/)
     branch[`codecycle/s:${SDIR}/TASK.md`] += '- Z1: behoben (def5678)\n'
     expect((await bash('git merge codecycle/s')).deny).toBeUndefined()
+    // Teil-Branch nie per git merge, auch wenn die Aufgabe geprüft ist
+    expect((await bash('git switch main && git merge codecycle/s--kern')).deny).toMatch(/Teil-Branch der Aufgabe codecycle\/s; kein git merge/)
   })
 })

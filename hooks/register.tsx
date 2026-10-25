@@ -97,7 +97,7 @@ import {
   withoutSavedClaim,
 } from './lib/main-claim.ts'
 import { correctedNote, resolveTaskDir } from './lib/task-dir.ts'
-import { SOLO_REVIEWER, mergedBranches, partReviewerStartProblem, reviewerStartProblem, soloMergeProblem, soloWriteDeny } from './lib/solo.ts'
+import { SOLO_REVIEWER, mergedBranches, partMergeProblem, partReviewerStartProblem, reviewerStartProblem, soloMergeProblem, soloWriteDeny } from './lib/solo.ts'
 import type { CrewHead } from './lib/agent-svg.ts'
 import { type NodeState, type SetupState, copyStateFrom, nodeStateFrom, nodeWarning, setupHint, splitUpdateOutput, toolCopyHint } from './lib/setup-check.ts'
 import { TOOL_VERSION } from '../tool/version.ts'
@@ -2382,7 +2382,7 @@ function denyHookBypass(_$: EngineInterface, e: ToolEvt, next: ToolNxt) {
   return hit ? { deny: `codecycle: ${hit} ist verboten (Git-Hooks sind die Prüfung, nicht umgehen). Fehler beheben statt überspringen.` } : next(e)
 }
 
-// Merge eines Solo-Aufgaben-Branchs (`git merge codecycle/<thema>`) nur mit Prüfbericht und vollständigen Funden, für alle.
+// Merge eines Solo-Aufgaben-Branchs (`git merge codecycle/<thema>`) nur mit Prüfbericht und vollständigen Funden, für alle; Teil-Branches (`codecycle/<thema>--<teil>`) nie.
 // Gelesen wird der committete Stand des Branchs (der Aufgabenordner liegt nur dort); Regel: hooks/lib/solo.ts soloMergeProblem.
 async function denySoloMerge($: EngineInterface, e: ToolEvt, next: ToolNxt) {
   const command = (e as unknown as { command?: unknown }).command
@@ -2403,7 +2403,10 @@ async function denySoloMerge($: EngineInterface, e: ToolEvt, next: ToolNxt) {
         } catch {
           continue
         }
-        if (state.weg !== 'solo' || state.branch !== branch) continue
+        if (state.weg !== 'solo' || !state.branch) continue
+        const part = partMergeProblem(state.branch, branch)
+        if (part) return { deny: part }
+        if (state.branch !== branch) continue
         const reports = await Promise.all(requiredReports(state).map(async path => ({ path, text: await show(`${branch}:${dir}/${path}`) })))
         const problem = soloMergeProblem(dir, reports, await show(`${branch}:${dir}/TASK.md`))
         if (problem) return { deny: problem }

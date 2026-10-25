@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.24.1 / Werkzeug 0.9.1] – 2026-10-25
+
+### Behoben
+
+- Ein Teil-Branch großer Aufgaben lässt sich nicht mehr mit `git merge` an der Prüfung vorbei mergen; Teile übernimmt `codecycle solo teil fertig`.
+
 ## [0.24.0 / Werkzeug 0.9.1] – 2026-10-25
 
 ### Neu

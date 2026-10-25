@@ -109,6 +109,17 @@ export function mergedBranches(command: string): string[] {
 }
 
 /**
+ * Merge eines Teil-Branchs (`<aufgabe>--<teil>`) einer Aufgabe mit Branch `taskBranch`: immer gesperrt. Der Teil enthält
+ * ungeprüfte Arbeit; übernommen wird er mit `codecycle solo teil fertig`, das den Aufgaben-Branch ohne Merge nachzieht.
+ * Rückgabe: Meldung, sonst null.
+ */
+export function partMergeProblem(taskBranch: string, merged: string): string | null {
+  if (!merged.startsWith(`${taskBranch}--`)) return null
+  const part = merged.slice(taskBranch.length + 2)
+  return `codecycle: ${merged} ist ein Teil-Branch der Aufgabe ${taskBranch}; kein git merge. Teil übernehmen mit codecycle solo teil fertig <ordner> ${part}, die Aufgabe nach der Prüfung über ${taskBranch} mergen.`
+}
+
+/**
  * Merge-Sperre (Haltepunkte „Prüfung“ und „Nachbesserung“): die nötigen Berichte (`requiredReports`) und TASK.md aus dem
  * Stand des Aufgaben-Branchs; Text null = Bericht fehlt bzw. nicht committet. Rückgabe: Meldung, sonst null.
  */
