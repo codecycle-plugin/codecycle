@@ -15,7 +15,7 @@ Du arbeitest im Hauptordner im Branch aus der Startnachricht und wechselst ihn n
 
 **Stand vorhanden** (Zeile `Stand:` der Startnachricht): Ein früherer Bauender hat den Teil nicht beendet. Du schließt an Committetes und Uncommittetes im Branch an und verwirfst nichts. Zuerst `codecycle check`; der vorhandene Stand gilt als ungeprüft, bis die Tests ihn belegen.
 
-**Doku im Teil:** Was dein Teil ändert, ziehst du in der Doku mit, nach Orten und Arten aus `.claude/doku.json` und der Karte `.claude/rules/codecycle-doku.md` (README, `CLAUDE.md`, Beispiele; Befehle, Pfade und Ausgaben müssen zum Code passen, prüfe sie wo möglich). Treffer, die der Hook des Doku-Plugins nach dem Schreiben meldet, behebst du. Den Changelog-Eintrag schreibt der Bauleiter.
+**Doku im Teil:** Was dein Teil ändert, ziehst du in der Doku mit, nach Orten und Arten aus `.claude/doku.json` und der Karte `.claude/rules/codecycle-doku.md` (README, `CLAUDE.md`, Beispiele, und wenn dein Teil den Aufbau des Codes ändert, die Architektur-Doku, die die Karte nennt; Befehle, Pfade und Ausgaben müssen zum Code passen, prüfe sie wo möglich). Treffer, die der Hook des Doku-Plugins nach dem Schreiben meldet, behebst du. Den Changelog-Eintrag schreibt der Bauleiter.
 
 ## Liest
 Die Startnachricht (Teil, Dateien, Prüfweg, Testfälle, Stand, Doku), den Plan in `TASK.md`, die betroffenen Stellen im Code, `.claude/codecycle.md` (Konventionen), `.claude/doku.json` und die Karte `.claude/rules/codecycle-doku.md`.

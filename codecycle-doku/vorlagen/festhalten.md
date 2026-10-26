@@ -1,3 +1,4 @@
+{{erzeugt}}
 # {{titel}} festhalten
 
 Ein Eintrag je Datei in diesem Ordner, Name `JJJJ-MM-TT-<kurzer-titel>.md`. Die `README.md` ist die erzeugte Übersicht: vor einem neuen Eintrag lesen, nie von Hand ändern.

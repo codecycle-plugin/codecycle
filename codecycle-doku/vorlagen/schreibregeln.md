@@ -2,6 +2,7 @@
 paths: ["**/*.md"]
 ---
 
+{{erzeugt}}
 # Doku schreiben
 
 Jede Doku-Datei hat eine Art; die Art bestimmt, was hinein darf. Gegenwart und Geschichte trennen: Anweisung und Nachschlagen sagen, was gilt; woher es kommt, steht in Entscheidung oder Chronik.
@@ -21,8 +22,8 @@ Jede Doku-Datei hat eine Art; die Art bestimmt, was hinein darf. Gegenwart und G
 7. **Entscheidungen im Wortlaut nur in der Art Entscheidung.** Anderswo steht die Regel.
 8. **Links lösen auf.** Relative Links und Sprungmarken zeigen auf Vorhandenes; eine `README.md` über 100 Zeilen hat oben eine Zeile „Inhalt:“ mit Links auf alle Überschriften `##`.
 9. **Art einer neuen Datei klären.** Passt der Pfad zu keiner Zeile der Tabelle, in die ersten fünf Zeilen einen HTML-Kommentar `doku: <art>` schreiben.
-10. **Fehlalarm** eines Hinweises: `doku-ok` als HTML-Kommentar in die Zeile.
+10. **Fehlalarm** eines Hinweises oder eines toten Links: `doku-ok` als HTML-Kommentar in die Zeile. Links nach `.codecycle-doku/` nimmt das nicht aus.
 
 ## Prüfen
 
-Nach jedem Schreiben meldet ein Hook die Treffer der geschriebenen Datei. Scharfe Treffer (Felder eines Eintrags, tote Links, Lücken im Inhaltsverzeichnis) immer beheben, Hinweise nach Prüfung.
+Nach jedem Schreiben meldet ein Hook die Treffer der geschriebenen Datei. Scharfe Treffer (tote Links, Links in nicht versionierte Ordner, Kopf-Fehler eines neuen oder geänderten Eintrags) immer beheben, Hinweise nach Prüfung. Prüfregeln abschalten oder abschwächen nur in `.claude/doku.json` (`pruefung`).

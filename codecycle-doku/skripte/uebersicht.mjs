@@ -9,7 +9,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { UEBERSICHT, festhaltenOrte, ladeBeschreibung, ladeRegeln, leseEintraege, sichererPfad } from './gemeinsam.mjs'
+import { UEBERSICHT, festhaltenOrte, ladeBeschreibung, ladeRegeln, leseEintraege, schemaVon, sichererPfad, statusKlasse } from './gemeinsam.mjs'
+
+/** Erkennungszeichen einer erzeugten Übersicht; eine README.md ohne es ist eine eigene Übersicht und bleibt unberührt. */
+export const ERZEUGT = 'Erzeugt aus den Köpfen der Einträge'
 
 const zelle = text => String(text ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
 const liste = w => (Array.isArray(w) ? w : w ? [w] : [])
@@ -56,14 +59,15 @@ const neuesteZuerst = (a, b) => String(b.kopf.datum ?? '').localeCompare(String(
  * @param {{ ordner: string }} ort
  * @param {any[]} alle Einträge aller Festhalten-Orte (für Verknüpfungen über Ordner hinweg)
  * @param {any} regeln
- * @param {{ mermaid?: boolean }} [optionen]
+ * @param {{ mermaid?: boolean, schema?: any }} [optionen] schema: Schema der Sammlung (Statuswerte über die Abbildung)
  */
 export function renderUebersicht(art, ort, alle, regeln, optionen = {}) {
   const titel = regeln.festhalten.arten[art].titel
   const eigene = alle.filter(e => e.ordner === ort.ordner)
-  const erledigt = eigene.filter(e => e.kopf.status === 'erledigt').sort(neuesteZuerst)
+  const istErledigt = e => statusKlasse(e.kopf.status, optionen.schema ?? null, regeln) === 'erledigt'
+  const erledigt = eigene.filter(istErledigt).sort(neuesteZuerst)
   const offen = eigene
-    .filter(e => e.kopf.status !== 'erledigt')
+    .filter(e => !istErledigt(e))
     .sort((a, b) => Number(b.kopf.wichtigkeit === 'wichtig') - Number(a.kopf.wichtigkeit === 'wichtig') || neuesteZuerst(a, b))
   const verknuepft = gruppen(alle).filter(g => g.some(e => e.ordner === ort.ordner))
 
@@ -85,7 +89,7 @@ export function renderUebersicht(art, ort, alle, regeln, optionen = {}) {
   const teile = [
     `# ${titel}`,
     '',
-    'Erzeugt aus den Köpfen der Einträge, nicht von Hand ändern.',
+    `${ERZEUGT}, nicht von Hand ändern.`,
     `Vor einem neuen Eintrag diese Datei lesen. Gerüst und Felder: [CLAUDE.md](CLAUDE.md).`,
   ]
   if (abschnitte.length === 0) teile.push('', 'Keine Einträge.')
@@ -114,8 +118,19 @@ function mermaid(verknuepft) {
   return [...zeilen, ...kanten, '```']
 }
 
+/** Liegt im Ordner eine eigene Übersicht (README.md ohne Erkennungszeichen)? */
+export function eigeneUebersicht(root, ordner) {
+  try {
+    return !readFileSync(join(root, ordner, UEBERSICHT), 'utf8').includes(ERZEUGT)
+  } catch {
+    return false
+  }
+}
+
 /**
- * Schreibt die Übersicht der Art `art` und gibt ihren Pfad (relativ zur Wurzel) zurück, oder null ohne Festhalten-Ort.
+ * Schreibt die Übersicht der Art `art` und gibt ihren Pfad (relativ zur Wurzel) zurück, oder null ohne Festhalten-Ort
+ * oder mit `schemata.<art>.uebersicht: eigen`.
+ * Geschrieben wird nur, wenn die Datei fehlt oder das Erkennungszeichen trägt; eine eigene Übersicht bleibt byte-gleich.
  * Liegt das Ziel über einen Symlink außerhalb des Projekts oder ist es selbst ein Symlink, wird nichts geschrieben (Fehler).
  * @param {{ regeln: any, beschreibung: any, orte?: any[] }} ctx
  */
@@ -123,7 +138,8 @@ export function schreibeUebersicht(root, art, ctx) {
   const orte = ctx.orte ?? festhaltenOrte(ctx.beschreibung, ctx.regeln)
   const ort = orte.find(o => o.art === art)
   if (!ort) return null
-  const text = renderUebersicht(art, ort, leseEintraege(root, orte), ctx.regeln, { mermaid: Boolean(ctx.beschreibung?.uebersicht?.mermaid) })
+  if (schemaVon(ctx.beschreibung, art)?.uebersicht === 'eigen') return null
+  const text = renderUebersicht(art, ort, leseEintraege(root, orte), ctx.regeln, { mermaid: Boolean(ctx.beschreibung?.uebersicht?.mermaid), schema: schemaVon(ctx.beschreibung, art) })
   const ziel = sichererPfad(root, `${ort.ordner}/${UEBERSICHT}`)
   if (ziel === null) throw new Error(`${ort.ordner}/${UEBERSICHT} liegt außerhalb des Projekts oder ist ein Symlink; nicht geschrieben`)
   mkdirSync(dirname(ziel), { recursive: true })
@@ -133,6 +149,7 @@ export function schreibeUebersicht(root, art, ctx) {
   } catch {
     // fehlt
   }
+  if (alt !== null && !alt.includes(ERZEUGT)) return `${ort.ordner}/${UEBERSICHT}`
   if (alt !== text) writeFileSync(ziel, text)
   return `${ort.ordner}/${UEBERSICHT}`
 }
@@ -150,9 +167,17 @@ function main(argv) {
   const alle = leseEintraege(root, orte)
   let abweichend = 0
   for (const ort of orte) {
-    const text = renderUebersicht(ort.art, ort, alle, regeln, { mermaid: Boolean(beschreibung.uebersicht?.mermaid) })
+    if (schemaVon(beschreibung, ort.art)?.uebersicht === 'eigen') {
+      console.log(`${ort.ordner}/${UEBERSICHT}: eigene Übersicht laut .claude/doku.json, übersprungen`)
+      continue
+    }
+    const text = renderUebersicht(ort.art, ort, alle, regeln, { mermaid: Boolean(beschreibung.uebersicht?.mermaid), schema: schemaVon(beschreibung, ort.art) })
     const ziel = join(root, ort.ordner, UEBERSICHT)
     const alt = existsSync(ziel) ? readFileSync(ziel, 'utf8') : null
+    if (alt !== null && !alt.includes(ERZEUGT)) {
+      console.log(`${ort.ordner}/${UEBERSICHT}: eigene Übersicht, übersprungen`)
+      continue
+    }
     if (argv.includes('--check')) {
       if (alt !== text) {
         console.error(`${ort.ordner}/${UEBERSICHT}: weicht von den Einträgen ab; erneuern mit node uebersicht.mjs`)

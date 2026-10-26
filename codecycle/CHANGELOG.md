@@ -2,6 +2,14 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.25.1 / Werkzeug 0.10.0] – unveröffentlicht
+
+### Geändert
+
+- Abschluss einer Aufgabe und gemerkte Nebenfunde schreiben Felder und Werte nach der Anleitung des Festhalten-Ordners; in einem Projekt mit eigenem, angedocktem Schema (`codecycle-doku` 0.2.0) also dessen Werte, etwa `status: gebaut`. Fehlen dort Abschluss-Werte, bleibt der Eintrag unverändert und die Sitzung nennt ihn.
+- Die Anleitung eines Festhalten-Ordners findet die Sitzung über die Karte der Doku (bei einer angedockten Sammlung eine Regeldatei unter `.claude/rules/`); den Changelog schreibt sie nur, wenn `.claude/doku.json` einen nennt.
+- Bauende und Schlussprüfer ziehen die Architektur-Doku mit, die die Karte nennt, wenn eine Änderung den Aufbau des Codes ändert.
+
 ## [0.25.0 / Werkzeug 0.10.0] – 2026-10-25
 
 **Bestehende Installationen:** codecycle setzt jetzt das Plugin `codecycle-doku` voraus. `/codecycle:update` holt es nach; wer über `/plugin` oder von Hand aktualisiert, ruft einmal `claude plugin install codecycle-doku@codecycle` auf, sonst lädt codecycle nicht.
