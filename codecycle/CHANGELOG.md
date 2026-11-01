@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.25.2 / Werkzeug 0.10.1] – unveröffentlicht
+
+### Behoben
+
+- `codecycle solo teil fertig` meldete einen behobenen Fund des Prüfers je Teil weiter als offen, wenn der Bericht nach der Überschrift `### TF1 … · behoben` noch eine Zeile wie `- TF1 behoben: …` enthielt. Den Stand eines Funds trägt jetzt seine Überschrift; ohne Überschrift zählt auch `TF1 behoben` direkt nach der Kennung.
+
 ## [0.25.1 / Werkzeug 0.10.0] – unveröffentlicht
 
 ### Geändert

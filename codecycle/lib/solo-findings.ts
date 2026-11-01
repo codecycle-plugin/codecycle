@@ -77,15 +77,26 @@ export function reportFindingIds(text: string, kinds: readonly string[] = ['M', 
 }
 
 /**
- * Offene Funde im Bericht des Prüfers je Teil: jede ID `TF<n>`, deren letzte Zeile nicht mit `· behoben` endet
- * (`### TF1 <Titel> · behoben` bzw. `· offen`; ohne Stand gilt der Fund als offen).
+ * Offene Funde im Bericht des Prüfers je Teil: jede ID `TF<n>`, deren Stand nicht `behoben` ist. Den Stand trägt die letzte
+ * Überschrift des Funds (`### TF1 <Titel> · behoben` bzw. `· offen`); Zeilen der Nachprüfung wie `- TF1 behoben: …` ändern
+ * ihn nicht. Ohne Überschrift zählt die letzte Zeile, dort auch `TF1 behoben` direkt nach der ID. Ohne Stand: offen.
  */
 export function openPartFindings(text: string): string[] {
+  const heading = new Map<string, string>()
   const last = new Map<string, string>()
-  for (const [id, line] of findingLines(text, ['TF'])) last.set(id, line)
+  for (const [id, line] of findingLines(text, ['TF'])) {
+    last.set(id, line)
+    if (/^\s*#{1,6}\s/.test(line)) heading.set(id, line)
+  }
   // Stand = Text nach dem letzten `·`, ohne Hervorhebung; nur genau `behoben` gilt („nicht behoben“ bleibt offen)
-  const done = (line: string): boolean => (line.split('·').at(-1) ?? '').replace(/[*_\s.]/g, '').toLowerCase() === 'behoben'
-  return [...last].filter(([, line]) => !line.includes('·') || !done(line)).map(([id]) => id)
+  const doneByDot = (line: string): boolean => line.includes('·') && (line.split('·').at(-1) ?? '').replace(/[*_\s.]/g, '').toLowerCase() === 'behoben'
+  const doneAfterId = (line: string): boolean => /^\s*(?:[-*]\s+|\d+\.\s+)?(?:\*\*|__)?\s*TF\d+(?:\*\*|__)?\s*[:–-]?\s*behoben\b/i.test(line)
+  return [...last]
+    .filter(([id, line]) => {
+      const h = heading.get(id)
+      return h !== undefined ? !doneByDot(h) : !(doneByDot(line) || doneAfterId(line))
+    })
+    .map(([id]) => id)
 }
 
 /**
