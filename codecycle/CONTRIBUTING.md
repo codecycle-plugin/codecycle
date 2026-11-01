@@ -22,7 +22,7 @@ Rückmeldungen und Pull Requests sind willkommen.
 |---|---|
 | `.claude-plugin/` | `plugin.json` (Name, Version, Abhängigkeit `codecycle-doku`); den Katalog des Marktplatzes (`marketplace.json`) hat die Wurzel des Repos |
 | `skills/` | die Befehle `/codecycle:*` als Anleitungen für Claude; `workflow/` enthält die gemeinsamen Regeln, den Merge-Ablauf, die Randfälle und die Vorlagen |
-| `agents/` | eine Datei je Rolle (Planprüfer, Bauender, Schlussprüfer, Einrichter, Werkzeugmeister): Aufgabe, erlaubte Werkzeuge, Regeln; der Block „Gemeinsame Regeln“ ist in allen Agenten wortgleich |
+| `agents/` | eine Datei je Rolle (Planprüfer, Bauender, Schlussprüfer, Einrichter, Werkzeugmeister): Aufgabe, erlaubte Werkzeuge, Regeln; im Block „Gemeinsame Regeln“ hat jede Rolle nur die Punkte, die für sie gelten; gemeinsame Punkte lauten überall gleich (ein Test prüft das) |
 | `models.json` | Modell je Rolle (Tabelle Rolle → Modell), dazu `part-reviewer` für den Prüfer je Teil; den Effort nennt die Agenten-Datei |
 | `hooks/` | der Mod: `register.tsx` (Anmeldung, Ereignisse, Werkzeuge), `band.tsx` (Bautafel), `panel.tsx` und `desk.tsx` (Seitenleiste), `hooks.json`; in `hooks/lib/` Budget, Token-Buch, Agenten-Figuren und der Zaun für Befehle der Agenten |
 | `tool/` | das Projekt-Werkzeug `codecycle` (TypeScript, läuft direkt mit Node); `/codecycle:setup` kopiert es ins Projekt nach `.codecycle/tool/` |

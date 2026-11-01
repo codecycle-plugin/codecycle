@@ -1,20 +1,13 @@
 # <rolle>
 
-Ablage: Pfad aus der Startnachricht, immer im Aufgabenordner des Hauptordners.
+Ablage: Pfad aus der Startnachricht, immer im Aufgabenordner des Hauptordners; ohne Aufgabe `.codecycle/tmp/reports/<rolle>.md`. Welche Zeilen in die Abschnitte gehören und welche Abschnitte dazukommen (etwa Funde), legt die Agenten-Datei der Rolle fest; sie gilt vor dieser Vorlage.
 
 ## Fakten
-- Geänderte Dateien: <…>
-- Abweichungen vom Plan: <Datei, ein Satz Begründung> | keine
-- Tests: <Befehl> → <Ergebnis, Anzahl grün/rot/übersprungen>
-- Lint/Format: <Ergebnis> | nicht vorhanden
-- Geänderte bestehende Tests: <Datei, Grund> | keine
-- Hilfsskripte: <was, wofür> | keine
-- Commit: <Hash>
+- <nur Belegtes: Befehl mit Ausgabe, Datei und Zeile, Commit>
 
 ## Begründungen
-- <…>
+- <…> | keine
 
 ## Offene Punkte
-- Vorschläge (z. B. eine Stelle außerhalb deines Teils): <…> | keine
-- Ähnliche Stellen (nur gemeldet, nicht geändert): <…> | keine
-- Annahmen (Schalter `assume-and-continue`): <ANNAHME: was angenommen wurde, warum, was bei falscher Annahme zu tun ist> | keine
+- <…> | keine
+- ANNAHME (Schalter `assume-and-continue`): <was angenommen wurde, warum, was bei falscher Annahme zu tun ist> | keine

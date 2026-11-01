@@ -2,6 +2,16 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
+## [0.26.0 / Werkzeug 0.10.1] – unveröffentlicht
+
+### Geändert
+
+- Der Bauende großer Aufgaben ist neu formuliert: Er liest zuerst Wortlaut und Erfolgssätze der Aufgabe und baut seinen Teil auf dieses Ziel hin, nicht nur nach seiner Planzeile. Die Fundstellen des Plans prüft er am Code; was das Ziel des Teils ändern würde, meldet er als `blockiert`.
+- Vor neuer Logik sucht der Bauende nach Vorhandenem und darf vorhandene Logik herauslösen und gemeinsam nutzen, solange die bestehenden Tests grün bleiben. Dieselbe Fehlerart behebt er im Bereich seines Teils mit; außerhalb meldet er sie, und die Sitzung nennt die Meldungen im Abschluss.
+- Jeder neue Test des Bauenden ist einmal rot gewesen; bleibt ein Test nach drei Versuchen rot, wechselt er den Ansatz. Am Ende probiert er den Teil selbst aus (Kommandozeile, Schnittstelle, Browser, Text vor Screenshot).
+- Der Bericht des Bauenden hat neue Zeilen (Umbau, Wiederverwendet / neu angelegt, Tests rot gesehen, Ausprobiert, Ansatz gewechselt); unter „Fakten“ steht nur Belegtes.
+- Jeder Agent bekommt nur die gemeinsamen Regeln, die für ihn gelten; die Regeln zu Hilfsskripten und Python sind auf eine Zeile gekürzt.
+
 ## [0.25.2 / Werkzeug 0.10.1] – unveröffentlicht
 
 ### Behoben

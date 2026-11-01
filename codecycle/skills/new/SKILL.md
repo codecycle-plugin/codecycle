@@ -92,6 +92,7 @@ Im eingerichteten Projekt legst du Punkte 1 bis 6 an, sobald der Entwurf steht, 
      Aufgabenordner: <aus der Ausgabe>
      Branch: <aus der Ausgabe>
      Teil: <name> · <Zeile des Teils aus dem Plan>
+     Ziel: zuerst „Wortlaut“ und „Erfolgssätze“ in <ordner>/TASK.md lesen
      Stand: <aus der Ausgabe>
      Bericht: <aus der Ausgabe; je Teil eine eigene Datei>
      Testfälle:
@@ -99,7 +100,7 @@ Im eingerichteten Projekt legst du Punkte 1 bis 6 an, sobald der Entwurf steht, 
      Doku: .claude/doku.json und Karte .claude/rules/codecycle-doku.md; Orte: <je Eintrag aus „orte“ und „festhalten“ in .claude/doku.json `name: pfad`>; Changelog: <changelog.datei> (<changelog.schema>), falls genannt
      ```
      Solange ein `builder` läuft, committest du nichts.
-  3. **Übernehmen, schlank:** Quittung und Kurzbericht lesen, `git diff --stat <aufgaben-branch>`, `codecycle check`; Code nur gezielt, wenn etwas auffällt (die gründliche Prüfung macht der Prüfer am Ende). Korrekturen per Nachricht an denselben `builder`.
+  3. **Übernehmen, schlank:** Quittung und Kurzbericht lesen, `git diff --stat <aufgaben-branch>`, `codecycle check`; Code nur gezielt, wenn etwas auffällt (die gründliche Prüfung macht der Prüfer am Ende). Korrekturen per Nachricht an denselben `builder`. Jede Zeile „Gleiche Fehlerart außerhalb des Teils“ aus seinem Bericht trägst du in `STATE.md` unter „Offene Fragen“ ein; vorgelegt werden sie im Abschluss.
   4. **Prüfer je Teil**, nur mit Schalter `part-review` an und nur für Teile mit Merkmal ` · groß`:
      - `codecycle solo pruefung start <ordner> --teil <name>` (Wegwerf-Worktree am Stand des Teil-Branchs), dann `codecycle:final-reviewer` mit `Aufgabenordner: <ordner>`, `Auftrag: Teil`, `Teil: <name> · <Zeile des Teils>`, `Worktree:` und `Commit:` aus der Ausgabe, `Diff: git diff <aufgaben-branch> <Commit>`, `Testfälle:` des Teils.
      - Bei Funden (`TF1` …) genau eine Fixrunde per Nachricht an denselben `builder`; dann `codecycle solo pruefung ende <ordner>`, erneut `codecycle solo pruefung start <ordner> --teil <name>` (derselbe Ordner am neuen Stand) und Nachprüfung per Nachricht an denselben Prüfer: er markiert jeden Fund `behoben` oder `offen`.
@@ -166,6 +167,7 @@ Im eingerichteten Projekt legst du Punkte 1 bis 6 an, sobald der Entwurf steht, 
    - **Nebenfunde:** je Nebenfund Titel, Beleg in einem Satz und was er für Nutzer bedeutet (oder „keine“).
    - **Annahmen:** die Zeilen aus `TASK.md`.
    - **Bauende:** je Teil Rolle und Ergebnis (oder „keine“).
+   - **Meldungen der Bauenden:** je gemeldete gleiche Fehlerart außerhalb eines Teils Datei :: Symbol und ein Satz (oder „keine“).
    - **Kosten:** die Zeile aus `effort --record`, Modelle je Agentenlauf.
    - Ganz unten **„Entscheidungen für dich“**, Fragen nummeriert, Format nach „Fragen an den Nutzer“ im Workflow-Skill: zuerst offene Wortlaut-Fragen, dann je Annahme `Abweichung:` eine Frage (behalten oder wie im Wortlaut; Empfehlung und Gegenargument nach deinem Urteil), dann je Nebenfund eine Frage (jetzt beheben, als eigene Aufgabe merken oder verwerfen; Empfehlung und Gegenargument nach deinem Urteil), dann die Merge-Frage nach `${CLAUDE_PLUGIN_ROOT}/skills/workflow/merge.md`, Abschnitt „Merge-Frage“. <!-- doku-ok -->
 5. **Antwort auf eine Wortlaut-Frage:** ändern → beheben, Commit, Status `behoben`; so lassen → `verworfen: Nutzer: „<Antwort>“`. Dann `codecycle solo funde <ordner>` erneut.
