@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.2.1] – unveröffentlicht
+
+### Neu
+
+- Ergänzen statt vermehren: Die Anleitung je Ordner für Ideen, Bugs und To-dos hat einen Abschnitt „Vor einem neuen Eintrag“. Claude sucht zuerst einen passenden Eintrag und ergänzt ihn mit „Ergänzung JJJJ-MM-TT“; ein abgelöster Eintrag wird geschlossen und verweist auf den neuen. Eine neue Datei gibt es nur für wirklich Neues. Gilt auch für angedockte Sammlungen; eingerichtete Projekte bekommen die Anleitung beim erneuten Aufruf der Einrichtung.
+
 ## [0.2.0] – unveröffentlicht
 
 ### Neu

@@ -347,7 +347,7 @@ function anleitungEigen(art, regeln, schema, ordner) {
     : '- Keine Abschluss-Werte festgelegt; einen Eintrag schließt der Nutzer von Hand ab.'
   const uebersicht = schema.uebersicht === 'eigen'
     ? `Die \`${ordner}/${UEBERSICHT}\` ist die eigene Übersicht des Projekts; sie wird nicht erzeugt.`
-    : `Die \`${ordner}/${UEBERSICHT}\` ist die erzeugte Übersicht: vor einem neuen Eintrag lesen, nie von Hand ändern.`
+    : `Die \`${ordner}/${UEBERSICHT}\` ist die erzeugte Übersicht; nie von Hand ändern.`
   return vorlage('festhalten-eigen', { ordner, erzeugt: KOPF_ERZEUGT, titel: regeln.festhalten.arten[art].titel, uebersicht, kopf, abschnitte, felder, abschluss }, [])
 }
 

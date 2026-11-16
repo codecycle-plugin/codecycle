@@ -1,7 +1,11 @@
 {{erzeugt}}
 # {{titel}} festhalten
 
-Ein Eintrag je Datei in diesem Ordner, Name `JJJJ-MM-TT-<kurzer-titel>.md`. Die `README.md` ist die erzeugte Übersicht: vor einem neuen Eintrag lesen, nie von Hand ändern.
+Ein Eintrag je Datei in diesem Ordner, Name `JJJJ-MM-TT-<kurzer-titel>.md`. Die `README.md` ist die erzeugte Übersicht; nie von Hand ändern.
+
+## Vor einem neuen Eintrag
+
+Lies die Übersicht und such in den vorhandenen Einträgen nach Stichworten. Passt einer, ergänze ihn mit einem Abschnitt `## Ergänzung JJJJ-MM-TT`. Löst ein neuer Eintrag einen alten ab, schließ den alten ab und verweis auf den neuen. Eine neue Datei nur für wirklich Neues. Grund: Ähnliche Einträge doppeln sich, widersprechen sich und machen den Ordner unübersichtlich.
 
 ## Gerüst
 

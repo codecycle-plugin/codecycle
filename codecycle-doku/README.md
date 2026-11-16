@@ -68,7 +68,7 @@ Changelog-Schemata: `keep-a-changelog`, `erzeugt` (aus Commits, wird nie angefas
 
 ## Festhalten
 
-„Halt das als Bug fest“ legt eine Datei im Bug-Ordner an; ebenso Ideen und To-dos. Standard-Orte: `docs/ideen/`, `docs/bugs/`, `docs/todos/`. Je Ordner sagt die Anleitung `CLAUDE.md`, welche Felder und Abschnitte ein Eintrag hat; die `README.md` des Ordners ist die erzeugte Übersicht.
+„Halt das als Bug fest“ legt eine Datei im Bug-Ordner an; ebenso Ideen und To-dos. Standard-Orte: `docs/ideen/`, `docs/bugs/`, `docs/todos/`. Je Ordner sagt die Anleitung `CLAUDE.md`, welche Felder und Abschnitte ein Eintrag hat; die `README.md` des Ordners ist die erzeugte Übersicht. Vor einem neuen Eintrag sucht Claude nach einem passenden alten und ergänzt diesen; eine neue Datei gibt es nur für wirklich Neues.
 
 Kopf eines Eintrags:
 

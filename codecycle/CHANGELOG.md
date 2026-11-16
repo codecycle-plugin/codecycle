@@ -2,7 +2,7 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und Projekt-Werkzeug haben getrennte Versionen („Plugin x / Werkzeug y“).
 
-## [0.26.0 / Werkzeug 0.10.1] – unveröffentlicht
+## [0.26.0 / Werkzeug 0.10.0] – unveröffentlicht
 
 ### Geändert
 
@@ -11,12 +11,6 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/). Plugin und
 - Jeder neue Test des Bauenden ist einmal rot gewesen; bleibt ein Test nach drei Versuchen rot, wechselt er den Ansatz. Am Ende probiert er den Teil selbst aus (Kommandozeile, Schnittstelle, Browser, Text vor Screenshot).
 - Der Bericht des Bauenden hat neue Zeilen (Umbau, Wiederverwendet / neu angelegt, Tests rot gesehen, Ausprobiert, Ansatz gewechselt); unter „Fakten“ steht nur Belegtes.
 - Jeder Agent bekommt nur die gemeinsamen Regeln, die für ihn gelten; die Regeln zu Hilfsskripten und Python sind auf eine Zeile gekürzt.
-
-## [0.25.2 / Werkzeug 0.10.1] – unveröffentlicht
-
-### Behoben
-
-- `codecycle solo teil fertig` meldete einen behobenen Fund des Prüfers je Teil weiter als offen, wenn der Bericht nach der Überschrift `### TF1 … · behoben` noch eine Zeile wie `- TF1 behoben: …` enthielt. Den Stand eines Funds trägt jetzt seine Überschrift; ohne Überschrift zählt auch `TF1 behoben` direkt nach der Kennung.
 
 ## [0.25.1 / Werkzeug 0.10.0] – unveröffentlicht
 
