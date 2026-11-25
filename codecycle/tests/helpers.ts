@@ -13,6 +13,7 @@ export const BAND = {
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
+    isCollapsed: false,
     isWorking: false,
     maxRows: 8,
     bodyColumns: 120,

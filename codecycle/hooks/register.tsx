@@ -2470,12 +2470,14 @@ async function onToolCall($: EngineInterface, e: Evt<'tool.call'>, next: Nxt<'to
     if (!e.agentId) await mainWriteSignal($, e as unknown as ToolInput)
     // im Vorlauf: genannter Aufgabenordner bindet, wenn seine STATE.md nach dem Aufruf offen ist (bei new erst danach da)
     const named = e.agentId ? [] : mentionedDirs(e as unknown as Record<string, unknown>)
-    if (named.length > 0 && e.tool !== BROWSER_CLOSE_TOOL) {
+    // Als string vergleichen: Die erzeugten Typen kennen nur die MCP-Werkzeuge, die beim Speichern des Mods verbunden waren.
+    const tool: string = e.tool
+    if (named.length > 0 && tool !== BROWSER_CLOSE_TOOL) {
       const result = await next(e)
       await mentionSignal($, named, e.tool)
       return result
     }
-    if (e.agentId || e.tool !== BROWSER_CLOSE_TOOL) return next(e)
+    if (e.agentId || tool !== BROWSER_CLOSE_TOOL) return next(e)
     // Bauleiter schließt den Browser: Hinweis „Browser offen“ erledigt
     const closed = await next(e)
     if (closed.deny === undefined && closed.isError !== true) browserOpen.clear()
